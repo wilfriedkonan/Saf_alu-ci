@@ -3,19 +3,23 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { DashboardWidgets } from "@/components/dashboard-widgets"
-import { getCurrentUser, type User, roleLabels } from "@/lib/auth"
+import { getStoredUser, /* roleLabels */ } from "@/lib/auth"
+import { UserRole, Utilisateur } from "@/types/Utilisateurs"
+import { useAuth, usePermissions } from "@/contexts/AuthContext"
+
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<User | null>(null)
   const router = useRouter()
+  const { user, logout } = useAuth() 
+  const { canManageUsers } = usePermissions()
 
   useEffect(() => {
-    const currentUser = getCurrentUser()
+    const currentUser = getStoredUser()
     if (!currentUser) {
       router.push("/")
-    } else {
+    } /* else {
       setUser(currentUser)
-    }
+    } */
   }, [router])
 
   if (!user) {
@@ -28,7 +32,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Tableau de bord</h1>
           <p className="text-muted-foreground">
-            Bienvenue, {user.name} - {roleLabels[user.role]}
+            Bienvenue, {user.Prenom} {user.Nom} - {[user.Role?.Nom as UserRole]}
           </p>
         </div>
         <DashboardWidgets user={user} />

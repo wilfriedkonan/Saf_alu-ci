@@ -10,22 +10,23 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, Search, FileText, Euro, Clock, CheckCircle } from "lucide-react"
-import { getCurrentUser, hasPermission } from "@/lib/auth"
 import { getQuotes, type Quote, quoteStatusLabels, quoteStatusColors, type QuoteStatus } from "@/lib/quotes"
 import { QuoteActions } from "@/components/quotes/quote-actions"
 import { QuoteFormModal } from "@/components/quotes/quote-form-modal"
+import { useAuth, usePermissions } from "@/contexts/AuthContext"
 
 export default function QuotesPage() {
-  const [user, setUser] = useState(getCurrentUser())
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [filteredQuotes, setFilteredQuotes] = useState<Quote[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<QuoteStatus | "all">("all")
   const [showQuoteForm, setShowQuoteForm] = useState(false)
   const router = useRouter()
+  const { user, logout } = useAuth() // ✅ Fonctionne partout
+  const { canManageQuotes } = usePermissions()
 
   useEffect(() => {
-    if (!user || !hasPermission(user, "devis")) {
+    if (!user || !canManageQuotes) {
       router.push("/dashboard")
       return
     }
@@ -91,7 +92,7 @@ export default function QuotesPage() {
 
   const stats = getQuoteStats()
 
-  if (!user || !hasPermission(user, "devis")) {
+  if (!user || !canManageQuotes) {
     return null
   }
 

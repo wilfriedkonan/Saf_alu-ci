@@ -12,8 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Trash2, Calculator } from "lucide-react"
-import { getCurrentUser } from "@/lib/auth"
 import type { Quote, QuoteItem } from "@/lib/quotes"
+import { useAuth, usePermissions } from "@/contexts/AuthContext"
+import { permission } from "node:process"
 
 interface QuoteFormModalProps {
   open: boolean
@@ -22,7 +23,9 @@ interface QuoteFormModalProps {
 }
 
 export function QuoteFormModal({ open, onOpenChange, onSubmit }: QuoteFormModalProps) {
-  const user = getCurrentUser()
+ const {user,logout}=useAuth ()
+ const {canManageQuotes}=usePermissions();
+
   const [formData, setFormData] = useState({
     clientName: "",
     clientEmail: "",
@@ -96,7 +99,7 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit }: QuoteFormModalP
       total,
       status: "brouillon",
       validUntil: formData.validUntil,
-      createdBy: user.email,
+      createdBy: user.Email,
       notes: formData.notes,
     }
 

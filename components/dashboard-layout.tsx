@@ -1,5 +1,4 @@
 "use client"
-
 import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
@@ -30,7 +29,10 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react"
-import { getCurrentUser, setCurrentUser, hasPermission, type User as AuthUser } from "@/lib/auth"
+import { hasPermission, Utilisateur, type Utilisateur as AuthUser } from "@/types/Utilisateurs"
+import { getStoredUser, setStoredUser } from "@/lib/auth"
+import { useAuth, usePermissions } from "@/contexts/AuthContext"
+
 
 interface NavigationItem {
   name: string
@@ -55,30 +57,40 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
-  const [user, setUser] = useState<AuthUser | null>(null)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+/*   const [user, setUser] = useState<Utilisateur | null>(() => getStoredUser())
+ */  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const router = useRouter()
+  const { user, logout } = useAuth() // ✅ Fonctionne partout
+  const { canManageUsers } = usePermissions()
 
   useEffect(() => {
-    const currentUser = getCurrentUser()
-    if (!currentUser) {
+    if (!user) {
       router.push("/")
-    } else {
-      setUser(currentUser)
     }
-  }, [router])
+    console.log('userx', user)
+  }, [router, user])
+
+  useEffect(() => {
+    console.log('userpro', user)
+    
+  }, [user])
 
   const handleLogout = () => {
-    setCurrentUser(null)
+    setStoredUser(null)
     router.push("/")
   }
-
-  const filteredNavigation = navigation.filter((item) => hasPermission(user, item.permission))
 
   if (!user) {
     return null
   }
+
+  const filteredNavigation = navigation.filter((item) => hasPermission(user, item.permission))
+
+  useEffect(() => {
+    console.log('filteredNavigation', filteredNavigation)
+    
+  }, [filteredNavigation])
 
   return (
     <div className="min-h-screen bg-background">
@@ -92,21 +104,24 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
           <nav className="mt-8 px-4">
             <ul className="space-y-2">
-              {filteredNavigation.map((item) => (
-                <li key={item.name}>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start"
-                    onClick={() => {
-                      router.push(item.href)
-                      setSidebarOpen(false)
-                    }}
-                  >
-                    <item.icon className="mr-3 h-5 w-5" />
-                    {item.name}
-                  </Button>
-                </li>
-              ))}
+              {filteredNavigation.map((item) => {
+                console.log('item:', item)
+                return (
+                  <li key={item.name}>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        router.push(item.href)
+                        setSidebarOpen(false)
+                      }}
+                    >
+                      <item.icon className="mr-3 h-5 w-5" />
+                      {item.name}
+                    </Button>
+                  </li>
+                )
+              })}
             </ul>
           </nav>
         </div>
@@ -178,11 +193,16 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback>
-                      {user.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                        .toUpperCase()}
+                      {(() => {
+                        const anyUser = user as any;
+                        console.log('anyUser', user)
+                        const displayName = (typeof user.Nom === "string" && user.Nom)
+                          || (typeof anyUser?.Nom === "string" && anyUser.Nom)
+                          || (typeof user?.Username === "string" && user.Username)
+                          || user?.Email
+                          || "U";
+                        return (String(displayName).trim().split(/\s+/).map((n: string) => n[0]).join("") || "U").toUpperCase();
+                      })()}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -190,8 +210,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user.name}</p>
-                    <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                    <p className="text-sm font-medium leading-none">{user.Nom || (user as any).Nom || user.Username || user.Email}</p>
+                    <p className="text-xs leading-none text-muted-foreground">{user.Email}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />

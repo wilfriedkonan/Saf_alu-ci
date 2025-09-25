@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -11,33 +10,34 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Building2 } from "lucide-react"
-import { authenticateUser, setCurrentUser } from "@/lib/auth"
+import { useAuth } from "@/contexts/AuthContext"
 
 export function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const router = useRouter()
+  
+  // Utiliser le hook useAuth au lieu des appels directs
+  const { login, loading } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
     setError("")
 
     try {
-      const user = await authenticateUser(email, password)
-      if (user) {
-        setCurrentUser(user)
+      const result = await login(email, password)
+      
+      if (result.success) {
+        // Connexion réussie, rediriger vers le dashboard
         router.push("/dashboard")
       } else {
-        setError("Email ou mot de passe incorrect")
+        setError(result.message || "Email ou mot de passe incorrect")
       }
-    } catch (err) {
-      setError("Une erreur est survenue lors de la connexion")
-    } finally {
-      setIsLoading(false)
+    } catch (err: any) {
+      /* console.error('Erreur lors de la connexion:', err)
+      setError(err.message || "Une erreur est survenue lors de la connexion") */
     }
   }
 
@@ -70,7 +70,7 @@ export function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={isLoading}
+                disabled={loading}
               />
             </div>
 
@@ -83,7 +83,7 @@ export function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                disabled={isLoading}
+                disabled={loading}
               />
             </div>
 
@@ -92,15 +92,15 @@ export function LoginForm() {
                 id="remember"
                 checked={rememberMe}
                 onCheckedChange={(checked) => setRememberMe(checked as boolean)}
-                disabled={isLoading}
+                disabled={loading}
               />
               <Label htmlFor="remember" className="text-sm">
                 Se souvenir de moi
               </Label>
             </div>
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? (
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Connexion...
@@ -120,11 +120,11 @@ export function LoginForm() {
           <div className="mt-6 p-4 bg-muted rounded-lg">
             <p className="text-sm text-muted-foreground mb-2">Comptes de test :</p>
             <div className="text-xs space-y-1">
-              <div>Admin: admin@construction.fr</div>
-              <div>Chef projet: marie.chef@construction.fr</div>
-              <div>Commercial: pierre.commercial@construction.fr</div>
-              <div>Comptable: sophie.compta@construction.fr</div>
-              <div className="font-medium">Mot de passe: password123</div>
+              <div><strong>Admin:</strong> kan_willy@hotmail.com</div>
+              <div><strong>Chef projet:</strong> marie.chef@construction.fr</div>
+              <div><strong>Commercial:</strong> pierre.commercial@construction.fr</div>
+              <div><strong>Comptable:</strong> sophie.compta@construction.fr</div>
+              <div className="font-medium mt-2">Mot de passe: password123</div>
             </div>
           </div>
         </CardContent>
