@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Plus, Search, AlertTriangle, Hammer, Euro, Eye, Trash2 } from "lucide-react"
-import { getCurrentUser, hasPermission } from "@/lib/auth"
 import { ProjectFormModal } from "@/components/projects/project-form-modal"
 import {
   getProjects,
@@ -23,9 +22,11 @@ import {
   priorityColors,
   type ProjectStatus,
 } from "@/lib/projects"
+import { useAuth, usePermissions } from "@/contexts/AuthContext"
 
 export default function ProjectsPage() {
-  const [user, setUser] = useState(getCurrentUser())
+  const {user}=useAuth();
+  const {canManageProjects}=usePermissions();
   const [projects, setProjects] = useState<Project[]>([])
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -34,7 +35,7 @@ export default function ProjectsPage() {
   const router = useRouter()
 
   useEffect(() => {
-    if (!user || !hasPermission(user, "projets")) {
+    if (!user || !canManageProjects) {
       router.push("/dashboard")
       return
     }
@@ -101,7 +102,7 @@ export default function ProjectsPage() {
   const overdueProjects = getOverdueProjects()
   const stats = getProjectStats()
 
-  if (!user || !hasPermission(user, "projets")) {
+  if (!user || !canManageProjects) {
     return null
   }
 

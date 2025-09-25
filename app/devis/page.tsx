@@ -22,7 +22,7 @@ export default function QuotesPage() {
   const [statusFilter, setStatusFilter] = useState<QuoteStatus | "all">("all")
   const [showQuoteForm, setShowQuoteForm] = useState(false)
   const router = useRouter()
-  const { user, logout } = useAuth() // ✅ Fonctionne partout
+  const { user, logout } = useAuth() 
   const { canManageQuotes } = usePermissions()
 
   useEffect(() => {

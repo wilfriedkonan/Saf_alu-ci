@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Plus,
   Download,
@@ -25,6 +25,8 @@ import { CashFlowChart } from "@/components/treasury/cash-flow-chart"
 import { ExpenseBreakdown } from "@/components/treasury/expense-breakdown"
 import { RecentTransactions } from "@/components/treasury/recent-transactions"
 import { TransactionFormModal } from "@/components/treasury/transaction-form-modal"
+import { useRouter } from "next/navigation"
+import { useAuth, usePermissions } from "@/contexts/AuthContext"
 
 // Mock treasury data
 const mockTreasuryData = {
@@ -43,12 +45,24 @@ const mockTreasuryData = {
 }
 
 export default function TreasuryPage() {
+  const { user } = useAuth();
+  const { canManageTresorerie } = usePermissions();
+  const router = useRouter()
   const [selectedPeriod, setSelectedPeriod] = useState("month")
   const [showAddTransaction, setShowAddTransaction] = useState(false)
   const [showAddAccount, setShowAddAccount] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [accounts, setAccounts] = useState(mockTreasuryData.accounts)
   const [alerts, setAlerts] = useState(mockTreasuryData.alerts)
+
+
+  useEffect(() => {
+    if (!user || !canManageTresorerie) {
+      router.push("/dashboard")
+      return
+    }
+  }, [user, router]
+  )
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("fr-FR", {
@@ -72,6 +86,10 @@ export default function TreasuryPage() {
 
   const handleDeleteAlert = (alertId: number) => {
     setAlerts(alerts.filter((alert) => alert.id !== alertId))
+  }
+
+  if (!user || !canManageTresorerie) {
+    return null
   }
 
   return (

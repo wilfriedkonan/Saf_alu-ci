@@ -11,7 +11,7 @@ import { useAuth, usePermissions } from "@/contexts/AuthContext"
 export default function DashboardPage() {
   const router = useRouter()
   const { user, logout } = useAuth() 
-  const { canManageUsers } = usePermissions()
+  const { canAccessDashboard } = usePermissions()
 
   useEffect(() => {
     const currentUser = getStoredUser()
@@ -28,7 +28,7 @@ export default function DashboardPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      {canAccessDashboard() &&<div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Tableau de bord</h1>
           <p className="text-muted-foreground">
@@ -36,7 +36,7 @@ export default function DashboardPage() {
           </p>
         </div>
         <DashboardWidgets user={user} />
-      </div>
+      </div>}
     </DashboardLayout>
   )
 }

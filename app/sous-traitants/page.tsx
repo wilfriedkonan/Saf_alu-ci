@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Plus, Search, Filter, Star, Phone, Mail, MapPin, Award, Trash2 } from "lucide-react"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SubcontractorFormModal } from "@/components/subcontractors/subcontractor-form-modal"
+import { useAuth, usePermissions } from "@/contexts/AuthContext"
+import { useRouter } from "next/navigation"
 
 // Mock data pour remplacer getSubcontractors()
 const mockSubcontractors = [
@@ -60,12 +62,22 @@ const mockSubcontractors = [
 ]
 
 export default function SubcontractorsPage() {
+  const { user } = useAuth() 
+  const { canManageSousTraitants } = usePermissions()
   const [subcontractors, setSubcontractors] = useState(mockSubcontractors)
   const [searchTerm, setSearchTerm] = useState("")
   const [specialtyFilter, setSpecialtyFilter] = useState("all")
   const [ratingFilter, setRatingFilter] = useState("all")
   const [isSubcontractorFormOpen, setIsSubcontractorFormOpen] = useState(false)
+  const router = useRouter()
 
+  useEffect(() => {
+    if (!user || !canManageSousTraitants) {
+      router.push("/dashboard")
+      return
+    }
+  }, [user, router]
+  )
   const specialtyLabels: Record<string, string> = {
     plomberie: "Plomberie",
     electricite: "Électricité",
@@ -157,6 +169,10 @@ export default function SubcontractorsPage() {
     }
   }
 
+  if (!user || !canManageSousTraitants) {
+    return null
+  }
+  
   return (
     <DashboardLayout>
       <div className="space-y-6">

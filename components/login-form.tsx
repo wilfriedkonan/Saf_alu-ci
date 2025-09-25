@@ -116,17 +116,6 @@ export function LoginForm() {
               </Button>
             </div>
           </form>
-
-          <div className="mt-6 p-4 bg-muted rounded-lg">
-            <p className="text-sm text-muted-foreground mb-2">Comptes de test :</p>
-            <div className="text-xs space-y-1">
-              <div><strong>Admin:</strong> kan_willy@hotmail.com</div>
-              <div><strong>Chef projet:</strong> marie.chef@construction.fr</div>
-              <div><strong>Commercial:</strong> pierre.commercial@construction.fr</div>
-              <div><strong>Comptable:</strong> sophie.compta@construction.fr</div>
-              <div className="font-medium mt-2">Mot de passe: password123</div>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>

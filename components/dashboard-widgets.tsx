@@ -2,11 +2,12 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
-import { Euro, FileText, Hammer, Users, TrendingUp, AlertTriangle, CheckCircle, Clock } from "lucide-react"
-import type { User } from "@/lib/auth"
+import { Euro, FileText, Hammer, Users, TrendingUp, AlertTriangle, CheckCircle, Clock, DollarSign } from "lucide-react"
+import { useAuth, usePermissions } from "@/contexts/AuthContext"
+import { Utilisateur } from "@/types/Utilisateurs"
 
 interface DashboardWidgetsProps {
-  user: User
+  user: Utilisateur|null
 }
 
 // Mock data for charts
@@ -27,16 +28,17 @@ const projectStatus = [
 ]
 
 export function DashboardWidgets({ user }: DashboardWidgetsProps) {
+const {canAccessDashboard}=usePermissions();
   const getKPIsForRole = () => {
-    switch (user.role) {
+    switch (user?.Role?.Nom) {
       case "super_admin":
       case "admin":
         return [
           {
             title: "Chiffre d'affaires",
-            value: "€342,500",
+            value: "342 500F",
             change: "+12.5%",
-            icon: Euro,
+            icon: DollarSign ,
             color: "text-green-600",
           },
           {
@@ -127,15 +129,15 @@ export function DashboardWidgets({ user }: DashboardWidgetsProps) {
         return [
           {
             title: "Factures impayées",
-            value: "€45,200",
-            change: "-€8,500",
+            value: "45 200F",
+            change: "-8 500F",
             icon: Euro,
             color: "text-red-600",
           },
           {
             title: "Trésorerie",
-            value: "€125,800",
-            change: "+€12,300",
+            value: "125 800F",
+            change: "+12 300F",
             icon: TrendingUp,
             color: "text-green-600",
           },
@@ -177,7 +179,8 @@ export function DashboardWidgets({ user }: DashboardWidgetsProps) {
   const kpis = getKPIsForRole()
 
   return (
-    <div className="space-y-6">
+    <>
+   <div className="space-y-6">
       {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {kpis.map((kpi, index) => (
@@ -198,7 +201,7 @@ export function DashboardWidgets({ user }: DashboardWidgetsProps) {
       </div>
 
       {/* Charts and additional widgets */}
-      {(user.role === "super_admin" || user.role === "admin" || user.role === "comptable") && (
+      {(user?.Role?.Nom === "super_admin" || user?.Role?.Nom === "admin" || user?.Role?.Nom === "comptable") && (
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>
@@ -258,7 +261,7 @@ export function DashboardWidgets({ user }: DashboardWidgetsProps) {
       )}
 
       {/* Project alerts for project managers */}
-      {(user.role === "chef_projet" || user.role === "admin" || user.role === "super_admin") && (
+      {(user?.Role?.Nom === "chef_projet" || user?.Role?.Nom === "admin" || user?.Role?.Nom === "super_admin") && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
@@ -326,6 +329,7 @@ export function DashboardWidgets({ user }: DashboardWidgetsProps) {
         </CardContent>
       </Card>
     </div>
+        </>
   )
 }
 

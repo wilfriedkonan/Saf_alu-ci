@@ -79,7 +79,7 @@ const expenseCategories: ExpenseCategory[] = [
 const transactions: Transaction[] = [
   {
     id: "t1",
-    date: "2024-01-15",
+    date: "2025-01-15",
     description: "Paiement Villa Moderne - Acompte",
     amount: 25000,
     type: "income",
@@ -91,7 +91,7 @@ const transactions: Transaction[] = [
   },
   {
     id: "t2",
-    date: "2024-01-14",
+    date: "2025-01-14",
     description: "Achat matériaux - Leroy Merlin",
     amount: -3500,
     type: "expense",
@@ -102,7 +102,7 @@ const transactions: Transaction[] = [
   },
   {
     id: "t3",
-    date: "2024-01-13",
+    date: "2025-01-13",
     description: "Salaire équipe - Janvier",
     amount: -12000,
     type: "expense",
@@ -112,7 +112,7 @@ const transactions: Transaction[] = [
   },
   {
     id: "t4",
-    date: "2024-01-12",
+    date: "2025-01-12",
     description: "Paiement Rénovation Bureau - Solde",
     amount: 18000,
     type: "income",
@@ -124,7 +124,7 @@ const transactions: Transaction[] = [
   },
   {
     id: "t5",
-    date: "2024-01-11",
+    date: "2025-01-11",
     description: "Location grue - 2 semaines",
     amount: -2800,
     type: "expense",
@@ -135,7 +135,7 @@ const transactions: Transaction[] = [
   },
   {
     id: "t6",
-    date: "2024-01-10",
+    date: "2025-01-10",
     description: "Assurance chantier - Trimestre",
     amount: -5000,
     type: "expense",
@@ -145,7 +145,7 @@ const transactions: Transaction[] = [
   },
   {
     id: "t7",
-    date: "2024-01-20",
+    date: "2025-01-20",
     description: "Paiement Extension Maison - À recevoir",
     amount: 35000,
     type: "income",
@@ -157,7 +157,7 @@ const transactions: Transaction[] = [
   },
   {
     id: "t8",
-    date: "2024-01-18",
+    date: "2025-01-18",
     description: "Carburant véhicules - Janvier",
     amount: -800,
     type: "expense",

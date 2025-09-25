@@ -60,9 +60,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 /*   const [user, setUser] = useState<Utilisateur | null>(() => getStoredUser())
  */  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const router = useRouter()
-  const { user, logout } = useAuth() // ✅ Fonctionne partout
-  const { canManageUsers } = usePermissions()
+  const router = useRouter();
+  const { user } = useAuth();  
 
   useEffect(() => {
     if (!user) {

@@ -10,7 +10,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, Search, Receipt, Euro, AlertTriangle, TrendingUp, Trash2 } from "lucide-react"
-import { getCurrentUser, hasPermission } from "@/lib/auth"
 import {
   getInvoices,
   getOverdueInvoices,
@@ -24,9 +23,11 @@ import {
 } from "@/lib/invoices"
 import { InvoiceActions } from "@/components/invoices/invoice-actions"
 import { InvoiceFormModal } from "@/components/invoices/invoice-form-modal"
+import { useAuth, usePermissions } from "@/contexts/AuthContext"
 
 export default function InvoicesPage() {
-  const [user, setUser] = useState(getCurrentUser())
+  const { user } = useAuth() 
+  const { canManageFinances } = usePermissions()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [filteredInvoices, setFilteredInvoices] = useState<Invoice[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -36,7 +37,7 @@ export default function InvoicesPage() {
   const router = useRouter()
 
   useEffect(() => {
-    if (!user || !hasPermission(user, "factures")) {
+    if (!user || !canManageFinances) {
       router.push("/dashboard")
       return
     }
@@ -85,7 +86,7 @@ export default function InvoicesPage() {
   const overdueInvoices = getOverdueInvoices()
   const stats = getInvoiceStats()
 
-  if (!user || !hasPermission(user, "factures")) {
+  if (!user || !canManageFinances) {
     return null
   }
 

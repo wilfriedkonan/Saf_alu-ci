@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowLeft, Building2, Calendar, Euro, Users, FileText, Upload } from "lucide-react"
-import { getCurrentUser, hasPermission } from "@/lib/auth"
 import {
   getProjectById,
   type Project,
@@ -20,15 +19,17 @@ import {
 } from "@/lib/projects"
 import { ProjectTimeline } from "@/components/projects/project-timeline"
 import { SubcontractorOffersTable } from "@/components/projects/subcontractor-offers-table"
+import { useAuth, usePermissions } from "@/contexts/AuthContext"
 
 export default function ProjectDetailPage() {
-  const [user, setUser] = useState(getCurrentUser())
+  const {user}=useAuth();
+  const {canManageProjects}=usePermissions();
   const [project, setProject] = useState<Project | null>(null)
   const router = useRouter()
   const params = useParams()
 
   useEffect(() => {
-    if (!user || !hasPermission(user, "projets")) {
+    if (!user || !canManageProjects) {
       router.push("/dashboard")
       return
     }
@@ -45,6 +46,9 @@ export default function ProjectDetailPage() {
   const handleRefresh = () => {
     if (params.id) {
       const projectData = getProjectById(params.id as string)
+      if(!projectData){
+        return
+      }
       setProject(projectData)
     }
   }
@@ -57,7 +61,7 @@ export default function ProjectDetailPage() {
     }).format(amount)
   }
 
-  if (!user || !hasPermission(user, "projets") || !project) {
+  if (!user || !canManageProjects || !project) {
     return null
   }
 
@@ -74,12 +78,12 @@ export default function ProjectDetailPage() {
 
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">{project.name}</h1>
-            <p className="text-muted-foreground">{project.number}</p>
+            <h1 className="text-3xl font-bold tracking-tight">{project?.name}</h1>
+            <p className="text-muted-foreground">{project?.number}</p>
           </div>
           <div className="flex items-center space-x-2">
-            <Badge className={projectStatusColors[project.status]}>{projectStatusLabels[project.status]}</Badge>
-            <Badge className={priorityColors[project.priority]}>{priorityLabels[project.priority]}</Badge>
+            {project&&<Badge className={projectStatusColors[project.status]}>{projectStatusLabels[project.status]}</Badge>}
+            {project&&<Badge className={priorityColors[project.priority]}>{priorityLabels[project.priority]}</Badge>}
           </div>
         </div>
 

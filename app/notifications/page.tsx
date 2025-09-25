@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,6 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Bell, Check, X, AlertTriangle, Info, CheckCircle, XCircle, Search, Filter } from "lucide-react"
+import { useAuth, usePermissions } from "@/contexts/AuthContext"
+import { useRouter } from "next/navigation"
 
 interface Notification {
   id: string
@@ -98,10 +100,21 @@ const notificationSettings = {
 }
 
 export default function NotificationsPage() {
+  const { canManageNotifications } = usePermissions();
+  const { user } = useAuth();
+  const route = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>(mockNotifications)
   const [filter, setFilter] = useState<string>("all")
   const [searchTerm, setSearchTerm] = useState("")
   const [settings, setSettings] = useState(notificationSettings)
+
+  /* useEffect(() => {
+    if (!user || !canManageNotifications) {
+      route.push("/dashboard");
+      return
+    }
+  }, [user, route]
+  ) */
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -192,6 +205,7 @@ export default function NotificationsPage() {
 
   const unreadCount = notifications.filter((n) => !n.isRead).length
 
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -268,11 +282,10 @@ export default function NotificationsPage() {
                     filteredNotifications.map((notification) => (
                       <div
                         key={notification.id}
-                        className={`p-4 border rounded-lg transition-colors ${
-                          !notification.isRead
-                            ? "bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800"
-                            : "bg-background"
-                        }`}
+                        className={`p-4 border rounded-lg transition-colors ${!notification.isRead
+                          ? "bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800"
+                          : "bg-background"
+                          }`}
                       >
                         <div className="flex items-start gap-3">
                           {getNotificationIcon(notification.type)}
@@ -323,7 +336,7 @@ export default function NotificationsPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="settings" className="space-y-6">
+       { (!user || !canManageNotifications) && <TabsContent value="settings" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Paramètres de notification</CardTitle>
@@ -437,7 +450,7 @@ export default function NotificationsPage() {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+          </TabsContent>}
         </Tabs>
       </div>
     </DashboardLayout>
