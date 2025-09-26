@@ -1,0 +1,305 @@
+// src/services/devisService.ts
+
+import axios, { AxiosResponse } from 'axios';
+import { 
+  Devis, 
+  DevisListItem, 
+  CreateDevisRequest, 
+  UpdateDevisRequest, 
+  ApiResponse,
+  DevisStatut 
+} from '@/types/Devis';
+
+// Configuration axios
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5264/api';
+
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Intercepteur pour ajouter le token d'authentification
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Intercepteur pour gérer les erreurs de réponse
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token expiré ou invalide
+      localStorage.removeItem('authToken');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+export class DevisService {
+  
+  /**
+   * Récupère tous les devis
+   */
+  static async getAllDevis(): Promise<DevisListItem[]> {
+    try {
+      const response: AxiosResponse<DevisListItem[]> = await apiClient.get('/devis');
+      console.log('Reponse: ',response.data)
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la récupération des devis:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Récupère un devis par son ID
+   */
+  static async getDevisById(id: number): Promise<Devis> {
+    try {
+      const response: AxiosResponse<Devis> = await apiClient.get(`/devis/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur lors de la récupération du devis ${id}:`, error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Crée un nouveau devis
+   */
+  static async createDevis(devisData: CreateDevisRequest): Promise<ApiResponse<Devis>> {
+    try {
+      const response: AxiosResponse<ApiResponse<Devis>> = await apiClient.post('/devis', devisData);
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la création du devis:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Met à jour un devis existant
+   */
+  static async updateDevis(id: number, devisData: UpdateDevisRequest): Promise<ApiResponse<void>> {
+    try {
+      const response: AxiosResponse<ApiResponse<void>> = await apiClient.put(`/devis/${id}`, devisData);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur lors de la mise à jour du devis ${id}:`, error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Supprime un devis
+   */
+  static async deleteDevis(id: number): Promise<ApiResponse<void>> {
+    try {
+      const response: AxiosResponse<ApiResponse<void>> = await apiClient.delete(`/devis/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur lors de la suppression du devis ${id}:`, error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Envoie un devis
+   */
+  static async envoyerDevis(id: number): Promise<ApiResponse<void>> {
+    try {
+      const response: AxiosResponse<ApiResponse<void>> = await apiClient.post(`/devis/${id}/envoyer`);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur lors de l'envoi du devis ${id}:`, error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Valide un devis
+   */
+  static async validerDevis(id: number): Promise<ApiResponse<void>> {
+    try {
+      const response: AxiosResponse<ApiResponse<void>> = await apiClient.post(`/devis/${id}/valider`);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur lors de la validation du devis ${id}:`, error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Refuse un devis
+   */
+  static async refuserDevis(id: number): Promise<ApiResponse<void>> {
+    try {
+      const response: AxiosResponse<ApiResponse<void>> = await apiClient.post(`/devis/${id}/refuser`);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur lors du refus du devis ${id}:`, error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Duplique un devis
+   */
+  static async dupliquerDevis(id: number): Promise<ApiResponse<{ id: number }>> {
+    try {
+      const response: AxiosResponse<ApiResponse<{ id: number }>> = await apiClient.post(`/devis/${id}/dupliquer`);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur lors de la duplication du devis ${id}:`, error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Exporte un devis en PDF
+   */
+  static async exporterDevisPDF(id: number): Promise<Blob> {
+    try {
+      const response: AxiosResponse<Blob> = await apiClient.get(`/devis/${id}/pdf`, {
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur lors de l'export PDF du devis ${id}:`, error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Recherche des devis avec filtres
+   */
+  static async rechercherDevis(params: {
+    search?: string;
+    statut?: DevisStatut;
+    clientId?: number;
+    dateDebut?: string;
+    dateFin?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{
+    devis: DevisListItem[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }> {
+    try {
+      const queryParams = new URLSearchParams();
+      
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, value.toString());
+        }
+      });
+
+      const response = await apiClient.get(`/devis/search?${queryParams.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la recherche de devis:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Récupère les statistiques des devis
+   */
+  static async getStatistiquesDevis(): Promise<{
+    total: number;
+    brouillon: number;
+    envoye: number;
+    enNegociation: number;
+    valide: number;
+    refuse: number;
+    expire: number;
+    montantTotal: number;
+    montantValide: number;
+  }> {
+    try {
+      const response = await apiClient.get('/devis/statistiques');
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la récupération des statistiques:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Gestion centralisée des erreurs
+   */
+  private static handleError(error: any): Error {
+    let message = 'Une erreur inattendue s\'est produite';
+    
+    if (axios.isAxiosError(error)) {
+      if (error.response) {
+        // Erreur de réponse du serveur
+        const status = error.response.status;
+        const data = error.response.data;
+        
+        switch (status) {
+          case 400:
+            message = data?.message || 'Données invalides';
+            break;
+          case 401:
+            message = 'Non autorisé - Veuillez vous reconnecter';
+            break;
+          case 403:
+            message = 'Accès interdit';
+            break;
+          case 404:
+            message = 'Ressource non trouvée';
+            break;
+          case 409:
+            message = 'Conflit - La ressource existe déjà';
+            break;
+          case 422:
+            message = data?.message || 'Données non valides';
+            break;
+          case 500:
+            message = 'Erreur serveur interne';
+            break;
+          default:
+            message = data?.message || `Erreur ${status}`;
+        }
+      } else if (error.request) {
+        // Erreur de réseau
+        message = 'Erreur de connexion - Vérifiez votre réseau';
+      }
+    }
+    
+    return new Error(message);
+  }
+}
+
+// Hook personnalisé pour utiliser le service de devis
+export const useDevisService = () => {
+  return {
+    getAllDevis: DevisService.getAllDevis,
+    getDevisById: DevisService.getDevisById,
+    createDevis: DevisService.createDevis,
+    updateDevis: DevisService.updateDevis,
+    deleteDevis: DevisService.deleteDevis,
+    envoyerDevis: DevisService.envoyerDevis,
+    validerDevis: DevisService.validerDevis,
+    refuserDevis: DevisService.refuserDevis,
+    dupliquerDevis: DevisService.dupliquerDevis,
+    exporterDevisPDF: DevisService.exporterDevisPDF,
+    rechercherDevis: DevisService.rechercherDevis,
+    getStatistiquesDevis: DevisService.getStatistiquesDevis,
+  };
+};
