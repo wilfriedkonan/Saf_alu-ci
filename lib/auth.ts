@@ -85,7 +85,6 @@ class AuthService {
         email,
         password,
       });
-      console.log('reponse:', response)
       const { token, user } = response.data;
      
       // Stocker le token et les infos utilisateur
@@ -112,7 +111,6 @@ class AuthService {
       const response = await apiClient.post('/Utilisateurs/register', userData);
       
       const { token, user } = response.data;
-      console.log(user)
       // Connexion automatique après inscription
       setStoredToken(token);
       setStoredUser(user);
@@ -154,7 +152,6 @@ class AuthService {
     try {
       const response = await apiClient.get('/Utilisateurs/me');
       const user = response.data;
-      console.log(user)
       // Mettre à jour les infos stockées
       setStoredUser(user);
       

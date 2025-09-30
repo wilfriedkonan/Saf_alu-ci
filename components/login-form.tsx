@@ -36,8 +36,7 @@ export function LoginForm() {
         setError(result.message || "Email ou mot de passe incorrect")
       }
     } catch (err: any) {
-      /* console.error('Erreur lors de la connexion:', err)
-      setError(err.message || "Une erreur est survenue lors de la connexion") */
+      setError(err.message || "Une erreur est survenue lors de la connexion")
     }
   }
 

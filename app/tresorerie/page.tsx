@@ -74,7 +74,6 @@ export default function TreasuryPage() {
   const cashFlowTrend = mockTreasuryData.monthlyIncome - mockTreasuryData.monthlyExpenses
 
   const handleCreateTransaction = (transactionData: any) => {
-    console.log("Nouvelle transaction créée:", transactionData)
     // Refresh data logic would go here
   }
 

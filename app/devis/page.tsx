@@ -17,13 +17,15 @@ import {
   DevisListItem, 
   DevisStatut, 
   DevisStatutLabels, 
-  DevisStatutColors 
-} from "@/types/Devis"
+  DevisStatutColors,
+  Devis
+} from "@/types/devis"
 import { useDevisList, useDevisStatistiques, useDevisActions } from "@/hooks/useDevis"
 import { QuoteActions } from "@/components/quotes/quote-actions"
 import { QuoteFormModal } from "@/components/quotes/quote-form-modal"
 import { useAuth, usePermissions } from "@/contexts/AuthContext"
 import { toast } from "@/hooks/use-toast"
+import { useDevisService } from "@/services/devisService"
 
 export default function DevisPage() {
   const [filteredDevis, setFilteredDevis] = useState<DevisListItem[]>([])
@@ -38,7 +40,8 @@ export default function DevisPage() {
   // Hooks personnalisés
   const { devis, loading: devisLoading, error: devisError, refreshDevis } = useDevisList()
   const { stats, loading: statsLoading, refreshStats } = useDevisStatistiques()
-  const { createDevis, loading: actionLoading } = useDevisActions()
+  const { createDevis, updateDevis, loading: actionLoading } = useDevisActions()
+  const { getDevisById } = useDevisService()
 
   // Vérification des permissions
   useEffect(() => {
@@ -69,21 +72,42 @@ export default function DevisPage() {
     setFilteredDevis(filtered)
   }, [devis, searchTerm, statusFilter])
 
-  // Gestionnaire de création de devis
-  const handleCreateDevis = async (newDevisData: any) => {
+  // État devis en édition
+  const [editingDevis, setEditingDevis] = useState<Devis | null>(null)
+
+  // Gestionnaire création/modification
+  const handleSubmitDevis = async (newDevisData: any) => {
     try {
-      const response = await createDevis(newDevisData)
+      const response = editingDevis
+        ? await updateDevis(editingDevis.id, newDevisData)
+        : await createDevis(newDevisData)
       toast({
-        title: "Devis créé",
-        description: response.message || "Le devis a été créé avec succès",
+        title: editingDevis ? "Devis modifié" : "Devis créé",
+        description: response.message || (editingDevis ? "Le devis a été modifié avec succès" : "Le devis a été créé avec succès"),
       })
       refreshDevis()
       refreshStats()
       setShowDevisForm(false)
+      setEditingDevis(null)
     } catch (error) {
       toast({
         title: "Erreur",
-        description: error instanceof Error ? error.message : "Erreur lors de la création du devis",
+        description: error instanceof Error ? error.message : (editingDevis ? "Erreur lors de la modification du devis" : "Erreur lors de la création du devis"),
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Ouvrir modal en mode édition
+  const handleEditDevis = async (item: any) => {
+    try {
+      const full = await getDevisById(item.id)
+      setEditingDevis(full)
+      setShowDevisForm(true)
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de charger le devis",
         variant: "destructive",
       })
     }
@@ -152,7 +176,7 @@ export default function DevisPage() {
             <p className="text-muted-foreground">Créez, gérez et suivez vos devis clients</p>
           </div>
           <Button 
-            onClick={() => setShowDevisForm(true)}
+            onClick={() => { setEditingDevis(null); setShowDevisForm(true) }}
             disabled={actionLoading}
           >
             {actionLoading ? (
@@ -352,7 +376,8 @@ export default function DevisPage() {
                           onUpdate={() => {
                             refreshDevis()
                             refreshStats()
-                          }} 
+                          }}
+                          onEdit={handleEditDevis}
                         />
                       </TableCell>
                     </TableRow>
@@ -367,8 +392,10 @@ export default function DevisPage() {
       {/* Modal de création de devis */}
       <QuoteFormModal 
         open={showDevisForm} 
-        onOpenChange={setShowDevisForm} 
-        onSubmit={handleCreateDevis} 
+        onOpenChange={(open) => { if (!open) setEditingDevis(null); setShowDevisForm(open) }} 
+        onSubmit={handleSubmitDevis}
+        devis={editingDevis || undefined}
+        loading={actionLoading}
       />
     </DashboardLayout>
   )

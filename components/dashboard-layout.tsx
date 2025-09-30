@@ -67,11 +67,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     if (!user) {
       router.push("/")
     }
-    console.log('userx', user)
   }, [router, user])
 
   useEffect(() => {
-    console.log('userpro', user)
     
   }, [user])
 
@@ -87,7 +85,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const filteredNavigation = navigation.filter((item) => hasPermission(user, item.permission))
 
   useEffect(() => {
-    console.log('filteredNavigation', filteredNavigation)
     
   }, [filteredNavigation])
 
@@ -104,7 +101,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           <nav className="mt-8 px-4">
             <ul className="space-y-2">
               {filteredNavigation.map((item) => {
-                console.log('item:', item)
                 return (
                   <li key={item.name}>
                     <Button
@@ -194,7 +190,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     <AvatarFallback>
                       {(() => {
                         const anyUser = user as any;
-                        console.log('anyUser', user)
                         const displayName = (typeof user.Nom === "string" && user.Nom)
                           || (typeof anyUser?.Nom === "string" && anyUser.Nom)
                           || (typeof user?.Username === "string" && user.Username)

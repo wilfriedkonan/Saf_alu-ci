@@ -3,11 +3,11 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { type Quote, quoteStatusLabels, quoteStatusColors } from "@/lib/quotes"
 import { Building2, Calendar, Mail, Phone, MapPin } from "lucide-react"
+import { Devis, DevisStatutLabels, DevisStatutColors } from "@/types/devis"
 
 interface QuotePreviewModalProps {
-  quote: Quote
+  quote: Devis
   open: boolean
   onOpenChange: (open: boolean) => void
 }
@@ -21,13 +21,14 @@ export function QuotePreviewModal({ quote, open, onOpenChange }: QuotePreviewMod
     }).format(amount)
   }
 
+  const montantTVA = Math.max(0, (quote.montantTTC ?? 0) - (quote.montantHT ?? 0))
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-6xl xl:max-w-7xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
-            <span>Prévisualisation - {quote.number}</span>
-            <Badge className={quoteStatusColors[quote.status]}>{quoteStatusLabels[quote.status]}</Badge>
+            <span>Prévisualisation - {quote.numero}</span>
+            <Badge className={DevisStatutColors[quote.statut]}>{DevisStatutLabels[quote.statut]}</Badge>
           </DialogTitle>
         </DialogHeader>
 
@@ -45,7 +46,7 @@ export function QuotePreviewModal({ quote, open, onOpenChange }: QuotePreviewMod
             </div>
             <div className="text-right">
               <h3 className="text-lg font-semibold">DEVIS</h3>
-              <p className="text-sm text-muted-foreground">{quote.number}</p>
+              <p className="text-sm text-muted-foreground">{quote.numero}</p>
             </div>
           </div>
 
@@ -58,19 +59,19 @@ export function QuotePreviewModal({ quote, open, onOpenChange }: QuotePreviewMod
               <div className="space-y-2">
                 <div className="flex items-center space-x-2">
                   <Building2 className="h-4 w-4 text-muted-foreground" />
-                  <span>{quote.clientName}</span>
+                  <span>{quote.client?.nom}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span>{quote.clientEmail}</span>
+                  <span>{quote.client?.email}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span>{quote.clientPhone}</span>
+                  <span>{quote.client?.telephone}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <span>{quote.clientAddress}</span>
+                  <span>{quote.client?.adresse}</span>
                 </div>
               </div>
             </div>
@@ -79,11 +80,11 @@ export function QuotePreviewModal({ quote, open, onOpenChange }: QuotePreviewMod
               <div className="space-y-2">
                 <div className="flex items-center space-x-2">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>Créé le {new Date(quote.createdAt).toLocaleDateString("fr-FR")}</span>
+                  <span>Créé le {new Date(quote.dateCreation).toLocaleDateString("fr-FR")}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>Valide jusqu'au {new Date(quote.validUntil).toLocaleDateString("fr-FR")}</span>
+                  <span>Valide jusqu'au {quote.dateValidite ? new Date(quote.dateValidite).toLocaleDateString("fr-FR") : "N/A"}</span>
                 </div>
               </div>
             </div>
@@ -94,7 +95,7 @@ export function QuotePreviewModal({ quote, open, onOpenChange }: QuotePreviewMod
           {/* Project Details */}
           <div>
             <h4 className="font-semibold mb-3">Projet</h4>
-            <h5 className="text-lg font-medium">{quote.projectTitle}</h5>
+            <h5 className="text-lg font-medium">{quote.titre}</h5>
             <p className="text-muted-foreground mt-1">{quote.description}</p>
           </div>
 
@@ -103,7 +104,7 @@ export function QuotePreviewModal({ quote, open, onOpenChange }: QuotePreviewMod
           {/* Items Table */}
           <div>
             <h4 className="font-semibold mb-3">Détail des prestations</h4>
-            <div className="border rounded-lg overflow-hidden">
+            <div className="border rounded-lg overflow-hidden overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-muted">
                   <tr>
@@ -115,13 +116,13 @@ export function QuotePreviewModal({ quote, open, onOpenChange }: QuotePreviewMod
                   </tr>
                 </thead>
                 <tbody>
-                  {quote.items.map((item, index) => (
-                    <tr key={item.id} className={index % 2 === 0 ? "bg-background" : "bg-muted/50"}>
-                      <td className="p-3">{item.description}</td>
-                      <td className="text-right p-3">{item.quantity}</td>
-                      <td className="text-right p-3">{item.unit}</td>
-                      <td className="text-right p-3">{formatCurrency(item.unitPrice)}</td>
-                      <td className="text-right p-3 font-medium">{formatCurrency(item.total)}</td>
+                  {quote.lignes?.map((ligne, index) => (
+                    <tr key={ligne.id} className={index % 2 === 0 ? "bg-background" : "bg-muted/50"}>
+                      <td className="p-3">{ligne.designation}</td>
+                      <td className="text-right p-3">{ligne.quantite}</td>
+                      <td className="text-right p-3">{ligne.unite}</td>
+                      <td className="text-right p-3">{formatCurrency(ligne.prixUnitaireHT)}</td>
+                      <td className="text-right p-3 font-medium">{formatCurrency(ligne.totalHT)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -134,16 +135,16 @@ export function QuotePreviewModal({ quote, open, onOpenChange }: QuotePreviewMod
             <div className="w-80 space-y-2">
               <div className="flex justify-between">
                 <span>Sous-total :</span>
-                <span>{formatCurrency(quote.subtotal)}</span>
+                <span>{formatCurrency(quote.montantHT)}</span>
               </div>
               <div className="flex justify-between">
-                <span>TVA ({quote.taxRate}%) :</span>
-                <span>{formatCurrency(quote.taxAmount)}</span>
+                <span>TVA ({quote.tauxTVA}%) :</span>
+                <span>{formatCurrency(montantTVA)}</span>
               </div>
               <Separator />
               <div className="flex justify-between text-lg font-bold">
                 <span>Total TTC :</span>
-                <span>{formatCurrency(quote.total)}</span>
+                <span>{formatCurrency(quote.montantTTC)}</span>
               </div>
             </div>
           </div>

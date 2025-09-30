@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Trash2, Calculator, Loader2 } from "lucide-react"
-import { CreateDevisRequest, CreateLigneDevisRequest, Devis } from "@/types/Devis"
+import { CreateDevisRequest, CreateLigneDevisRequest, Devis } from "@/types/devis"
 import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "@/hooks/use-toast"
 
@@ -194,12 +194,11 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
       })),
     }
 
-    try {
+    try { 
       await onSubmit(devisData)
       // Le parent gère la fermeture de la modal et les messages de succès
     } catch (error) {
       // L'erreur est gérée par le parent ou le hook
-      console.error('Erreur lors de la soumission:', error)
     }
   }
 

@@ -8,7 +8,7 @@ import {
   CreateDevisRequest, 
   UpdateDevisRequest,
   DevisStatut
-} from '@/types/Devis';
+} from '@/types/devis';
 
 // Hook pour gérer la liste des devis
 export const useDevisList = () => {
@@ -198,13 +198,33 @@ export const useDevisActions = () => {
     try {
       setLoading(true);
       setError(null);
-      const blob = await DevisService.exporterDevisPDF(id);
+      const { blob, filename: serverFilename } = await DevisService.exporterDevisPDF(id);
+
+      // Vérifications de validité du contenu
+      if (!(blob instanceof Blob) || blob.size === 0) {
+        throw new Error("Le fichier PDF reçu est vide ou invalide");
+      }
+      if (blob.type && blob.type !== 'application/pdf') {
+        try {
+          const text = await blob.text();
+          // Essaye d'extraire un message d'erreur côté API
+          try {
+            const json = JSON.parse(text);
+            const apiMsg = (json && (json.message || json.Message)) as string | undefined;
+            throw new Error(apiMsg || "La réponse du serveur n'est pas un PDF valide");
+          } catch {
+            throw new Error(text || "La réponse du serveur n'est pas un PDF valide");
+          }
+        } catch {
+          throw new Error("La réponse du serveur n'est pas un PDF valide");
+        }
+      }
       
       // Créer un lien de téléchargement
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = filename || `devis-${id}.pdf`;
+      link.download = filename || serverFilename || `devis-${id}.pdf`;
       document.body.appendChild(link);
       link.click();
       

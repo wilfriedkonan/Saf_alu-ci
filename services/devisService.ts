@@ -8,7 +8,7 @@ import {
   UpdateDevisRequest, 
   ApiResponse,
   DevisStatut 
-} from '@/types/Devis';
+} from '@/types/devis';
 
 // Configuration axios
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5264/api';
@@ -41,7 +41,7 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       // Token expiré ou invalide
       localStorage.removeItem('authToken');
-      window.location.href = '/login';
+      window.location.href = '/';
     }
     return Promise.reject(error);
   }
@@ -52,9 +52,9 @@ export class DevisService {
   /**
    * Récupère tous les devis
    */
-  static async getAllDevis(): Promise<DevisListItem[]> {
+  static async getAllDevis(): Promise<any[]> {
     try {
-      const response: AxiosResponse<DevisListItem[]> = await apiClient.get('/devis');
+      const response: AxiosResponse<any[]> = await apiClient.get('/devis');
       console.log('Reponse: ',response.data)
       return response.data;
     } catch (error) {
@@ -82,8 +82,11 @@ export class DevisService {
   static async createDevis(devisData: CreateDevisRequest): Promise<ApiResponse<Devis>> {
     try {
       const response: AxiosResponse<ApiResponse<Devis>> = await apiClient.post('/devis', devisData);
+      console.log('Reponse neDevisData:',response)
+
       return response.data;
-    } catch (error) {
+    } catch (error) {      console.log('Retour de service devis :')
+
       console.error('Erreur lors de la création du devis:', error);
       throw this.handleError(error);
     }
@@ -170,12 +173,23 @@ export class DevisService {
   /**
    * Exporte un devis en PDF
    */
-  static async exporterDevisPDF(id: number): Promise<Blob> {
+  static async exporterDevisPDF(id: number): Promise<{ blob: Blob; filename?: string }> {
     try {
       const response: AxiosResponse<Blob> = await apiClient.get(`/devis/${id}/pdf`, {
         responseType: 'blob'
       });
-      return response.data;
+
+      let filename: string | undefined
+      const disposition = (response.headers as any)?.['content-disposition'] as string | undefined
+      if (disposition) {
+        const match = /filename\*=UTF-8''([^;\n]+)|filename="?([^";\n]+)"?/i.exec(disposition)
+        const encoded = match?.[1]
+        const plain = match?.[2]
+        if (encoded) filename = decodeURIComponent(encoded)
+        else if (plain) filename = plain
+      }
+
+      return { blob: response.data, filename }
     } catch (error) {
       console.error(`Erreur lors de l'export PDF du devis ${id}:`, error);
       throw this.handleError(error);

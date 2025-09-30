@@ -64,7 +64,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         logout();
       }
     } catch (error) {
-      console.error('Erreur lors du chargement du profil:', error);
       logout();
     }
   };
@@ -110,7 +109,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
       }
     } catch (error: any) {
-      console.error('Erreur de connexion:', error);
       return {
         success: false,
         Success: false,
@@ -157,7 +155,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
       }
     } catch (error: any) {
-      console.error('Erreur d\'inscription:', error);
       return {
         success: false,
         Success: false,
@@ -201,7 +198,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Rafraîchir les rôles
   const refreshRoles = async (): Promise<void> => {
     // Implémentation future pour charger les rôles depuis l'API
-    console.log('refreshRoles - à implémenter');
   };
 
   // Initialisation au démarrage de l'application
@@ -228,7 +224,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setIsAuthenticated(false);
         }
       } catch (error) {
-        console.error('Erreur lors de l\'initialisation de l\'auth:', error);
         // En cas d'erreur, nettoyer et déconnecter
         logout();
       } finally {

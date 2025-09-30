@@ -91,13 +91,11 @@ export default function InvoicesPage() {
   }
 
   const handleCreateInvoice = (invoiceData: any) => {
-    console.log("Nouvelle facture créée:", invoiceData)
     handleRefresh()
   }
 
   const handleDeleteInvoice = (invoiceId: string) => {
     if (confirm("Êtes-vous sûr de vouloir supprimer cette facture ?")) {
-      console.log("Facture supprimée:", invoiceId)
       handleRefresh()
     }
   }

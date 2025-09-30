@@ -19,11 +19,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { MoreHorizontal, Mail, Copy, Edit, Eye, Trash2, FileDown, Receipt, Loader2 } from "lucide-react"
-import { DevisListItem, DevisStatutLabels } from "@/types/Devis"
+import { DevisListItem, DevisStatutLabels, Devis } from "@/types/devis"
 import { useDevisActions } from "@/hooks/useDevis"
 import { QuotePreviewModal } from "./quote-preview-modal"
 import { InvoiceGenerationModal } from "./invoice-generation-modal"
 import { toast } from "@/hooks/use-toast"
+import { useDevisService } from "@/services/devisService"
 
 interface QuoteActionsProps {
   devis: DevisListItem
@@ -35,6 +36,14 @@ export function QuoteActions({ devis, onUpdate, onEdit }: QuoteActionsProps) {
   const [showPreview, setShowPreview] = useState(false)
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showSendDialog, setShowSendDialog] = useState(false)
+  const [showValidateDialog, setShowValidateDialog] = useState(false)
+  const [showRejectDialog, setShowRejectDialog] = useState(false)
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false)
+  const [showExportDialog, setShowExportDialog] = useState(false)
+  const [showGenerateInvoiceDialog, setShowGenerateInvoiceDialog] = useState(false)
+  const [thisDevis, setThisDevis] = useState<Devis | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
 
   const {
     loading,
@@ -45,7 +54,7 @@ export function QuoteActions({ devis, onUpdate, onEdit }: QuoteActionsProps) {
     deleteDevis,
     exporterPDF
   } = useDevisActions()
-
+  
   const handleSendDevis = async () => {
     try {
       await envoyerDevis(devis.id)
@@ -160,6 +169,26 @@ export function QuoteActions({ devis, onUpdate, onEdit }: QuoteActionsProps) {
     }
   }
 
+  const {
+    getDevisById
+  } = useDevisService()
+
+  const handlePreview = async () => {
+    try {
+      setPreviewLoading(true)
+      const response = await getDevisById(devis.id)
+      setThisDevis(response)
+      setShowPreview(true)
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Erreur lors de l'ouverture du devis",
+        variant: "destructive",
+      })
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
   const canSend = devis.statut === "Brouillon"
   const canValidate = ["Envoye", "EnNegociation"].includes(devis.statut)
   const canReject = ["Envoye", "EnNegociation"].includes(devis.statut)
@@ -179,62 +208,62 @@ export function QuoteActions({ devis, onUpdate, onEdit }: QuoteActionsProps) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => setShowPreview(true)}>
+          <DropdownMenuItem onClick={handlePreview}>
             <Eye className="mr-2 h-4 w-4" />
             Prévisualiser
           </DropdownMenuItem>
-          
+
           {canSend && (
-            <DropdownMenuItem onClick={handleSendDevis}>
+            <DropdownMenuItem onClick={() => setShowSendDialog(true)}>
               <Mail className="mr-2 h-4 w-4" />
               Envoyer
             </DropdownMenuItem>
           )}
-          
+
           {canValidate && (
-            <DropdownMenuItem onClick={handleValidateDevis}>
+            <DropdownMenuItem onClick={() => setShowValidateDialog(true)}>
               <Receipt className="mr-2 h-4 w-4" />
               Valider
             </DropdownMenuItem>
           )}
-          
+
           {canReject && (
-            <DropdownMenuItem onClick={handleRejectDevis} className="text-orange-600">
+            <DropdownMenuItem onClick={() => setShowRejectDialog(true)} className="text-orange-600">
               <Trash2 className="mr-2 h-4 w-4" />
               Refuser
             </DropdownMenuItem>
           )}
-          
-          <DropdownMenuItem onClick={handleDuplicate}>
+
+          <DropdownMenuItem onClick={() => setShowDuplicateDialog(true)}>
             <Copy className="mr-2 h-4 w-4" />
             Dupliquer
           </DropdownMenuItem>
-          
+
           {canEdit && onEdit && (
             <DropdownMenuItem onClick={() => onEdit(devis)}>
               <Edit className="mr-2 h-4 w-4" />
               Modifier
             </DropdownMenuItem>
           )}
-          
+
           <DropdownMenuSeparator />
-          
-          <DropdownMenuItem onClick={handleExportPDF}>
+
+          <DropdownMenuItem onClick={() => setShowExportDialog(true)}>
             <FileDown className="mr-2 h-4 w-4" />
             Export PDF
           </DropdownMenuItem>
-          
+
           {canGenerateInvoice && (
-            <DropdownMenuItem onClick={handleGenerateInvoice}>
+            <DropdownMenuItem onClick={() => setShowGenerateInvoiceDialog(true)}>
               <Receipt className="mr-2 h-4 w-4" />
               Générer facture
             </DropdownMenuItem>
           )}
-          
+
           <DropdownMenuSeparator />
-          
-          <DropdownMenuItem 
-            onClick={() => setShowDeleteDialog(true)} 
+
+          <DropdownMenuItem
+            onClick={() => setShowDeleteDialog(true)}
             className="text-red-600"
           >
             <Trash2 className="mr-2 h-4 w-4" />
@@ -243,11 +272,124 @@ export function QuoteActions({ devis, onUpdate, onEdit }: QuoteActionsProps) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <QuotePreviewModal 
-        quote={devis as any} 
-        open={showPreview} 
-        onOpenChange={setShowPreview} 
-      />
+      {/* Confirm Send */}
+      <Dialog open={showSendDialog} onOpenChange={setShowSendDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Envoyer le devis</DialogTitle>
+            <DialogDescription>
+              Voulez-vous vraiment envoyer le devis {devis.numero} au client ?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSendDialog(false)} disabled={loading}>Annuler</Button>
+            <Button onClick={async () => { await handleSendDevis(); setShowSendDialog(false) }} disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Envoyer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Validate */}
+      <Dialog open={showValidateDialog} onOpenChange={setShowValidateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Valider le devis</DialogTitle>
+            <DialogDescription>
+              Confirmez-vous la validation du devis {devis.numero} ?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowValidateDialog(false)} disabled={loading}>Annuler</Button>
+            <Button onClick={async () => { await handleValidateDevis(); setShowValidateDialog(false) }} disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Valider"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Reject */}
+      <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Refuser le devis</DialogTitle>
+            <DialogDescription>
+              Souhaitez-vous refuser le devis {devis.numero} ? Cette action est réversible par validation ultérieure.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRejectDialog(false)} disabled={loading}>Annuler</Button>
+            <Button onClick={async () => { await handleRejectDevis(); setShowRejectDialog(false) }} disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refuser"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Duplicate */}
+      <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Dupliquer le devis</DialogTitle>
+            <DialogDescription>
+              Voulez-vous créer une copie du devis {devis.numero} ?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDuplicateDialog(false)} disabled={loading}>Annuler</Button>
+            <Button onClick={async () => { await handleDuplicate(); setShowDuplicateDialog(false) }} disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Dupliquer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Export */}
+      <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Exporter en PDF</DialogTitle>
+            <DialogDescription>
+              Confirmez l'export du devis {devis.numero} en PDF.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowExportDialog(false)} disabled={loading}>Annuler</Button>
+            <Button onClick={async () => { await handleExportPDF(); setShowExportDialog(false) }} disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Exporter"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Generate Invoice */}
+      <Dialog open={showGenerateInvoiceDialog} onOpenChange={setShowGenerateInvoiceDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Générer une facture</DialogTitle>
+            <DialogDescription>
+              Voulez-vous générer une facture à partir du devis {devis.numero} ?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowGenerateInvoiceDialog(false)} disabled={loading}>Annuler</Button>
+            <Button onClick={() => { setShowGenerateInvoiceDialog(false); handleGenerateInvoice() }} disabled={loading}>
+              Générer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {thisDevis && (
+        <QuotePreviewModal
+          quote={thisDevis}
+          open={showPreview}
+          onOpenChange={(open) => {
+            if (!open) setThisDevis(null)
+            setShowPreview(open)
+          }}
+        />
+      )}
 
       <InvoiceGenerationModal
         quote={devis as any}

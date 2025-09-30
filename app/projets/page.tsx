@@ -89,13 +89,11 @@ export default function ProjectsPage() {
       updatedAt: new Date().toISOString().split("T")[0],
     }
     setProjects([...projects, newProject])
-    console.log("Projet créé:", newProject)
   }
 
   const handleDeleteProject = (projectId: string) => {
     if (confirm("Êtes-vous sûr de vouloir supprimer ce projet ?")) {
       setProjects(projects.filter((project) => project.id !== projectId))
-      console.log("Projet supprimé:", projectId)
     }
   }
 
