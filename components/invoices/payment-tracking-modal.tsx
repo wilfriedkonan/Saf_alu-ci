@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Check, Calendar, Euro } from "lucide-react"
-import { type Invoice, markPaymentAsPaid } from "@/lib/invoices"
+import { useInvoices } from "@/hooks/useInvoices"
+import type { Invoice } from "@/lib/invoices"
 import { toast } from "@/hooks/use-toast"
 
 interface PaymentTrackingModalProps {
@@ -16,6 +17,9 @@ interface PaymentTrackingModalProps {
 }
 
 export function PaymentTrackingModal({ invoice, open, onOpenChange, onUpdate }: PaymentTrackingModalProps) {
+  // Utiliser le hook pour les actions de paiement
+  const { markAsPaid, loading } = useInvoices(false)
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
@@ -24,8 +28,12 @@ export function PaymentTrackingModal({ invoice, open, onOpenChange, onUpdate }: 
     }).format(amount)
   }
 
-  const handleMarkPaymentAsPaid = (paymentId: string, paymentDescription: string) => {
-    const success = markPaymentAsPaid(invoice.id, paymentId)
+  const handleMarkPaymentAsPaid = async (paymentId: string, paymentDescription: string, paymentAmount: number) => {
+    const success = await markAsPaid(invoice.id, {
+      amount: paymentAmount,
+      paidDate: new Date().toISOString(),
+    })
+
     if (success) {
       onUpdate()
       toast({
@@ -43,6 +51,17 @@ export function PaymentTrackingModal({ invoice, open, onOpenChange, onUpdate }: 
         return "bg-red-100 text-red-800"
       default:
         return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const getPaymentStatusLabel = (status: string) => {
+    switch (status) {
+      case "payee":
+        return "Payé"
+      case "en_retard":
+        return "En retard"
+      default:
+        return "En attente"
     }
   }
 
@@ -111,18 +130,15 @@ export function PaymentTrackingModal({ invoice, open, onOpenChange, onUpdate }: 
                     <div className="text-right">
                       <p className="font-bold">{formatCurrency(payment.amount)}</p>
                       <Badge className={getPaymentStatusColor(payment.status)}>
-                        {payment.status === "payee"
-                          ? "Payé"
-                          : payment.status === "en_retard"
-                            ? "En retard"
-                            : "En attente"}
+                        {getPaymentStatusLabel(payment.status)}
                       </Badge>
                     </div>
                     {payment.status !== "payee" && (
                       <Button
                         size="sm"
-                        onClick={() => handleMarkPaymentAsPaid(payment.id, payment.description)}
+                        onClick={() => handleMarkPaymentAsPaid(payment.id, payment.description, payment.amount)}
                         className="flex-shrink-0"
+                        disabled={loading}
                       >
                         <Check className="h-4 w-4 mr-1" />
                         Marquer payé

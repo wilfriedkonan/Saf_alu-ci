@@ -29,6 +29,7 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
   const [formData, setFormData] = useState({
     type: "facture_devis" as InvoiceType,
     clientName: "",
+    clientId: 0,
     clientEmail: "",
     clientPhone: "",
     clientAddress: "",
@@ -128,7 +129,7 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[98vw] max-w-[95vw] lg:max-w-[90vw] xl:max-w-[85vw] 2xl:max-w-[80vw] h-[98vh] max-h-[98vh] p-0 overflow-hidden">
+      <DialogContent className="w-[98vw] max-w-[98vw] lg:max-w-[96vw] xl:max-w-[94vw] h-[98vh] flex flex-col p-0">
         <div className="flex flex-col h-full">
           <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
             <DialogTitle className="text-xl font-semibold">Nouvelle Facture</DialogTitle>
@@ -211,17 +212,26 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-                    <div className="md:col-span-2">
-                      <Label htmlFor="clientName">Nom du client</Label>
-                      <Input
-                        id="clientName"
-                        value={formData.clientName}
-                        onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
-                        required
-                      />
-                    </div>
+                  <div className="space-y-1.5">
+                  <Label htmlFor="clientId" className="text-sm font-medium">
+                    Client *
+                  </Label>
+                  <Select
+                    value={formData.clientId > 0 ? formData.clientId.toString() : ""}
+                    onValueChange={(value) => setFormData({ ...formData, clientId: parseInt(value) || 0 })}
+                  >
+                    <SelectTrigger className="text-sm h-9">
+                      <SelectValue placeholder="Sélectionner un client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Client Test 1</SelectItem>
+                      <SelectItem value="2">Client Test 2</SelectItem>
+                      <SelectItem value="3">Client Test 3</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                    <div className="md:col-span-2">
+                    <div className="space-y-1.5">
                       <Label htmlFor="clientEmail">Email</Label>
                       <Input
                         id="clientEmail"

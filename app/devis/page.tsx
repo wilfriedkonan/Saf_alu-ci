@@ -36,6 +36,7 @@ export default function DevisPage() {
   const router = useRouter()
   const { user } = useAuth() 
   const { canManageQuotes } = usePermissions()
+  const canAccessQuotes = !!canManageQuotes()
   
   // Hooks personnalisés
   const { devis, loading: devisLoading, error: devisError, refreshDevis } = useDevisList()
@@ -45,11 +46,11 @@ export default function DevisPage() {
 
   // Vérification des permissions
   useEffect(() => {
-    if (!user || !canManageQuotes) {
+    if (!user || !canAccessQuotes) {
       router.push("/dashboard")
       return
     }
-  }, [user, canManageQuotes, router])
+  }, [user, canAccessQuotes, router])
 
   // Filtrage des devis
   useEffect(() => {
@@ -123,7 +124,7 @@ export default function DevisPage() {
   }
 
   // Vérification des permissions avant rendu
-  if (!user || !canManageQuotes) {
+  if (!user || !canAccessQuotes) {
     return null
   }
 

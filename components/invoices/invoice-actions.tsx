@@ -18,7 +18,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { MoreHorizontal, Mail, Edit, Eye, FileDown, Check, AlertTriangle, X } from "lucide-react"
-import { type Invoice, updateInvoiceStatus, sendReminder } from "@/lib/invoices"
+import { useInvoices } from "@/hooks/useInvoices"
+import type { Invoice } from "@/lib/invoices"
 import { InvoicePreviewModal } from "./invoice-preview-modal"
 import { PaymentTrackingModal } from "./payment-tracking-modal"
 import { toast } from "@/hooks/use-toast"
@@ -33,38 +34,33 @@ export function InvoiceActions({ invoice, onUpdate }: InvoiceActionsProps) {
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
 
+  // Utiliser le hook pour les actions
+  const { send, cancel, sendReminder, downloadPDF, loading } = useInvoices(false)
+
   const handleSendInvoice = async () => {
-    updateInvoiceStatus(invoice.id, "envoyee")
-    onUpdate()
-    toast({
-      title: "Facture envoyée",
-      description: `La facture ${invoice.number} a été envoyée à ${invoice.clientEmail}`,
-    })
+    const success = await send(invoice.id)
+    if (success) {
+      onUpdate()
+      toast({
+        title: "Facture envoyée",
+        description: `La facture ${invoice.number} a été envoyée à ${invoice.clientEmail}`,
+      })
+    }
   }
 
-  const handleMarkAsPaid = () => {
-    updateInvoiceStatus(invoice.id, "payee")
-    onUpdate()
-    toast({
-      title: "Facture marquée comme payée",
-      description: `La facture ${invoice.number} a été marquée comme payée`,
-    })
+  const handleSendReminder = async () => {
+    const success = await sendReminder(invoice.id)
+    if (success) {
+      onUpdate()
+      toast({
+        title: "Relance envoyée",
+        description: `Une relance a été envoyée pour la facture ${invoice.number}`,
+      })
+    }
   }
 
-  const handleSendReminder = () => {
-    sendReminder(invoice.id)
-    onUpdate()
-    toast({
-      title: "Relance envoyée",
-      description: `Une relance a été envoyée pour la facture ${invoice.number}`,
-    })
-  }
-
-  const handleExportPDF = () => {
-    toast({
-      title: "Export PDF",
-      description: `La facture ${invoice.number} a été exportée en PDF`,
-    })
+  const handleExportPDF = async () => {
+    await downloadPDF(invoice.id)
   }
 
   const handleExportExcel = () => {
@@ -74,14 +70,16 @@ export function InvoiceActions({ invoice, onUpdate }: InvoiceActionsProps) {
     })
   }
 
-  const handleCancel = () => {
-    updateInvoiceStatus(invoice.id, "annulee")
-    onUpdate()
-    toast({
-      title: "Facture annulée",
-      description: `La facture ${invoice.number} a été annulée`,
-    })
-    setShowCancelDialog(false)
+  const handleCancel = async () => {
+    const success = await cancel(invoice.id)
+    if (success) {
+      onUpdate()
+      toast({
+        title: "Facture annulée",
+        description: `La facture ${invoice.number} a été annulée`,
+      })
+      setShowCancelDialog(false)
+    }
   }
 
   const canSend = invoice.status === "brouillon"
@@ -95,7 +93,7 @@ export function InvoiceActions({ invoice, onUpdate }: InvoiceActionsProps) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-8 w-8 p-0">
+          <Button variant="ghost" className="h-8 w-8 p-0" disabled={loading}>
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
@@ -105,7 +103,7 @@ export function InvoiceActions({ invoice, onUpdate }: InvoiceActionsProps) {
             Prévisualiser
           </DropdownMenuItem>
           {canSend && (
-            <DropdownMenuItem onClick={handleSendInvoice}>
+            <DropdownMenuItem onClick={handleSendInvoice} disabled={loading}>
               <Mail className="mr-2 h-4 w-4" />
               Envoyer
             </DropdownMenuItem>
@@ -122,13 +120,13 @@ export function InvoiceActions({ invoice, onUpdate }: InvoiceActionsProps) {
             </DropdownMenuItem>
           )}
           {canSendReminder && (
-            <DropdownMenuItem onClick={handleSendReminder}>
+            <DropdownMenuItem onClick={handleSendReminder} disabled={loading}>
               <AlertTriangle className="mr-2 h-4 w-4" />
               Envoyer relance
             </DropdownMenuItem>
           )}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleExportPDF}>
+          <DropdownMenuItem onClick={handleExportPDF} disabled={loading}>
             <FileDown className="mr-2 h-4 w-4" />
             Export PDF
           </DropdownMenuItem>
@@ -138,7 +136,7 @@ export function InvoiceActions({ invoice, onUpdate }: InvoiceActionsProps) {
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           {canCancel && (
-            <DropdownMenuItem onClick={() => setShowCancelDialog(true)} className="text-red-600">
+            <DropdownMenuItem onClick={() => setShowCancelDialog(true)} className="text-red-600" disabled={loading}>
               <X className="mr-2 h-4 w-4" />
               Annuler
             </DropdownMenuItem>
@@ -167,7 +165,7 @@ export function InvoiceActions({ invoice, onUpdate }: InvoiceActionsProps) {
             <Button variant="outline" onClick={() => setShowCancelDialog(false)}>
               Annuler
             </Button>
-            <Button variant="destructive" onClick={handleCancel}>
+            <Button variant="destructive" onClick={handleCancel} disabled={loading}>
               Confirmer l'annulation
             </Button>
           </DialogFooter>

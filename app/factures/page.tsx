@@ -9,72 +9,93 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, Search, Receipt, Euro, AlertTriangle, TrendingUp, Trash2 } from "lucide-react"
-import {
-  getInvoices,
-  getOverdueInvoices,
-  getInvoiceStats,
-  type Invoice,
-  invoiceStatusLabels,
-  invoiceStatusColors,
-  invoiceTypeLabels,
-  type InvoiceStatus,
-  type InvoiceType,
-} from "@/lib/invoices"
+import { Plus, Search, Receipt, Euro, AlertTriangle, TrendingUp, Trash2, Loader2 } from "lucide-react"
+import { useInvoices, useInvoiceStats } from "@/hooks/useInvoices"
+import type { InvoiceStatus, InvoiceType } from "@/lib/invoices"
+import { invoiceStatusLabels, invoiceStatusColors, invoiceTypeLabels } from "@/lib/invoices"
 import { InvoiceActions } from "@/components/invoices/invoice-actions"
 import { InvoiceFormModal } from "@/components/invoices/invoice-form-modal"
 import { useAuth, usePermissions } from "@/contexts/AuthContext"
 
 export default function InvoicesPage() {
-  const { user } = useAuth() 
+  const { user } = useAuth()
   const { canManageFinances } = usePermissions()
-  const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [filteredInvoices, setFilteredInvoices] = useState<Invoice[]>([])
+  const canAccessFinances = !!canManageFinances()
+  const router = useRouter()
+
+  // Hook principal pour les factures
+  const {
+    invoices,
+    overdueInvoices,
+    loading,
+    error,
+    getAll,
+    getOverdue,
+    create,
+    remove,
+    refresh,
+    clearError,
+  } = useInvoices(false) // Chargement manuel
+
+  // Hook pour les statistiques
+  const { stats } = useInvoiceStats(new Date().getFullYear())
+
+  // États locaux pour les filtres
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | "all">("all")
   const [typeFilter, setTypeFilter] = useState<InvoiceType | "all">("all")
   const [isInvoiceFormOpen, setIsInvoiceFormOpen] = useState(false)
-  const router = useRouter()
 
+  // Vérifier les permissions
   useEffect(() => {
-    if (!user || !canManageFinances) {
+    if (!user || !canAccessFinances) {
       router.push("/dashboard")
       return
     }
+    // Charger les données au montage
+    getAll()
+    getOverdue()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, canAccessFinances, router])
 
-    const invoicesData = getInvoices()
-    setInvoices(invoicesData)
-    setFilteredInvoices(invoicesData)
-  }, [user, router])
-
+  // Appliquer les filtres
   useEffect(() => {
-    let filtered = invoices
+    getAll({
+      search: searchTerm,
+      status: statusFilter,
+      type: typeFilter,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, statusFilter, typeFilter])
 
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (invoice) =>
-          invoice.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          invoice.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          invoice.projectTitle.toLowerCase().includes(searchTerm.toLowerCase()),
-      )
+  // Auto-dismiss des erreurs
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => clearError(), 5000)
+      return () => clearTimeout(timer)
     }
+  }, [error, clearError])
 
-    if (statusFilter !== "all") {
-      filtered = filtered.filter((invoice) => invoice.status === statusFilter)
+  // Gestion de la création
+  const handleCreateInvoice = async (invoiceData: any) => {
+    const newInvoice = await create(invoiceData)
+    if (newInvoice) {
+      setIsInvoiceFormOpen(false)
+      refresh()
     }
-
-    if (typeFilter !== "all") {
-      filtered = filtered.filter((invoice) => invoice.type === typeFilter)
-    }
-
-    setFilteredInvoices(filtered)
-  }, [invoices, searchTerm, statusFilter, typeFilter])
-
-  const handleRefresh = () => {
-    const invoicesData = getInvoices()
-    setInvoices(invoicesData)
   }
 
+  // Gestion de la suppression
+  const handleDeleteInvoice = async (id: string, number: string) => {
+    if (confirm(`Êtes-vous sûr de vouloir supprimer la facture ${number} ?`)) {
+      const success = await remove(id)
+      if (success) {
+        refresh()
+      }
+    }
+  }
+
+  // Formatage de la devise
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
@@ -83,37 +104,27 @@ export default function InvoicesPage() {
     }).format(amount)
   }
 
-  const overdueInvoices = getOverdueInvoices()
-  const stats = getInvoiceStats()
-
-  if (!user || !canManageFinances) {
+  // Protection de la route
+  if (!user || !canAccessFinances) {
     return null
-  }
-
-  const handleCreateInvoice = (invoiceData: any) => {
-    handleRefresh()
-  }
-
-  const handleDeleteInvoice = (invoiceId: string) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer cette facture ?")) {
-      handleRefresh()
-    }
   }
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Gestion des Factures</h1>
             <p className="text-muted-foreground">Créez, gérez et suivez vos factures clients</p>
           </div>
-          <Button onClick={() => setIsInvoiceFormOpen(true)}>
+          <Button onClick={() => setIsInvoiceFormOpen(true)} disabled={loading}>
             <Plus className="mr-2 h-4 w-4" />
             Nouvelle facture
           </Button>
         </div>
 
+        {/* Alertes factures en retard */}
         {overdueInvoices.length > 0 && (
           <Card className="border-red-200 bg-red-50">
             <CardHeader>
@@ -150,45 +161,49 @@ export default function InvoicesPage() {
           </Card>
         )}
 
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total factures</CardTitle>
-              <Receipt className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.total}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">En retard</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.overdue}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Impayées</CardTitle>
-              <Euro className="h-4 w-4 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(stats.totalUnpaid)}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Revenus encaissés</CardTitle>
-              <TrendingUp className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(stats.totalRevenue)}</div>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Statistiques */}
+        {stats && (
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total factures</CardTitle>
+                <Receipt className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.total?stats.total:0}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">En retard</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-red-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.overdue?stats.overdue:0}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Impayées</CardTitle>
+                <Euro className="h-4 w-4 text-red-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(stats.totalUnpaid?stats.totalUnpaid:0)}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Revenus encaissés</CardTitle>
+                <TrendingUp className="h-4 w-4 text-green-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(stats.totalRevenue?stats.totalRevenue:0)}</div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
+        {/* Filtres */}
         <Card>
           <CardHeader>
             <CardTitle>Filtres</CardTitle>
@@ -235,87 +250,115 @@ export default function InvoicesPage() {
           </CardContent>
         </Card>
 
+        {/* Affichage des erreurs */}
+        {error && (
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <p className="text-red-800">{error}</p>
+                <Button variant="outline" size="sm" onClick={clearError}>
+                  Fermer
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Liste des factures */}
         <Card>
           <CardHeader>
-            <CardTitle>Liste des factures ({filteredInvoices.length})</CardTitle>
+            <CardTitle>Liste des factures ({invoices.length})</CardTitle>
             <CardDescription>Gérez vos factures avec suivi des paiements</CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Numéro</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Projet</TableHead>
-                  <TableHead>Montant</TableHead>
-                  <TableHead>Payé</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead>Échéance</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredInvoices.map((invoice) => (
-                  <TableRow key={invoice.id}>
-                    <TableCell className="font-medium">{invoice.number}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{invoiceTypeLabels[invoice.type]}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{invoice.clientName}</div>
-                        <div className="text-sm text-muted-foreground">{invoice.clientEmail}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="max-w-48 truncate" title={invoice.projectTitle}>
-                        {invoice.projectTitle}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-medium">{formatCurrency(invoice.total)}</TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium text-green-600">{formatCurrency(invoice.paidAmount)}</div>
-                        {invoice.remainingAmount > 0 && (
-                          <div className="text-sm text-red-600">Reste: {formatCurrency(invoice.remainingAmount)}</div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={invoiceStatusColors[invoice.status]}>
-                        {invoiceStatusLabels[invoice.status]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        <div>{new Date(invoice.dueDate).toLocaleDateString("fr-FR")}</div>
-                        {invoice.remindersSent > 0 && (
-                          <div className="text-xs text-muted-foreground">{invoice.remindersSent} relance(s)</div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center gap-2 justify-end">
-                        <InvoiceActions invoice={invoice} onUpdate={handleRefresh} />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteInvoice(invoice.id)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+            {loading ? (
+              <div className="text-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+                <p className="text-muted-foreground mt-2">Chargement...</p>
+              </div>
+            ) : invoices.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Aucune facture trouvée</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Numéro</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Client</TableHead>
+                    <TableHead>Projet</TableHead>
+                    <TableHead>Montant</TableHead>
+                    <TableHead>Payé</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead>Échéance</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {invoices.map((invoice) => (
+                    <TableRow key={invoice.id}>
+                      <TableCell className="font-medium">{invoice.number}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{invoiceTypeLabels[invoice.type]}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{invoice.clientName}</div>
+                          <div className="text-sm text-muted-foreground">{invoice.clientEmail}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="max-w-48 truncate" title={invoice.projectTitle}>
+                          {invoice.projectTitle}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-medium">{formatCurrency(invoice.total)}</TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium text-green-600">{formatCurrency(invoice.paidAmount)}</div>
+                          {invoice.remainingAmount > 0 && (
+                            <div className="text-sm text-red-600">Reste: {formatCurrency(invoice.remainingAmount)}</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={invoiceStatusColors[invoice.status]}>
+                          {invoiceStatusLabels[invoice.status]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          <div>{new Date(invoice.dueDate).toLocaleDateString("fr-FR")}</div>
+                          {invoice.remindersSent > 0 && (
+                            <div className="text-xs text-muted-foreground">{invoice.remindersSent} relance(s)</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center gap-2 justify-end">
+                          <InvoiceActions invoice={invoice} onUpdate={refresh} />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteInvoice(invoice.id, invoice.number)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            disabled={loading}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </div>
 
+      {/* Modal de création */}
       <InvoiceFormModal
         isOpen={isInvoiceFormOpen}
         onClose={() => setIsInvoiceFormOpen(false)}
