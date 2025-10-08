@@ -6,11 +6,11 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Check, Calendar, Euro } from "lucide-react"
 import { useInvoices } from "@/hooks/useInvoices"
-import type { Invoice } from "@/lib/invoices"
+import type { Facture } from "@/types/invoices"
 import { toast } from "@/hooks/use-toast"
 
 interface PaymentTrackingModalProps {
-  invoice: Invoice
+  invoice: Facture
   open: boolean
   onOpenChange: (open: boolean) => void
   onUpdate: () => void
@@ -29,9 +29,9 @@ export function PaymentTrackingModal({ invoice, open, onOpenChange, onUpdate }: 
   }
 
   const handleMarkPaymentAsPaid = async (paymentId: string, paymentDescription: string, paymentAmount: number) => {
-    const success = await markAsPaid(invoice.id, {
-      amount: paymentAmount,
-      paidDate: new Date().toISOString(),
+    const success = await markAsPaid(invoice.id.toString(), {
+      montantPaye: paymentAmount,
+      datePaiement: new Date().toISOString(),
     })
 
     if (success) {
@@ -98,16 +98,16 @@ export function PaymentTrackingModal({ invoice, open, onOpenChange, onUpdate }: 
           <div>
             <h4 className="font-semibold mb-4">Échéancier de paiement</h4>
             <div className="space-y-3">
-              {invoice.paymentSchedule.map((payment, index) => (
+              {invoice.echeanciers?.map((payment, index) => (
                 <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="flex-1">
                     <div className="flex items-center space-x-3">
                       <div className="flex-shrink-0">
                         <div
                           className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                            payment.status === "payee"
+                            payment.statut === "Paye"
                               ? "bg-green-100 text-green-800"
-                              : payment.status === "en_retard"
+                              : payment.statut === "EnRetard"
                                 ? "bg-red-100 text-red-800"
                                 : "bg-gray-100 text-gray-800"
                           }`}
@@ -118,9 +118,9 @@ export function PaymentTrackingModal({ invoice, open, onOpenChange, onUpdate }: 
                       <div className="flex-1">
                         <p className="font-medium">{payment.description}</p>
                         <div className="flex items-center space-x-4 text-sm text-muted-foreground mt-1">
-                          <span>Échéance: {new Date(payment.dueDate).toLocaleDateString("fr-FR")}</span>
-                          {payment.paidDate && (
-                            <span>Payé le: {new Date(payment.paidDate).toLocaleDateString("fr-FR")}</span>
+                          <span>Échéance: {new Date(payment.dateEcheance).toLocaleDateString("fr-FR")}</span>
+                          {payment.datePaiement && (
+                            <span>Payé le: {new Date(payment.datePaiement).toLocaleDateString("fr-FR")}</span>
                           )}
                         </div>
                       </div>
@@ -128,15 +128,15 @@ export function PaymentTrackingModal({ invoice, open, onOpenChange, onUpdate }: 
                   </div>
                   <div className="flex items-center space-x-3">
                     <div className="text-right">
-                      <p className="font-bold">{formatCurrency(payment.amount)}</p>
-                      <Badge className={getPaymentStatusColor(payment.status)}>
-                        {getPaymentStatusLabel(payment.status)}
+                      <p className="font-bold">{formatCurrency(payment.montantTTC)}</p>
+                      <Badge className={getPaymentStatusColor(payment.statut)}>
+                        {getPaymentStatusLabel(payment.statut)}
                       </Badge>
                     </div>
-                    {payment.status !== "payee" && (
+                    {payment.statut !== "Paye" && (
                       <Button
                         size="sm"
-                        onClick={() => handleMarkPaymentAsPaid(payment.id, payment.description, payment.amount)}
+                        onClick={() => handleMarkPaymentAsPaid(payment.id.toString(), payment.description || "", payment.montantTTC)}
                         className="flex-shrink-0"
                         disabled={loading}
                       >
@@ -154,20 +154,20 @@ export function PaymentTrackingModal({ invoice, open, onOpenChange, onUpdate }: 
           <div>
             <h4 className="font-semibold mb-3">Historique des paiements</h4>
             <div className="space-y-2">
-              {invoice.paymentSchedule
-                .filter((payment) => payment.status === "payee")
+              {invoice.echeanciers
+                ?.filter((payment) => payment.statut === "Paye")
                 .map((payment) => (
                   <div key={payment.id} className="flex items-center justify-between text-sm p-2 bg-green-50 rounded">
                     <span>{payment.description}</span>
                     <div className="text-right">
-                      <div className="font-medium">{formatCurrency(payment.amount)}</div>
+                      <div className="font-medium">{formatCurrency(payment.montantTTC)}</div>
                       <div className="text-muted-foreground">
-                        {payment.paidDate && new Date(payment.paidDate).toLocaleDateString("fr-FR")}
+                        {payment.datePaiement && new Date(payment.datePaiement).toLocaleDateString("fr-FR")}
                       </div>
                     </div>
                   </div>
                 ))}
-              {invoice.paymentSchedule.filter((payment) => payment.status === "payee").length === 0 && (
+              {invoice.echeanciers?.filter((payment) => payment.statut === "Paye").length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">Aucun paiement enregistré</p>
               )}
             </div>

@@ -46,6 +46,7 @@ const navigation: NavigationItem[] = [
   { name: "Devis", href: "/devis", icon: FileText, permission: "devis" },
   { name: "Projets", href: "/projets", icon: Hammer, permission: "projets" },
   { name: "Factures", href: "/factures", icon: Receipt, permission: "factures" },
+  { name: "Clients", href: "/clients", icon: Users, permission: "clients" },
   { name: "Sous-traitants", href: "/sous-traitants", icon: Users, permission: "sous_traitants" },
   { name: "Trésorerie", href: "/tresorerie", icon: Wallet, permission: "tresorerie" },
   { name: "Paramètres", href: "/parametres", icon: UserCog, permission: "utilisateurs" },

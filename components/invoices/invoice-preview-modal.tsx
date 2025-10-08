@@ -3,11 +3,11 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { type Invoice, invoiceStatusLabels, invoiceStatusColors, invoiceTypeLabels } from "@/lib/invoices"
+import { type Facture, invoiceStatusLabels, invoiceStatusColors, invoiceTypeLabels } from "@/types/invoices"
 import { Building2, Mail, Phone, MapPin } from "lucide-react"
 
 interface InvoicePreviewModalProps {
-  invoice: Invoice
+  invoice: Facture
   open: boolean
   onOpenChange: (open: boolean) => void
 }
@@ -84,22 +84,22 @@ export function InvoicePreviewModal({ invoice, open, onOpenChange }: InvoicePrev
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Date d'émission:</span>
-                  <span>{new Date(invoice.createdAt).toLocaleDateString("fr-FR")}</span>
+                  <span>{new Date(invoice.dateCreation).toLocaleDateString("fr-FR")}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Date d'échéance:</span>
                   <span>{new Date(invoice.dueDate).toLocaleDateString("fr-FR")}</span>
                 </div>
-                {invoice.paidDate && (
+                {invoice.dateEcheance && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Date de paiement:</span>
-                    <span>{new Date(invoice.paidDate).toLocaleDateString("fr-FR")}</span>
+                    <span>{new Date(invoice.dateEcheance).toLocaleDateString("fr-FR")}</span>
                   </div>
                 )}
-                {invoice.relatedQuoteId && (
+                {invoice.devisId && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Devis associé:</span>
-                    <span>DEV-2024-{invoice.relatedQuoteId.padStart(3, "0")}</span>
+                    <span>DEV-2024-{invoice.devisId.toString().padStart(3, "0")}</span>
                   </div>
                 )}
               </div>
@@ -132,13 +132,13 @@ export function InvoicePreviewModal({ invoice, open, onOpenChange }: InvoicePrev
                   </tr>
                 </thead>
                 <tbody>
-                  {invoice.items.map((item, index) => (
+                  {invoice.lignes?.map((item, index) => (
                     <tr key={item.id} className={index % 2 === 0 ? "bg-background" : "bg-muted/50"}>
                       <td className="p-3">{item.description}</td>
-                      <td className="text-right p-3">{item.quantity}</td>
-                      <td className="text-right p-3">{item.unit}</td>
-                      <td className="text-right p-3">{formatCurrency(item.unitPrice)}</td>
-                      <td className="text-right p-3 font-medium">{formatCurrency(item.total)}</td>
+                      <td className="text-right p-3">{item.quantite}</td>
+                      <td className="text-right p-3">{item.unite}</td>
+                      <td className="text-right p-3">{formatCurrency(item.prixUnitaireHT)}</td>
+                      <td className="text-right p-3 font-medium">{formatCurrency(item.totalHT)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -151,11 +151,11 @@ export function InvoicePreviewModal({ invoice, open, onOpenChange }: InvoicePrev
             <div className="w-80 space-y-2">
               <div className="flex justify-between">
                 <span>Sous-total :</span>
-                <span>{formatCurrency(invoice.subtotal)}</span>
+                <span>{formatCurrency(invoice.total)}</span>
               </div>
               <div className="flex justify-between">
-                <span>TVA ({invoice.taxRate}%) :</span>
-                <span>{formatCurrency(invoice.taxAmount)}</span>
+                <span>TVA ({invoice.tauxTVA}%) :</span>
+                <span>{formatCurrency(invoice.montantTVA)}</span>
               </div>
               <Separator />
               <div className="flex justify-between text-lg font-bold">
@@ -178,36 +178,36 @@ export function InvoicePreviewModal({ invoice, open, onOpenChange }: InvoicePrev
           </div>
 
           {/* Payment Schedule */}
-          {invoice.paymentSchedule.length > 1 && (
+          {invoice.echeanciers?.length && (
             <>
               <Separator />
               <div>
                 <h4 className="font-semibold mb-3">Échéancier de paiement</h4>
                 <div className="space-y-2">
-                  {invoice.paymentSchedule.map((payment, index) => (
+                  {invoice.echeanciers.map((payment, index) => (
                     <div key={payment.id} className="flex items-center justify-between p-3 border rounded-lg">
                       <div>
                         <p className="font-medium">{payment.description}</p>
                         <p className="text-sm text-muted-foreground">
-                          Échéance: {new Date(payment.dueDate).toLocaleDateString("fr-FR")}
-                          {payment.paidDate && ` • Payé le ${new Date(payment.paidDate).toLocaleDateString("fr-FR")}`}
+                          Échéance: {new Date(payment.dateEcheance).toLocaleDateString("fr-FR")}
+                          {payment.datePaiement && ` • Payé le ${new Date(payment.datePaiement).toLocaleDateString("fr-FR")}`}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium">{formatCurrency(payment.amount)}</p>
+                        <p className="font-medium">{formatCurrency(payment.montantTTC)}</p>
                         <Badge
                           variant="outline"
                           className={
-                            payment.status === "payee"
+                            payment.statut === "payee"
                               ? "bg-green-100 text-green-800"
-                              : payment.status === "en_retard"
+                              : payment.statut === "en_retard"
                                 ? "bg-red-100 text-red-800"
                                 : "bg-gray-100 text-gray-800"
                           }
                         >
-                          {payment.status === "payee"
+                          {payment.statut === "payee"
                             ? "Payé"
-                            : payment.status === "en_retard"
+                            : payment.statut === "en_retard"
                               ? "En retard"
                               : "En attente"}
                         </Badge>
@@ -220,7 +220,7 @@ export function InvoicePreviewModal({ invoice, open, onOpenChange }: InvoicePrev
           )}
 
           {/* Notes */}
-          {invoice.notes && (
+        {/*   {invoice. && (
             <>
               <Separator />
               <div>
@@ -228,10 +228,10 @@ export function InvoicePreviewModal({ invoice, open, onOpenChange }: InvoicePrev
                 <p className="text-muted-foreground">{invoice.notes}</p>
               </div>
             </>
-          )}
+          )} */}
 
           {/* Reminders */}
-          {invoice.remindersSent > 0 && (
+          {/* {invoice.remindersSent > 0 && (
             <>
               <Separator />
               <div>
@@ -243,7 +243,7 @@ export function InvoicePreviewModal({ invoice, open, onOpenChange }: InvoicePrev
                 </p>
               </div>
             </>
-          )}
+          )} */}
         </div>
       </DialogContent>
     </Dialog>

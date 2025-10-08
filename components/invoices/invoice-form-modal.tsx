@@ -17,17 +17,19 @@ import { CalendarIcon, Plus, Trash2 } from "lucide-react"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 import { cn } from "@/lib/utils"
-import type { InvoiceType, InvoiceItem, PaymentScheduleItem } from "@/lib/invoices"
+import type { InvoiceType, LigneFacture, Echeancier } from "@/types/invoices"
+
+import type { CreateFactureRequest } from "@/types/invoices"
 
 interface InvoiceFormModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (invoice: any) => void
+  onSubmit: (invoice: CreateFactureRequest) => void
 }
 
 export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModalProps) {
   const [formData, setFormData] = useState({
-    type: "facture_devis" as InvoiceType,
+    type: "Devis" as InvoiceType,
     clientName: "",
     clientId: 0,
     clientEmail: "",
@@ -37,41 +39,45 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
     description: "",
     taxRate: 18,
     notes: "",
+    titre:"",
   })
 
-  const [items, setItems] = useState<InvoiceItem[]>([
-    { id: "1", description: "", quantity: 1, unit: "unité", unitPrice: 0, total: 0 },
+  const [items, setItems] = useState<LigneFacture[]>([
+    { id: 1, factureId: 1, ordre: 1, designation: "", description: "", quantite: 1, unite: "unité", prixUnitaireHT: 0, totalHT: 0 },
   ])
 
-  const [paymentSchedule, setPaymentSchedule] = useState<PaymentScheduleItem[]>([
-    { id: "1", description: "Paiement unique", amount: 0, dueDate: "", status: "en_attente" },
+  const [paymentSchedule, setPaymentSchedule] = useState<Echeancier[]>([
+    { id: 1, factureId: 1, ordre: 1, description: "Paiement unique", montantTTC: 0, dateEcheance: "", statut: "EnAttente" },
   ])
 
   const [dueDate, setDueDate] = useState<Date>()
 
   const addItem = () => {
-    const newItem: InvoiceItem = {
-      id: Date.now().toString(),
+    const newItem : LigneFacture = {
+      id: Date.now(), // Utiliser un ID unique basé sur le timestamp
+      designation: "",
       description: "",
-      quantity: 1,
-      unit: "unité",
-      unitPrice: 0,
-      total: 0,
+      quantite: 1,
+      unite: "unité",
+      prixUnitaireHT: 0,
+      totalHT: 0,
+      factureId: 1,
+      ordre: items.length + 1,
     }
     setItems([...items, newItem])
   }
 
-  const removeItem = (id: string) => {
+  const removeItem = (id: number) => {
     setItems(items.filter((item) => item.id !== id))
   }
 
-  const updateItem = (id: string, field: keyof InvoiceItem, value: any) => {
+  const updateItem = (id: number, field: keyof LigneFacture, value: any) => {
     setItems(
       items.map((item) => {
         if (item.id === id) {
           const updatedItem = { ...item, [field]: value }
-          if (field === "quantity" || field === "unitPrice") {
-            updatedItem.total = updatedItem.quantity * updatedItem.unitPrice
+          if (field === "quantite" || field === "prixUnitaireHT") {
+            updatedItem.totalHT = updatedItem.quantite * updatedItem.prixUnitaireHT
           }
           return updatedItem
         }
@@ -81,49 +87,61 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
   }
 
   const addPayment = () => {
-    const newPayment: PaymentScheduleItem = {
-      id: Date.now().toString(),
+    const newPayment: Echeancier = {
+      id: Date.now(), // Utiliser un ID unique basé sur le timestamp
       description: "",
-      amount: 0,
-      dueDate: "",
-      status: "en_attente",
+      montantTTC: 0,
+      dateEcheance: "",
+      statut: "EnAttente",
+      factureId: 1,
+      ordre: paymentSchedule.length + 1,
     }
     setPaymentSchedule([...paymentSchedule, newPayment])
   }
 
-  const removePayment = (id: string) => {
+  const removePayment = (id: number) => {
     setPaymentSchedule(paymentSchedule.filter((payment) => payment.id !== id))
   }
 
-  const updatePayment = (id: string, field: keyof PaymentScheduleItem, value: any) => {
+  const updatePayment = (id: number, field: keyof Echeancier, value: any) => {
     setPaymentSchedule(paymentSchedule.map((payment) => (payment.id === id ? { ...payment, [field]: value } : payment)))
   }
 
-  const subtotal = items.reduce((sum, item) => sum + item.total, 0)
+  const subtotal = items.reduce((sum, item) => sum + item.totalHT, 0)
   const taxAmount = subtotal * (formData.taxRate / 100)
   const total = subtotal + taxAmount
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    const invoice = {
-      ...formData,
-      items,
-      paymentSchedule,
-      subtotal,
-      taxAmount,
-      total,
-      dueDate: dueDate ? format(dueDate, "yyyy-MM-dd") : "",
-      status: "brouillon",
-      paidAmount: 0,
-      remainingAmount: total,
-      remindersSent: 0,
-      createdAt: new Date().toISOString().split("T")[0],
-      updatedAt: new Date().toISOString().split("T")[0],
-      createdBy: "user@example.com",
+    // Format des données selon l'API
+    const invoiceData = {
+      typeFacture: formData.type,
+      clientId: formData.clientId || undefined,
+      sousTraitantId: undefined,
+      devisId: undefined,
+      projetId: undefined,
+      titre: formData.titre,
+      description: formData.description || "",
+      dateFacture: new Date().toISOString(),
+      dateEcheance: dueDate ? dueDate.toISOString() : new Date().toISOString(),
+      conditionsPaiement: formData.notes || "",
+      referenceClient: formData.clientName || "",
+      lignes: items.map(item => ({
+        designation: item.designation || item.description || "",
+        description: item.description || "",
+        quantite: item.quantite,
+        unite: item.unite,
+        prixUnitaireHT: item.prixUnitaireHT
+      })),
+      echeanciers: paymentSchedule.map(payment => ({
+        description: payment.description || "",
+        montantTTC: payment.montantTTC,
+        dateEcheance: payment.dateEcheance ? new Date(payment.dateEcheance).toISOString() : new Date().toISOString()
+      }))
     }
 
-    onSubmit(invoice)
+    onSubmit(invoiceData)
     onClose()
   }
 
@@ -154,9 +172,9 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="facture_devis">Facture Devis</SelectItem>
-                          <SelectItem value="facture_sous_traitant">Facture Sous-traitant</SelectItem>
-                          <SelectItem value="avoir">Avoir</SelectItem>
+                          <SelectItem value="Devis">Facture Devis</SelectItem>
+                          <SelectItem value="SousTraitant">Facture Sous-traitant</SelectItem>
+                          <SelectItem value="Avoir">Avoir</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -165,8 +183,8 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
                       <Label htmlFor="projectTitle">Titre du projet</Label>
                       <Input
                         id="projectTitle"
-                        value={formData.projectTitle}
-                        onChange={(e) => setFormData({ ...formData, projectTitle: e.target.value })}
+                        value={formData.titre}
+                        onChange={(e) => setFormData({ ...formData, titre: e.target.value })}
                         required
                       />
                     </div>
@@ -212,10 +230,8 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-                  <div className="space-y-1.5">
-                  <Label htmlFor="clientId" className="text-sm font-medium">
-                    Client *
-                  </Label>
+                  <div >
+                  <Label htmlFor="clientId"> Client *</Label>
                   <Select
                     value={formData.clientId > 0 ? formData.clientId.toString() : ""}
                     onValueChange={(value) => setFormData({ ...formData, clientId: parseInt(value) || 0 })}
@@ -231,7 +247,7 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
                   </Select>
                 </div>
 
-                    <div className="space-y-1.5">
+                    <div >
                       <Label htmlFor="clientEmail">Email</Label>
                       <Input
                         id="clientEmail"
@@ -291,11 +307,11 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
                     {items.map((item, index) => (
                       <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 border rounded-lg">
                         <div className="md:col-span-4">
-                          <Label>Description</Label>
+                          <Label>Désignation</Label>
                           <Input
-                            value={item.description}
-                            onChange={(e) => updateItem(item.id, "description", e.target.value)}
-                            placeholder="Description de l'élément"
+                            value={item.designation}
+                            onChange={(e) => updateItem(item.id, "designation", e.target.value)}
+                            placeholder="Désignation de l'élément"
                             required
                           />
                         </div>
@@ -304,8 +320,8 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
                           <Label>Quantité</Label>
                           <Input
                             type="number"
-                            value={item.quantity}
-                            onChange={(e) => updateItem(item.id, "quantity", Number.parseFloat(e.target.value) || 0)}
+                            value={item.quantite}
+                            onChange={(e) => updateItem(item.id, "quantite", Number.parseFloat(e.target.value) || 0)}
                             min="0"
                             step="0.01"
                             required
@@ -315,8 +331,8 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
                         <div className="md:col-span-2">
                           <Label>Unité</Label>
                           <Input
-                            value={item.unit}
-                            onChange={(e) => updateItem(item.id, "unit", e.target.value)}
+                            value={item.unite}
+                            onChange={(e) => updateItem(item.id, "unite", e.target.value)}
                             placeholder="m², h, forfait..."
                           />
                         </div>
@@ -325,8 +341,8 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
                           <Label>Prix unitaire (FCFA)</Label>
                           <Input
                             type="number"
-                            value={item.unitPrice}
-                            onChange={(e) => updateItem(item.id, "unitPrice", Number.parseFloat(e.target.value) || 0)}
+                            value={item.prixUnitaireHT}
+                            onChange={(e) => updateItem(item.id, "prixUnitaireHT", Number.parseFloat(e.target.value) || 0)}
                             min="0"
                             step="0.01"
                             required
@@ -335,7 +351,7 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
 
                         <div className="md:col-span-1 flex items-end">
                           <Badge variant="outline" className="w-full justify-center">
-                            {item.total.toLocaleString()} FCFA
+                            {item.totalHT.toLocaleString()} FCFA
                           </Badge>
                         </div>
 
@@ -385,9 +401,9 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
                           <Label>Montant (FCFA)</Label>
                           <Input
                             type="number"
-                            value={payment.amount}
+                            value={payment.montantTTC}
                             onChange={(e) =>
-                              updatePayment(payment.id, "amount", Number.parseFloat(e.target.value) || 0)
+                              updatePayment(payment.id, "montantTTC", Number.parseFloat(e.target.value) || 0)
                             }
                             min="0"
                             step="0.01"
@@ -399,8 +415,8 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
                           <Label>Date d'échéance</Label>
                           <Input
                             type="date"
-                            value={payment.dueDate}
-                            onChange={(e) => updatePayment(payment.id, "dueDate", e.target.value)}
+                            value={payment.dateEcheance}
+                            onChange={(e) => updatePayment(payment.id, "dateEcheance", e.target.value)}
                             required
                           />
                         </div>

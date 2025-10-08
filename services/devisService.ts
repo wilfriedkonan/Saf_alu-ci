@@ -1,4 +1,4 @@
-// src/services/devisService.ts
+// services/devisService.ts
 
 import axios, { AxiosResponse } from 'axios';
 import { 
@@ -53,7 +53,7 @@ export class DevisService {
    * Récupère tous les devis
    */
   static async getAllDevis(): Promise<any[]> {
-    try {
+    try {console.log("Récupération des devis")
       const response: AxiosResponse<any[]> = await apiClient.get('/devis');
       console.log('Reponse: ',response.data)
       return response.data;

@@ -1,343 +1,425 @@
 // services/invoiceService.ts
 
+import axios, { AxiosResponse } from 'axios';
 import type {
-    Invoice,
-    InvoiceStatus,
-    InvoiceType,
-  } from "@/lib/invoices"
+    Facture,
+    LigneFacture,
+    Echeancier,
+    CreateFactureRequest,
+    CreateLigneFactureRequest,
+    CreateEcheancierRequest,
+    MarquerPayeRequest,
+  } from "@/types/invoices"
   
-  // DTOs pour l'API
-  interface CreateInvoiceDTO {
-    type: InvoiceType
-    clientId?: number
-    subcontractorId?: number
-    quoteId?: number
-    projectId?: number
-    title: string
-    projectTitle: string
+  // Types pour les statuts et types de factures
+  type FactureStatut = "Brouillon" | "Envoyee" | "Payee" | "EnRetard" | "Annulee";
+  type FactureType = "Devis" | "SousTraitant" | "Avoir" | "Acompte";
+  
+  // DTOs pour l'API - Utilisation des types de types/invoices.ts
+  interface UpdateFactureRequest {
+    titre?: string
     description?: string
-    invoiceDate: string
-    dueDate: string
-    paymentTerms?: string
-    clientReference?: string
-    taxRate?: number
-    clientName: string
-    clientEmail: string
-    clientPhone?: string
-    clientAddress?: string
-    items: Array<{
-      description: string
-      quantity: number
-      unit: string
-      unitPrice: number
-    }>
-    paymentSchedule?: Array<{
-      description?: string
-      amount: number
-      dueDate: string
-    }>
-    notes?: string
+    dateFacture?: string
+    dateEcheance?: string
+    conditionsPaiement?: string
+    referenceClient?: string
+    lignes?: CreateLigneFactureRequest[]
+    echeanciers?: CreateEcheancierRequest[]
   }
   
-  interface UpdateInvoiceDTO {
-    title?: string
-    projectTitle?: string
-    description?: string
-    invoiceDate?: string
-    dueDate?: string
-    paymentTerms?: string
-    clientReference?: string
-    items?: Array<{
-      description: string
-      quantity: number
-      unit: string
-      unitPrice: number
-    }>
-    paymentSchedule?: Array<{
-      description?: string
-      amount: number
-      dueDate: string
-    }>
-    notes?: string
-  }
-  
-  interface MarkAsPaidDTO {
-    amount: number
-    paymentMethod?: string
-    paymentReference?: string
-    paidDate?: string
-  }
-  
-  interface InvoiceStats {
+  interface FactureStats {
     total: number
     overdue: number
     totalUnpaid: number
     totalRevenue: number
-    byStatus?: Record<InvoiceStatus, number>
-    byType?: Record<InvoiceType, number>
+    byStatus?: Record<FactureStatut, number>
+    byType?: Record<FactureType, number>
   }
   
-  interface InvoiceFilters {
-    status?: InvoiceStatus | "all"
-    type?: InvoiceType | "all"
+  interface FactureFilters {
+    status?: FactureStatut | "all"
+    type?: FactureType | "all"
     search?: string
     clientId?: number
     projectId?: number
     year?: number
   }
+
+  interface ApiResponse<T> {
+    data?: T;
+    message?: string;
+    errors?: string[];
+  }
   
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
-  
-  class InvoiceService {
-    private getAuthHeaders(): HeadersInit {
-      const token = localStorage.getItem("token")
-      return {
-        "Content-Type": "application/json",
-        Authorization: token ? `Bearer ${token}` : "",
+  // Configuration axios
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5264/api';
+
+  const apiClient = axios.create({
+    baseURL: API_BASE_URL,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  // Intercepteur pour ajouter le token d'authentification
+  apiClient.interceptors.request.use(
+    (config) => {
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
       }
+      return config;
+    },
+    (error) => {
+      return Promise.reject(error);
     }
-  
-    private async handleResponse<T>(response: Response): Promise<T> {
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: "Une erreur est survenue" }))
-        throw new Error(error.message || `Erreur HTTP: ${response.status}`)
+  );
+
+  // Intercepteur pour gérer les erreurs de réponse
+  apiClient.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      if (error.response?.status === 401) {
+        // Token expiré ou invalide
+        localStorage.removeItem('authToken');
+        window.location.href = '/';
       }
-      return response.json()
+      return Promise.reject(error);
     }
+  );
+  
+  export class InvoiceService {
   
     /**
      * Récupère toutes les factures avec filtres optionnels
      */
-    async getAll(filters?: InvoiceFilters): Promise<Invoice[]> {
-      const params = new URLSearchParams()
-      
-      if (filters?.status && filters.status !== "all") {
-        params.append("statut", filters.status)
+    static async getAllInvoices(filters?: FactureFilters): Promise<Facture[]> {
+      try { 
+        const params = new URLSearchParams()
+        
+        if (filters?.status && filters.status !== "all") {
+          params.append("statut", filters.status)
+        }
+        
+        if (filters?.type && filters.type !== "all") {
+          params.append("typeFacture", filters.type)
+        }
+    
+        const url = `/factures${params.toString() ? `?${params.toString()}` : ""}`
+        
+        const response: AxiosResponse<Facture[]> = await apiClient.get(url)
+        
+        let data = response.data
+        
+        // Filtrage côté client pour search, clientId, projectId
+        if (filters?.search) {
+          const searchLower = filters.search.toLowerCase()
+          data = data.filter(
+            (inv) =>
+              inv.numero.toLowerCase().includes(searchLower) ||
+              inv.client?.nom?.toLowerCase().includes(searchLower) ||
+              inv.titre?.toLowerCase().includes(searchLower)
+          )
+        }
+        
+        if (filters?.clientId) {
+          data = data.filter((inv) => inv.clientId === filters.clientId)
+        }
+        
+        if (filters?.projectId) {
+          data = data.filter((inv) => inv.projetId === filters.projectId)
+        }
+        
+        return data
+      } catch (error) {
+        console.error('Erreur lors de la récupération des factures:', error);
+        throw this.handleError(error);
       }
-      
-      if (filters?.type && filters.type !== "all") {
-        params.append("typeFacture", filters.type)
-      }
-  
-      const url = `${API_BASE_URL}/factures${params.toString() ? `?${params.toString()}` : ""}`
-      
-      const response = await fetch(url, {
-        headers: this.getAuthHeaders(),
-      })
-  
-      const data = await this.handleResponse<Invoice[]>(response)
-      
-      // Filtrage côté client pour search, clientId, projectId
-      let filtered = data
-      
-      if (filters?.search) {
-        const searchLower = filters.search.toLowerCase()
-        filtered = filtered.filter(
-          (inv) =>
-            inv.number.toLowerCase().includes(searchLower) ||
-            inv.clientName?.toLowerCase().includes(searchLower) ||
-            inv.projectTitle?.toLowerCase().includes(searchLower)
-        )
-      }
-      
-      if (filters?.clientId) {
-        filtered = filtered.filter((inv) => inv.clientId === filters.clientId)
-      }
-      
-      if (filters?.projectId) {
-        filtered = filtered.filter((inv) => inv.projectId === filters.projectId)
-      }
-      
-      return filtered
     }
   
     /**
      * Récupère une facture par son ID
      */
-    async getById(id: string): Promise<Invoice> {
-      const response = await fetch(`${API_BASE_URL}/factures/${id}`, {
-        headers: this.getAuthHeaders(),
-      })
-  
-      return this.handleResponse<Invoice>(response)
+    static async getInvoiceById(id: string): Promise<Facture> {
+      try {
+        const response: AxiosResponse<Facture> = await apiClient.get(`/factures/${id}`);
+        return response.data;
+      } catch (error) {
+        console.error(`Erreur lors de la récupération de la facture ${id}:`, error);
+        throw this.handleError(error);
+      }
     }
   
-    /**
-     * Crée une nouvelle facture
-     */
-    async create(data: CreateInvoiceDTO): Promise<Invoice> {
-      const response = await fetch(`${API_BASE_URL}/factures`, {
-        method: "POST",
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(data),
-      })
-  
-      return this.handleResponse<Invoice>(response)
+  /**
+   * Crée une nouvelle facture
+   */
+  static async createInvoice(data: CreateFactureRequest): Promise<ApiResponse<Facture>> {
+    try {
+      console.log('📤 Données envoyées à l\'API pour créer une facture:', JSON.stringify(data, null, 2));
+      const response: AxiosResponse<ApiResponse<Facture>> = await apiClient.post('/factures', data);
+      console.log('✅ Réponse de l\'API:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Erreur lors de la création de la facture:', error);
+      throw this.handleError(error);
     }
+  }
   
     /**
      * Crée une facture à partir d'un devis
      */
-    async createFromQuote(quoteId: number): Promise<Invoice> {
-      const response = await fetch(`${API_BASE_URL}/factures/from-devis/${quoteId}`, {
-        method: "POST",
-        headers: this.getAuthHeaders(),
-      })
-  
-      return this.handleResponse<Invoice>(response)
+    static async createInvoiceFromQuote(quoteId: number): Promise<ApiResponse<Facture>> {
+      try {
+        const response: AxiosResponse<ApiResponse<Facture>> = await apiClient.post(`/factures/from-devis/${quoteId}`);
+        return response.data;
+      } catch (error) {
+        console.error(`Erreur lors de la création de la facture depuis le devis ${quoteId}:`, error);
+        throw this.handleError(error);
+      }
     }
   
     /**
      * Met à jour une facture (uniquement si statut = brouillon)
      */
-    async update(id: string, data: UpdateInvoiceDTO): Promise<void> {
-      const response = await fetch(`${API_BASE_URL}/factures/${id}`, {
-        method: "PUT",
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(data),
-      })
-  
-      await this.handleResponse<void>(response)
+    static async updateInvoice(id: string, data: UpdateFactureRequest): Promise<ApiResponse<void>> {
+      try {
+        const response: AxiosResponse<ApiResponse<void>> = await apiClient.put(`/factures/${id}`, data);
+        return response.data;
+      } catch (error) {
+        console.error(`Erreur lors de la mise à jour de la facture ${id}:`, error);
+        throw this.handleError(error);
+      }
     }
   
     /**
      * Envoie une facture (change le statut à envoyée)
      */
-    async send(id: string): Promise<void> {
-      const response = await fetch(`${API_BASE_URL}/factures/${id}/envoyer`, {
-        method: "POST",
-        headers: this.getAuthHeaders(),
-      })
-  
-      await this.handleResponse<void>(response)
+    static async sendInvoice(id: string): Promise<ApiResponse<void>> {
+      try {
+        const response: AxiosResponse<ApiResponse<void>> = await apiClient.post(`/factures/${id}/envoyer`);
+        return response.data;
+      } catch (error) {
+        console.error(`Erreur lors de l'envoi de la facture ${id}:`, error);
+        throw this.handleError(error);
+      }
     }
   
     /**
      * Marque une facture comme payée (partiellement ou totalement)
      */
-    async markAsPaid(id: string, data: MarkAsPaidDTO): Promise<void> {
-      const response = await fetch(`${API_BASE_URL}/factures/${id}/marquer-payee`, {
-        method: "POST",
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify({
-          montantPaye: data.amount,
-          modePaiement: data.paymentMethod,
-          referencePaiement: data.paymentReference,
-          datePaiement: data.paidDate || new Date().toISOString(),
-        }),
-      })
-  
-      await this.handleResponse<void>(response)
+    static async markInvoiceAsPaid(id: string, data: MarquerPayeRequest): Promise<ApiResponse<void>> {
+      try {
+        const response: AxiosResponse<ApiResponse<void>> = await apiClient.post(`/factures/${id}/marquer-payee`, data);
+        return response.data;
+      } catch (error) {
+        console.error(`Erreur lors du marquage de paiement de la facture ${id}:`, error);
+        throw this.handleError(error);
+      }
     }
   
     /**
      * Annule une facture
      */
-    async cancel(id: string, reason?: string): Promise<void> {
-      const response = await fetch(`${API_BASE_URL}/factures/${id}/annuler`, {
-        method: "POST",
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify({ motif: reason }),
-      })
-  
-      await this.handleResponse<void>(response)
+    static async cancelInvoice(id: string, reason?: string): Promise<ApiResponse<void>> {
+      try {
+        const response: AxiosResponse<ApiResponse<void>> = await apiClient.post(`/factures/${id}/annuler`, {
+          motif: reason
+        });
+        return response.data;
+      } catch (error) {
+        console.error(`Erreur lors de l'annulation de la facture ${id}:`, error);
+        throw this.handleError(error);
+      }
     }
   
     /**
      * Supprime une facture
      */
-    async delete(id: string): Promise<void> {
-      const response = await fetch(`${API_BASE_URL}/factures/${id}`, {
-        method: "DELETE",
-        headers: this.getAuthHeaders(),
-      })
-  
-      await this.handleResponse<void>(response)
+    static async deleteInvoice(id: string): Promise<ApiResponse<void>> {
+      try {
+        const response: AxiosResponse<ApiResponse<void>> = await apiClient.delete(`/factures/${id}`);
+        return response.data;
+      } catch (error) {
+        console.error(`Erreur lors de la suppression de la facture ${id}:`, error);
+        throw this.handleError(error);
+      }
     }
   
     /**
      * Récupère les factures impayées
      */
-    async getOverdue(): Promise<Invoice[]> {
-      const response = await fetch(`${API_BASE_URL}/factures/impayes`, {
-        headers: this.getAuthHeaders(),
-      })
-  
-      return this.handleResponse<Invoice[]>(response)
+    static async getOverdueInvoices(): Promise<Facture[]> {
+      try {
+        const response: AxiosResponse<Facture[]> = await apiClient.get('/factures/impayes');
+        return response.data;
+      } catch (error) {
+        console.error('Erreur lors de la récupération des factures impayées:', error);
+        throw this.handleError(error);
+      }
     }
   
     /**
      * Envoie une relance pour une facture
      */
-    async sendReminder(id: string): Promise<void> {
-      const response = await fetch(`${API_BASE_URL}/factures/${id}/relance`, {
-        method: "POST",
-        headers: this.getAuthHeaders(),
-      })
-  
-      await this.handleResponse<void>(response)
+    static async sendInvoiceReminder(id: string): Promise<ApiResponse<void>> {
+      try {
+        const response: AxiosResponse<ApiResponse<void>> = await apiClient.post(`/factures/${id}/relance`);
+        return response.data;
+      } catch (error) {
+        console.error(`Erreur lors de l'envoi de la relance pour la facture ${id}:`, error);
+        throw this.handleError(error);
+      }
     }
   
     /**
      * Télécharge le PDF d'une facture
      */
-    async downloadPDF(id: string): Promise<Blob> {
-      const response = await fetch(`${API_BASE_URL}/factures/${id}/pdf`, {
-        headers: this.getAuthHeaders(),
-      })
-  
-      if (!response.ok) {
-        throw new Error("Erreur lors du téléchargement du PDF")
+    static async downloadInvoicePDF(id: string): Promise<{ blob: Blob; filename?: string }> {
+      try {
+        const response: AxiosResponse<Blob> = await apiClient.get(`/factures/${id}/pdf`, {
+          responseType: 'blob'
+        });
+
+        let filename: string | undefined
+        const disposition = (response.headers as any)?.['content-disposition'] as string | undefined
+        if (disposition) {
+          const match = /filename\*=UTF-8''([^;\n]+)|filename="?([^";\n]+)"?/i.exec(disposition)
+          const encoded = match?.[1]
+          const plain = match?.[2]
+          if (encoded) filename = decodeURIComponent(encoded)
+          else if (plain) filename = plain
+        }
+
+        return { blob: response.data, filename }
+      } catch (error) {
+        console.error(`Erreur lors du téléchargement du PDF de la facture ${id}:`, error);
+        throw this.handleError(error);
       }
-  
-      return response.blob()
     }
   
     /**
      * Récupère les statistiques des factures
      */
-    async getStats(year?: number): Promise<InvoiceStats> {
-      const params = year ? `?annee=${year}` : ""
-      const response = await fetch(`${API_BASE_URL}/factures/statistiques${params}`, {
-        headers: this.getAuthHeaders(),
-      })
-  
-      return this.handleResponse<InvoiceStats>(response)
+    static async getInvoiceStats(year?: number): Promise<FactureStats> {
+      try {
+        const params = year ? `?annee=${year}` : ""
+        const response: AxiosResponse<FactureStats> = await apiClient.get(`/factures/statistiques${params}`);
+        return response.data;
+      } catch (error) {
+        console.error('Erreur lors de la récupération des statistiques des factures:', error);
+        throw this.handleError(error);
+      }
     }
   
     /**
      * Exporte les factures en Excel
      */
-    async exportToExcel(filters?: InvoiceFilters): Promise<Blob> {
-      const params = new URLSearchParams()
+    static async exportInvoicesToExcel(filters?: FactureFilters): Promise<{ blob: Blob; filename?: string }> {
+      try {
+        const params = new URLSearchParams()
+        
+        if (filters?.status && filters.status !== "all") {
+          params.append("statut", filters.status)
+        }
+        
+        if (filters?.type && filters.type !== "all") {
+          params.append("typeFacture", filters.type)
+        }
+
+        const response: AxiosResponse<Blob> = await apiClient.get(`/factures/export/excel?${params.toString()}`, {
+          responseType: 'blob'
+        });
+
+        let filename: string | undefined
+        const disposition = (response.headers as any)?.['content-disposition'] as string | undefined
+        if (disposition) {
+          const match = /filename\*=UTF-8''([^;\n]+)|filename="?([^";\n]+)"?/i.exec(disposition)
+          const encoded = match?.[1]
+          const plain = match?.[2]
+          if (encoded) filename = decodeURIComponent(encoded)
+          else if (plain) filename = plain
+        }
+
+        return { blob: response.data, filename }
+      } catch (error) {
+        console.error('Erreur lors de l\'export Excel des factures:', error);
+        throw this.handleError(error);
+      }
+    }
+
+    /**
+     * Gestion centralisée des erreurs
+     */
+    private static handleError(error: any): Error {
+      let message = 'Une erreur inattendue s\'est produite';
       
-      if (filters?.status && filters.status !== "all") {
-        params.append("statut", filters.status)
+      if (axios.isAxiosError(error)) {
+        if (error.response) {
+          // Erreur de réponse du serveur
+          const status = error.response.status;
+          const data = error.response.data;
+          
+          switch (status) {
+            case 400:
+              message = data?.message || 'Données invalides';
+              break;
+            case 401:
+              message = 'Non autorisé - Veuillez vous reconnecter';
+              break;
+            case 403:
+              message = 'Accès interdit';
+              break;
+            case 404:
+              message = 'Ressource non trouvée';
+              break;
+            case 409:
+              message = 'Conflit - La ressource existe déjà';
+              break;
+            case 422:
+              message = data?.message || 'Données non valides';
+              break;
+            case 500:
+              message = 'Erreur serveur interne';
+              break;
+            default:
+              message = data?.message || `Erreur ${status}`;
+          }
+        } else if (error.request) {
+          // Erreur de réseau
+          message = 'Erreur de connexion - Vérifiez votre réseau';
+        }
       }
       
-      if (filters?.type && filters.type !== "all") {
-        params.append("typeFacture", filters.type)
-      }
-  
-      const response = await fetch(`${API_BASE_URL}/factures/export/excel?${params.toString()}`, {
-        headers: this.getAuthHeaders(),
-      })
-  
-      if (!response.ok) {
-        throw new Error("Erreur lors de l'export Excel")
-      }
-  
-      return response.blob()
+      return new Error(message);
     }
   }
   
-  export const invoiceService = new InvoiceService()
+  // Hook personnalisé pour utiliser le service de factures
+  export const useInvoiceService = () => {
+    return {
+      getAllInvoices: InvoiceService.getAllInvoices,
+      getInvoiceById: InvoiceService.getInvoiceById,
+      createInvoice: InvoiceService.createInvoice,
+      createInvoiceFromQuote: InvoiceService.createInvoiceFromQuote,
+      updateInvoice: InvoiceService.updateInvoice,
+      deleteInvoice: InvoiceService.deleteInvoice,
+      sendInvoice: InvoiceService.sendInvoice,
+      markInvoiceAsPaid: InvoiceService.markInvoiceAsPaid,
+      cancelInvoice: InvoiceService.cancelInvoice,
+      sendInvoiceReminder: InvoiceService.sendInvoiceReminder,
+      downloadInvoicePDF: InvoiceService.downloadInvoicePDF,
+      getOverdueInvoices: InvoiceService.getOverdueInvoices,
+      getInvoiceStats: InvoiceService.getInvoiceStats,
+      exportInvoicesToExcel: InvoiceService.exportInvoicesToExcel,
+    };
+  };
   
   // Exporter les types pour utilisation dans les composants
   export type {
-    CreateInvoiceDTO,
-    UpdateInvoiceDTO,
-    MarkAsPaidDTO,
-    InvoiceStats,
-    InvoiceFilters,
+    FactureStatut,
+    FactureType,
+    UpdateFactureRequest,
+    FactureStats,
+    FactureFilters,
+    ApiResponse,
   }

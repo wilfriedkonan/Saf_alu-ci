@@ -19,13 +19,13 @@ import {
 } from "@/components/ui/dialog"
 import { MoreHorizontal, Mail, Edit, Eye, FileDown, Check, AlertTriangle, X } from "lucide-react"
 import { useInvoices } from "@/hooks/useInvoices"
-import type { Invoice } from "@/lib/invoices"
+import type { Facture } from "@/types/invoices"
 import { InvoicePreviewModal } from "./invoice-preview-modal"
 import { PaymentTrackingModal } from "./payment-tracking-modal"
 import { toast } from "@/hooks/use-toast"
 
 interface InvoiceActionsProps {
-  invoice: Invoice
+  invoice: Facture
   onUpdate: () => void
 }
 
@@ -38,7 +38,7 @@ export function InvoiceActions({ invoice, onUpdate }: InvoiceActionsProps) {
   const { send, cancel, sendReminder, downloadPDF, loading } = useInvoices(false)
 
   const handleSendInvoice = async () => {
-    const success = await send(invoice.id)
+    const success = await send(invoice.id.toString())
     if (success) {
       onUpdate()
       toast({
@@ -49,7 +49,7 @@ export function InvoiceActions({ invoice, onUpdate }: InvoiceActionsProps) {
   }
 
   const handleSendReminder = async () => {
-    const success = await sendReminder(invoice.id)
+    const success = await sendReminder(invoice.id.toString())
     if (success) {
       onUpdate()
       toast({
@@ -60,7 +60,7 @@ export function InvoiceActions({ invoice, onUpdate }: InvoiceActionsProps) {
   }
 
   const handleExportPDF = async () => {
-    await downloadPDF(invoice.id)
+    await downloadPDF(invoice.id.toString())
   }
 
   const handleExportExcel = () => {
@@ -71,7 +71,7 @@ export function InvoiceActions({ invoice, onUpdate }: InvoiceActionsProps) {
   }
 
   const handleCancel = async () => {
-    const success = await cancel(invoice.id)
+    const success = await cancel(invoice.id.toString())
     if (success) {
       onUpdate()
       toast({
@@ -82,12 +82,12 @@ export function InvoiceActions({ invoice, onUpdate }: InvoiceActionsProps) {
     }
   }
 
-  const canSend = invoice.status === "brouillon"
+  const canSend = invoice.status === "Brouillon"
   const canMarkPaid =
-    invoice.status === "envoyee" || invoice.status === "en_retard" || invoice.status === "partiellement_payee"
+    invoice.status === "Envoyee" || invoice.status === "EnRetard" || invoice.status === "Payee"
   const canSendReminder =
-    invoice.status === "envoyee" || invoice.status === "en_retard" || invoice.status === "partiellement_payee"
-  const canCancel = invoice.status !== "payee" && invoice.status !== "annulee"
+    invoice.status === "Envoyee" || invoice.status === "EnRetard" || invoice.status === "Payee"
+  const canCancel = invoice.status !== "Payee" && invoice.status !== "Annulee"
 
   return (
     <>

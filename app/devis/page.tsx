@@ -50,8 +50,13 @@ export default function DevisPage() {
       router.push("/dashboard")
       return
     }
-  }, [user, canAccessQuotes, router])
+    console.log('stat verification:',stats)
 
+  }, [user, canAccessQuotes, router])
+  useEffect(() => {
+    
+    console.log('stat after load:',stats)
+  }, [stats])
   // Filtrage des devis
   useEffect(() => {
     let filtered = devis
@@ -71,6 +76,7 @@ export default function DevisPage() {
     }
 
     setFilteredDevis(filtered)
+    console.log('valeur devis de filtered:',filtered)
   }, [devis, searchTerm, statusFilter])
 
   // État devis en édition

@@ -1,12 +1,12 @@
 // lib/invoiceUtils.ts - Utilitaires pour les factures
 
-import type { Invoice, InvoiceStatus, InvoiceItem, PaymentScheduleItem } from "@/lib/invoices"
+import type { Facture, InvoiceStatus, LigneFacture, Echeancier } from "@/types/invoices"
 
 /**
  * Calcule le sous-total d'une facture
  */
-export function calculateSubtotal(items: InvoiceItem[]): number {
-  return items.reduce((sum, item) => sum + item.total, 0)
+export function calculateSubtotal(items: LigneFacture[]): number {
+  return items.reduce((sum, item) => sum + item.totalHT, 0)
 }
 
 /**
@@ -27,7 +27,7 @@ export function calculateTotal(subtotal: number, taxAmount: number): number {
  * Calcule tous les montants d'une facture
  */
 export function calculateInvoiceAmounts(
-  items: InvoiceItem[],
+  items: LigneFacture[],
   taxRate: number
 ): {
   subtotal: number
@@ -44,8 +44,8 @@ export function calculateInvoiceAmounts(
 /**
  * Vérifie si une facture est en retard
  */
-export function isInvoiceOverdue(invoice: Invoice): boolean {
-  if (invoice.status === "payee" || invoice.status === "annulee") {
+export function isInvoiceOverdue(invoice: Facture): boolean {
+  if (invoice.status === "Payee" || invoice.status === "Annulee") {
     return false
   }
 
@@ -69,10 +69,10 @@ export function getDaysOverdue(dueDate: string): number {
  * Vérifie si le total des échéanciers correspond au total de la facture
  */
 export function validatePaymentSchedule(
-  paymentSchedule: PaymentScheduleItem[],
+  paymentSchedule: Echeancier[],
   totalAmount: number
 ): boolean {
-  const scheduleTotal = paymentSchedule.reduce((sum, payment) => sum + payment.amount, 0)
+  const scheduleTotal = paymentSchedule.reduce((sum, payment) => sum + payment.montantTTC, 0)
   return Math.abs(scheduleTotal - totalAmount) < 0.01 // Tolérance de 1 centime
 }
 
@@ -93,23 +93,23 @@ export function determineInvoiceStatus(
   dueDate: string
 ): InvoiceStatus {
   // Si annulée, on garde ce statut
-  if (currentStatus === "annulee") {
-    return "annulee"
+  if (currentStatus === "Annulee") {
+    return "Annulee"
   }
 
   // Si totalement payée
   if (paidAmount >= totalAmount) {
-    return "payee"
+    return "Payee"
   }
 
   // Si partiellement payée
   if (paidAmount > 0 && paidAmount < totalAmount) {
-    return "partiellement_payee"
+    return "Payee"
   }
 
   // Si en retard
-  if (new Date(dueDate) < new Date() && currentStatus === "envoyee") {
-    return "en_retard"
+  if (new Date(dueDate) < new Date() && currentStatus === "Envoyee") {
+    return "EnRetard"
   }
 
   // Sinon on garde le statut actuel
@@ -162,7 +162,7 @@ export function calculatePaymentProgress(paidAmount: number, totalAmount: number
 /**
  * Groupe les factures par statut
  */
-export function groupInvoicesByStatus(invoices: Invoice[]): Record<InvoiceStatus, Invoice[]> {
+export function groupInvoicesByStatus(invoices: Facture[]): Record<InvoiceStatus, Facture[]> {
   return invoices.reduce(
     (acc, invoice) => {
       if (!acc[invoice.status]) {
@@ -171,17 +171,17 @@ export function groupInvoicesByStatus(invoices: Invoice[]): Record<InvoiceStatus
       acc[invoice.status].push(invoice)
       return acc
     },
-    {} as Record<InvoiceStatus, Invoice[]>
+    {} as Record<InvoiceStatus, Facture[]>
   )
 }
 
 /**
  * Groupe les factures par mois
  */
-export function groupInvoicesByMonth(invoices: Invoice[]): Record<string, Invoice[]> {
+export function groupInvoicesByMonth(invoices: Facture[]): Record<string, Facture[]> {
   return invoices.reduce(
     (acc, invoice) => {
-      const date = new Date(invoice.createdAt)
+      const date = new Date(invoice.dateCreation)
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
       
       if (!acc[key]) {
@@ -190,7 +190,7 @@ export function groupInvoicesByMonth(invoices: Invoice[]): Record<string, Invoic
       acc[key].push(invoice)
       return acc
     },
-    {} as Record<string, Invoice[]>
+    {} as Record<string, Facture[]>
   )
 }
 
@@ -198,7 +198,7 @@ export function groupInvoicesByMonth(invoices: Invoice[]): Record<string, Invoic
  * Filtre les factures selon des critères
  */
 export function filterInvoices(
-  invoices: Invoice[],
+  invoices: Facture[],
   filters: {
     search?: string
     status?: InvoiceStatus | "all"
@@ -207,7 +207,7 @@ export function filterInvoices(
     startDate?: string
     endDate?: string
   }
-): Invoice[] {
+): Facture[] {
   let filtered = [...invoices]
 
   if (filters.search) {
@@ -229,15 +229,15 @@ export function filterInvoices(
   }
 
   if (filters.projectId) {
-    filtered = filtered.filter((inv) => inv.projectId === filters.projectId)
+    filtered = filtered.filter((inv) => inv.projetId === filters.projectId)
   }
 
   if (filters.startDate) {
-    filtered = filtered.filter((inv) => new Date(inv.createdAt) >= new Date(filters.startDate!))
+    filtered = filtered.filter((inv) => new Date(inv.dateCreation) >= new Date(filters.startDate!))
   }
 
   if (filters.endDate) {
-    filtered = filtered.filter((inv) => new Date(inv.createdAt) <= new Date(filters.endDate!))
+    filtered = filtered.filter((inv) => new Date(inv.dateCreation) <= new Date(filters.endDate!))
   }
 
   return filtered
@@ -247,16 +247,16 @@ export function filterInvoices(
  * Trie les factures
  */
 export function sortInvoices(
-  invoices: Invoice[],
+  invoices: Facture[],
   sortBy: "date" | "amount" | "dueDate" | "status" = "date",
   order: "asc" | "desc" = "desc"
-): Invoice[] {
+): Facture[] {
   const sorted = [...invoices].sort((a, b) => {
     let comparison = 0
 
     switch (sortBy) {
       case "date":
-        comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        comparison = new Date(a.dateCreation).getTime() - new Date(b.dateCreation).getTime()
         break
       case "amount":
         comparison = a.total - b.total
@@ -278,7 +278,7 @@ export function sortInvoices(
 /**
  * Calcule le taux de recouvrement
  */
-export function calculateRecoveryRate(invoices: Invoice[]): number {
+export function calculateRecoveryRate(invoices: Facture[]): number {
   const totalInvoiced = invoices.reduce((sum, inv) => sum + inv.total, 0)
   const totalPaid = invoices.reduce((sum, inv) => sum + inv.paidAmount, 0)
 
@@ -290,15 +290,15 @@ export function calculateRecoveryRate(invoices: Invoice[]): number {
 /**
  * Calcule le délai moyen de paiement
  */
-export function calculateAveragePaymentDelay(invoices: Invoice[]): number {
-  const paidInvoices = invoices.filter((inv) => inv.status === "payee" && inv.paidDate)
+export function calculateAveragePaymentDelay(invoices: Facture[]): number {
+  const paidInvoices = invoices.filter((inv) => inv.status === "Payee" && inv.datePaiement)
 
   if (paidInvoices.length === 0) return 0
 
   const totalDelay = paidInvoices.reduce((sum, inv) => {
-    if (!inv.paidDate) return sum
-    const invoiceDate = new Date(inv.createdAt).getTime()
-    const paidDate = new Date(inv.paidDate).getTime()
+    if (!inv.datePaiement) return sum
+    const invoiceDate = new Date(inv.dateCreation).getTime()
+    const paidDate = new Date(inv.datePaiement).getTime()
     return sum + Math.ceil((paidDate - invoiceDate) / (1000 * 60 * 60 * 24))
   }, 0)
 
@@ -309,8 +309,8 @@ export function calculateAveragePaymentDelay(invoices: Invoice[]): number {
  * Valide les données d'une facture avant création
  */
 export function validateInvoiceData(data: {
-  items: InvoiceItem[]
-  paymentSchedule?: PaymentScheduleItem[]
+  items: LigneFacture[]
+  paymentSchedule?: Echeancier[]
   taxRate: number
 }): { valid: boolean; errors: string[] } {
   const errors: string[] = []
@@ -322,10 +322,10 @@ export function validateInvoiceData(data: {
 
   // Vérifier que tous les éléments ont des montants positifs
   data.items.forEach((item, index) => {
-    if (item.quantity <= 0) {
+    if (item.quantite <= 0) {
       errors.push(`L'élément ${index + 1} doit avoir une quantité positive`)
     }
-    if (item.unitPrice < 0) {
+    if (item.prixUnitaireHT < 0) {
       errors.push(`L'élément ${index + 1} ne peut pas avoir un prix négatif`)
     }
   })
@@ -346,7 +346,7 @@ export function validateInvoiceData(data: {
 
     // Vérifier que chaque paiement a un montant positif
     data.paymentSchedule.forEach((payment, index) => {
-      if (payment.amount <= 0) {
+      if (payment.montantTTC <= 0) {
         errors.push(`Le paiement ${index + 1} doit avoir un montant positif`)
       }
     })
@@ -361,25 +361,25 @@ export function validateInvoiceData(data: {
 /**
  * Exporte les données de facture pour impression
  */
-export function prepareInvoiceForPrint(invoice: Invoice) {
+export function prepareInvoiceForPrint(invoice: Facture) {
   return {
     ...invoice,
-    subtotalFormatted: formatCurrency(invoice.subtotal),
-    taxAmountFormatted: formatCurrency(invoice.taxAmount),
+    subtotalFormatted: formatCurrency(invoice.montantHT),
+    taxAmountFormatted: formatCurrency(invoice.montantTVA),
     totalFormatted: formatCurrency(invoice.total),
     paidAmountFormatted: formatCurrency(invoice.paidAmount),
     remainingAmountFormatted: formatCurrency(invoice.remainingAmount),
-    createdAtFormatted: formatDate(invoice.createdAt),
+    createdAtFormatted: formatDate(invoice.dateCreation),
     dueDateFormatted: formatDate(invoice.dueDate),
-    items: invoice.items.map((item) => ({
+    items: invoice.lignes?.map((item) => ({
       ...item,
-      unitPriceFormatted: formatCurrency(item.unitPrice),
-      totalFormatted: formatCurrency(item.total),
+      unitPriceFormatted: formatCurrency(item.prixUnitaireHT),
+      totalFormatted: formatCurrency(item.totalHT),
     })),
-    paymentSchedule: invoice.paymentSchedule.map((payment) => ({
+    paymentSchedule: invoice.echeanciers?.map((payment) => ({
       ...payment,
-      amountFormatted: formatCurrency(payment.amount),
-      dueDateFormatted: formatDate(payment.dueDate),
+      amountFormatted: formatCurrency(payment.montantTTC),
+      dueDateFormatted: formatDate(payment.dateEcheance),
     })),
   }
 }

@@ -14,6 +14,7 @@ import { Plus, Trash2, Calculator, Loader2 } from "lucide-react"
 import { CreateDevisRequest, CreateLigneDevisRequest, Devis } from "@/types/devis"
 import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "@/hooks/use-toast"
+import { useClientsList } from "@/hooks/useClients"
 
 interface QuoteFormModalProps {
   open: boolean
@@ -43,10 +44,20 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
     conditions: "",
     notes: "",
   })
-
+  
   const [lignes, setLignes] = useState<LigneFormData[]>([
     { designation: "", description: "", quantite: 1, unite: "U", prixUnitaireHT: 0 },
   ])
+ 
+  const {clients,loading: clientLoading, error: devisError, refreshCliens}=useClientsList()
+
+  // Fonction pour obtenir le client sélectionné
+  const getSelectedClient = () => {
+    if (formData.clientId > 0 && clients) {
+      return clients.find(client => client.id === formData.clientId)
+    }
+    return null
+  }
 
   // Réinitialiser le formulaire quand la modal s'ouvre
   useEffect(() => {
@@ -134,7 +145,13 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
     }
 
     if (formData.clientId === 0) {
-      errors.push('Veuillez sélectionner un client')
+      if (clientLoading) {
+        errors.push('Veuillez attendre le chargement des clients')
+      } else if (!clients || clients.length === 0) {
+        errors.push('Aucun client disponible. Veuillez créer un client d\'abord.')
+      } else {
+        errors.push('Veuillez sélectionner un client')
+      }
     }
 
     if (lignes.length === 0) {
@@ -233,22 +250,84 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
               </CardHeader>
               <CardContent className="pt-0 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="clientId" className="text-sm font-medium">
-                    Client *
-                  </Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="clientId" className="text-sm font-medium">
+                      Client *
+                    </Label>
+                    {devisError && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={refreshCliens}
+                        className="text-xs h-6 px-2"
+                      >
+                        🔄 Rafraîchir
+                      </Button>
+                    )}
+                  </div>
                   <Select
                     value={formData.clientId > 0 ? formData.clientId.toString() : ""}
                     onValueChange={(value) => handleInputChange("clientId", parseInt(value) || 0)}
+                    disabled={clientLoading}
                   >
                     <SelectTrigger className="text-sm h-9">
-                      <SelectValue placeholder="Sélectionner un client" />
+                      <SelectValue 
+                        placeholder={
+                          clientLoading 
+                            ? "Chargement des clients..." 
+                            : clients && clients.length === 0 
+                              ? "Aucun client disponible" 
+                              : "Sélectionner un client"
+                        } 
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="1">Client Test 1</SelectItem>
-                      <SelectItem value="2">Client Test 2</SelectItem>
-                      <SelectItem value="3">Client Test 3</SelectItem>
+                      {clientLoading ? (
+                        <SelectItem value="" disabled>
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Chargement...
+                          </div>
+                        </SelectItem>
+                      ) : clients && clients.length > 0 ? (
+                        clients.map((client) => (
+                          <SelectItem key={client.id} value={client.id.toString()}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{client.nom}</span>
+                              {client.designation && (
+                                <span className="text-xs text-muted-foreground">{client.designation}</span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>
+                          Aucun client disponible
+                        </SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
+                  {devisError && (
+                    <p className="text-xs text-red-600">Erreur lors du chargement des clients</p>
+                  )}
+                  {/* Affichage des informations du client sélectionné */}
+                  {getSelectedClient() && (
+                    <div className="mt-2 p-2 bg-blue-50 rounded-md border border-blue-200">
+                      <div className="text-xs text-blue-800">
+                        <div className="font-medium">Client sélectionné:</div>
+                        <div className="text-blue-700">
+                          {getSelectedClient()?.nom}
+                          {getSelectedClient()?.designation && (
+                            <span className="text-blue-600"> - {getSelectedClient()?.designation}</span>
+                          )}
+                        </div>
+                        <div className="text-blue-600">
+                          {getSelectedClient()?.email} • {getSelectedClient()?.telephone}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -509,7 +588,7 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
                 type="submit" 
                 className="sm:w-auto" 
                 onClick={handleSubmit}
-                disabled={loading || !formData.titre.trim() || formData.clientId === 0}
+                disabled={loading || clientLoading || !formData.titre.trim() || formData.clientId === 0 || (!clients || clients.length === 0)}
               >
                 {loading ? (
                   <>

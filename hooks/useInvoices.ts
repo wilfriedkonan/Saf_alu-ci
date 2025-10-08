@@ -1,113 +1,41 @@
 // hooks/useInvoices.ts
 
 import { useState, useCallback, useEffect } from "react"
+import { InvoiceService } from "@/services/invoiceService"
 import type {
-  Invoice,
-  InvoiceStatus,
-  InvoiceType,
-} from "@/lib/invoices"
+  Facture,
+  CreateFactureRequest,
+  MarquerPayeRequest,
+} from "@/types/invoices"
+import type {
+  FactureStatut,
+  FactureType,
+  UpdateFactureRequest,
+  FactureFilters,
+  FactureStats,
+} from "@/services/invoiceService"
 import { toast } from "@/hooks/use-toast"
-
-// DTOs pour l'API
-interface CreateInvoiceDTO {
-  type: InvoiceType
-  clientId?: number
-  subcontractorId?: number
-  quoteId?: number
-  projectId?: number
-  title: string
-  projectTitle: string
-  description?: string
-  invoiceDate: string
-  dueDate: string
-  paymentTerms?: string
-  clientReference?: string
-  taxRate?: number
-  clientName: string
-  clientEmail: string
-  clientPhone?: string
-  clientAddress?: string
-  items: Array<{
-    description: string
-    quantity: number
-    unit: string
-    unitPrice: number
-  }>
-  paymentSchedule?: Array<{
-    description?: string
-    amount: number
-    dueDate: string
-  }>
-  notes?: string
-}
-
-interface UpdateInvoiceDTO {
-  title?: string
-  projectTitle?: string
-  description?: string
-  invoiceDate?: string
-  dueDate?: string
-  paymentTerms?: string
-  clientReference?: string
-  items?: Array<{
-    description: string
-    quantity: number
-    unit: string
-    unitPrice: number
-  }>
-  paymentSchedule?: Array<{
-    description?: string
-    amount: number
-    dueDate: string
-  }>
-  notes?: string
-}
-
-interface MarkAsPaidDTO {
-  amount: number
-  paymentMethod?: string
-  paymentReference?: string
-  paidDate?: string
-}
-
-interface InvoiceFilters {
-  status?: InvoiceStatus | "all"
-  type?: InvoiceType | "all"
-  search?: string
-  clientId?: number
-  projectId?: number
-  year?: number
-}
-
-interface InvoiceStats {
-  total: number
-  overdue: number
-  totalUnpaid: number
-  totalRevenue: number
-}
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 
 interface UseInvoicesResult {
   // État
-  invoices: Invoice[]
-  invoice: Invoice | null
-  stats: InvoiceStats | null
-  overdueInvoices: Invoice[]
+  invoices: Facture[]
+  invoice: Facture | null
+  stats: FactureStats | null
+  overdueInvoices: Facture[]
   loading: boolean
   error: string | null
   
   // Actions CRUD
-  getAll: (filters?: InvoiceFilters) => Promise<void>
+  getAll: (filters?: FactureFilters) => Promise<void>
   getById: (id: string) => Promise<void>
-  create: (data: CreateInvoiceDTO) => Promise<Invoice | null>
-  createFromQuote: (quoteId: number) => Promise<Invoice | null>
-  update: (id: string, data: UpdateInvoiceDTO) => Promise<boolean>
+  create: (data: CreateFactureRequest) => Promise<Facture | null>
+  createFromQuote: (quoteId: number) => Promise<Facture | null>
+  update: (id: string, data: UpdateFactureRequest) => Promise<boolean>
   remove: (id: string) => Promise<boolean>
   
   // Actions spécifiques
   send: (id: string) => Promise<boolean>
-  markAsPaid: (id: string, data: MarkAsPaidDTO) => Promise<boolean>
+  markAsPaid: (id: string, data: MarquerPayeRequest) => Promise<boolean>
   cancel: (id: string, reason?: string) => Promise<boolean>
   sendReminder: (id: string) => Promise<boolean>
   
@@ -115,89 +43,37 @@ interface UseInvoicesResult {
   getStats: (year?: number) => Promise<void>
   getOverdue: () => Promise<void>
   downloadPDF: (id: string) => Promise<void>
-  exportToExcel: (filters?: InvoiceFilters) => Promise<void>
+  exportToExcel: (filters?: FactureFilters) => Promise<void>
   refresh: () => Promise<void>
   clearError: () => void
 }
 
 export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
-  const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [invoice, setInvoice] = useState<Invoice | null>(null)
-  const [stats, setStats] = useState<InvoiceStats | null>({
+  const [invoices, setInvoices] = useState<Facture[]>([])
+  const [invoice, setInvoice] = useState<Facture | null>(null)
+  const [stats, setStats] = useState<FactureStats | null>({
     total: 0,
     overdue: 0,
     totalUnpaid: 0,
     totalRevenue: 0,
   })
-  const [overdueInvoices, setOverdueInvoices] = useState<Invoice[]>([])
+  const [overdueInvoices, setOverdueInvoices] = useState<Facture[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [filters, setFilters] = useState<InvoiceFilters | undefined>(undefined)
-
-  const getAuthHeaders = (): HeadersInit => {
-    const token = localStorage.getItem("token")
-    return {
-      "Content-Type": "application/json",
-      Authorization: token ? `Bearer ${token}` : "",
-    }
-  }
-
-  const handleResponse = async <T,>(response: Response): Promise<T> => {
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: "Une erreur est survenue" }))
-      throw new Error(error.message || `Erreur HTTP: ${response.status}`)
-    }
-    return response.json()
-  }
+  const [filters, setFilters] = useState<FactureFilters | undefined>(undefined)
 
   /**
    * Récupère toutes les factures
    */
-  const getAll = useCallback(async (newFilters?: InvoiceFilters) => {
+  const getAll = useCallback(async (newFilters?: FactureFilters) => {
     setLoading(true)
     setError(null)
     
     try {
       if (newFilters) setFilters(newFilters)
       
-      const params = new URLSearchParams()
       const activeFilters = newFilters || filters
-      
-      if (activeFilters?.status && activeFilters.status !== "all") {
-        params.append("statut", activeFilters.status)
-      }
-      
-      if (activeFilters?.type && activeFilters.type !== "all") {
-        params.append("typeFacture", activeFilters.type)
-      }
-
-      const url = `${API_BASE_URL}/factures${params.toString() ? `?${params.toString()}` : ""}`
-      
-      const response = await fetch(url, {
-        headers: getAuthHeaders(),
-      })
-
-      let data = await handleResponse<Invoice[]>(response)
-      
-      // Filtrage côté client
-      if (activeFilters?.search) {
-        const searchLower = activeFilters.search.toLowerCase()
-        data = data.filter(
-          (inv) =>
-            inv.number.toLowerCase().includes(searchLower) ||
-            inv.clientName?.toLowerCase().includes(searchLower) ||
-            inv.projectTitle?.toLowerCase().includes(searchLower)
-        )
-      }
-      
-      if (activeFilters?.clientId) {
-        data = data.filter((inv) => inv.clientId === activeFilters.clientId)
-      }
-      
-      if (activeFilters?.projectId) {
-        data = data.filter((inv) => inv.projectId === activeFilters.projectId)
-      }
-      
+      const data = await InvoiceService.getAllInvoices(activeFilters)
       setInvoices(data)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Erreur lors du chargement des factures"
@@ -220,11 +96,7 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
     setError(null)
     
     try {
-      const response = await fetch(`${API_BASE_URL}/factures/${id}`, {
-        headers: getAuthHeaders(),
-      })
-
-      const data = await handleResponse<Invoice>(response)
+      const data = await InvoiceService.getInvoiceById(id)
       setInvoice(data)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Erreur lors du chargement de la facture"
@@ -242,23 +114,18 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
   /**
    * Crée une nouvelle facture
    */
-  const create = useCallback(async (data: CreateInvoiceDTO): Promise<Invoice | null> => {
+  const create = useCallback(async (data: CreateFactureRequest): Promise<Facture | null> => {
     setLoading(true)
     setError(null)
     
     try {
-      const response = await fetch(`${API_BASE_URL}/factures`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(data),
-      })
-
-      const result = await handleResponse<Invoice>(response)
+      const response = await InvoiceService.createInvoice(data)
+      const result = response.data!
       setInvoices((prev) => [result, ...prev])
       
       toast({
         title: "Succès",
-        description: `Facture ${result.number} créée avec succès`,
+        description: `Facture ${result.numero} créée avec succès`,
       })
       
       return result
@@ -279,22 +146,18 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
   /**
    * Crée une facture depuis un devis
    */
-  const createFromQuote = useCallback(async (quoteId: number): Promise<Invoice | null> => {
+  const createFromQuote = useCallback(async (quoteId: number): Promise<Facture | null> => {
     setLoading(true)
     setError(null)
     
     try {
-      const response = await fetch(`${API_BASE_URL}/factures/from-devis/${quoteId}`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-      })
-
-      const result = await handleResponse<Invoice>(response)
+      const response = await InvoiceService.createInvoiceFromQuote(quoteId)
+      const result = response.data!
       setInvoices((prev) => [result, ...prev])
       
       toast({
         title: "Succès",
-        description: `Facture ${result.number} créée depuis le devis`,
+        description: `Facture ${result.numero} créée depuis le devis`,
       })
       
       return result
@@ -315,18 +178,12 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
   /**
    * Met à jour une facture
    */
-  const update = useCallback(async (id: string, data: UpdateInvoiceDTO): Promise<boolean> => {
+  const update = useCallback(async (id: string, data: UpdateFactureRequest): Promise<boolean> => {
     setLoading(true)
     setError(null)
     
     try {
-      const response = await fetch(`${API_BASE_URL}/factures/${id}`, {
-        method: "PUT",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(data),
-      })
-
-      await handleResponse<void>(response)
+      await InvoiceService.updateInvoice(id, data)
       
       // Recharger la facture mise à jour
       await getById(id)
@@ -360,15 +217,10 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
     setError(null)
     
     try {
-      const response = await fetch(`${API_BASE_URL}/factures/${id}`, {
-        method: "DELETE",
-        headers: getAuthHeaders(),
-      })
-
-      await handleResponse<void>(response)
-      setInvoices((prev) => prev.filter((inv) => inv.id !== id))
+      await InvoiceService.deleteInvoice(id)
+      setInvoices((prev) => prev.filter((inv) => inv.id.toString() !== id))
       
-      if (invoice?.id === id) {
+      if (invoice?.id.toString() === id) {
         setInvoice(null)
       }
       
@@ -400,12 +252,7 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
     setError(null)
     
     try {
-      const response = await fetch(`${API_BASE_URL}/factures/${id}/envoyer`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-      })
-
-      await handleResponse<void>(response)
+      await InvoiceService.sendInvoice(id)
       
       // Recharger les données
       await getAll(filters)
@@ -433,23 +280,12 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
   /**
    * Marque une facture comme payée
    */
-  const markAsPaid = useCallback(async (id: string, data: MarkAsPaidDTO): Promise<boolean> => {
+  const markAsPaid = useCallback(async (id: string, data: MarquerPayeRequest): Promise<boolean> => {
     setLoading(true)
     setError(null)
     
     try {
-      const response = await fetch(`${API_BASE_URL}/factures/${id}/marquer-payee`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          montantPaye: data.amount,
-          modePaiement: data.paymentMethod,
-          referencePaiement: data.paymentReference,
-          datePaiement: data.paidDate || new Date().toISOString(),
-        }),
-      })
-
-      await handleResponse<void>(response)
+      await InvoiceService.markInvoiceAsPaid(id, data)
       
       // Recharger les données
       await getAll(filters)
@@ -482,13 +318,7 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
     setError(null)
     
     try {
-      const response = await fetch(`${API_BASE_URL}/factures/${id}/annuler`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ motif: reason }),
-      })
-
-      await handleResponse<void>(response)
+      await InvoiceService.cancelInvoice(id, reason)
       
       // Recharger les données
       await getAll(filters)
@@ -521,12 +351,7 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
     setError(null)
     
     try {
-      const response = await fetch(`${API_BASE_URL}/factures/${id}/relance`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-      })
-
-      await handleResponse<void>(response)
+      await InvoiceService.sendInvoiceReminder(id)
       
       // Recharger les données
       await getAll(filters)
@@ -559,12 +384,7 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
     setError(null)
     
     try {
-      const params = year ? `?annee=${year}` : ""
-      const response = await fetch(`${API_BASE_URL}/factures/statistiques${params}`, {
-        headers: getAuthHeaders(),
-      })
-
-      const data = await handleResponse<InvoiceStats>(response)
+      const data = await InvoiceService.getInvoiceStats(year)
       setStats(data)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Erreur lors du chargement des statistiques"
@@ -582,11 +402,7 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
     setError(null)
     
     try {
-      const response = await fetch(`${API_BASE_URL}/factures/impayes`, {
-        headers: getAuthHeaders(),
-      })
-
-      const data = await handleResponse<Invoice[]>(response)
+      const data = await InvoiceService.getOverdueInvoices()
       setOverdueInvoices(data)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Erreur lors du chargement des impayés"
@@ -604,19 +420,12 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
     setError(null)
     
     try {
-      const response = await fetch(`${API_BASE_URL}/factures/${id}/pdf`, {
-        headers: getAuthHeaders(),
-      })
-
-      if (!response.ok) {
-        throw new Error("Erreur lors du téléchargement du PDF")
-      }
-
-      const blob = await response.blob()
+      const { blob, filename } = await InvoiceService.downloadInvoicePDF(id)
+      
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = `facture-${id}.pdf`
+      a.download = filename || `facture-${id}.pdf`
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)
@@ -642,34 +451,17 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
   /**
    * Exporte en Excel
    */
-  const exportToExcel = useCallback(async (exportFilters?: InvoiceFilters) => {
+  const exportToExcel = useCallback(async (exportFilters?: FactureFilters) => {
     setLoading(true)
     setError(null)
     
     try {
-      const params = new URLSearchParams()
+      const { blob, filename } = await InvoiceService.exportInvoicesToExcel(exportFilters)
       
-      if (exportFilters?.status && exportFilters.status !== "all") {
-        params.append("statut", exportFilters.status)
-      }
-      
-      if (exportFilters?.type && exportFilters.type !== "all") {
-        params.append("typeFacture", exportFilters.type)
-      }
-
-      const response = await fetch(`${API_BASE_URL}/factures/export/excel?${params.toString()}`, {
-        headers: getAuthHeaders(),
-      })
-
-      if (!response.ok) {
-        throw new Error("Erreur lors de l'export Excel")
-      }
-
-      const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = `factures-${new Date().toISOString().split("T")[0]}.xlsx`
+      a.download = filename || `factures-${new Date().toISOString().split("T")[0]}.xlsx`
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)
@@ -746,6 +538,43 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
   }
 }
 
+// Hook pour gérer la liste des facture
+export const useListFacture = () => {
+
+  const [facture, setFacture] = useState<Facture[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchFacture = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await InvoiceService.getAllInvoices();
+      console.log('dataFacture dans hook list facture:',data)
+      setFacture(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors du chargement des factures');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchFacture();
+  }, [fetchFacture]);
+
+  const refreshFacture = useCallback(() => {
+    fetchFacture();
+  }, [fetchFacture]);
+
+  return {
+    facture,
+    loading,
+    error,
+    refreshFacture
+  };
+};
+
 /**
  * Hook simplifié pour une seule facture
  */
@@ -773,9 +602,9 @@ export function useInvoice(id?: string) {
     invoice,
     loading,
     error,
-    update: (data: UpdateInvoiceDTO) => update(id!, data),
+    update: (data: UpdateFactureRequest) => update(id!, data),
     send: () => send(id!),
-    markAsPaid: (data: MarkAsPaidDTO) => markAsPaid(id!, data),
+    markAsPaid: (data: MarquerPayeRequest) => markAsPaid(id!, data),
     cancel: (reason?: string) => cancel(id!, reason),
     downloadPDF: () => downloadPDF(id!),
     clearError,
@@ -799,5 +628,63 @@ export function useInvoiceStats(year?: number, autoLoad: boolean = true) {
     loading,
     error,
     refresh: () => getStats(year),
+  }
+}
+
+/**
+ * Hook unifié pour charger toutes les données des factures en une fois
+ */
+export function useInvoicesWithStats(filters?: FactureFilters, year?: number) {
+  const [invoices, setInvoices] = useState<Facture[]>([])
+  const [overdueInvoices, setOverdueInvoices] = useState<Facture[]>([])
+  const [stats, setStats] = useState<FactureStats | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadAllData = useCallback(async (newFilters?: FactureFilters) => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      // Charger toutes les données en parallèle
+      const [invoicesData, overdueData, statsData] = await Promise.all([
+        InvoiceService.getAllInvoices(newFilters || filters),
+        InvoiceService.getOverdueInvoices(),
+        InvoiceService.getInvoiceStats(year)
+      ])
+
+      setInvoices(invoicesData)
+      setOverdueInvoices(overdueData)
+      setStats(statsData)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Erreur lors du chargement des données"
+      setError(errorMessage)
+      toast({
+        title: "Erreur",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [filters, year])
+
+  const refresh = useCallback(() => {
+    loadAllData()
+  }, [loadAllData])
+
+  const clearError = useCallback(() => {
+    setError(null)
+  }, [])
+
+  return {
+    invoices,
+    overdueInvoices,
+    stats,
+    loading,
+    error,
+    loadAllData,
+    refresh,
+    clearError
   }
 }

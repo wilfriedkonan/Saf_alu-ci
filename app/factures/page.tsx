@@ -10,9 +10,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, Search, Receipt, Euro, AlertTriangle, TrendingUp, Trash2, Loader2 } from "lucide-react"
-import { useInvoices, useInvoiceStats } from "@/hooks/useInvoices"
-import type { InvoiceStatus, InvoiceType } from "@/lib/invoices"
-import { invoiceStatusLabels, invoiceStatusColors, invoiceTypeLabels } from "@/lib/invoices"
+import { useInvoices, useInvoiceStats, useListFacture } from "@/hooks/useInvoices"
+import type { Facture, InvoiceStatus, InvoiceType, CreateFactureRequest } from "@/types/invoices"
+import { invoiceStatusLabels, invoiceStatusColors, invoiceTypeLabels } from "@/types/invoices"
 import { InvoiceActions } from "@/components/invoices/invoice-actions"
 import { InvoiceFormModal } from "@/components/invoices/invoice-form-modal"
 import { useAuth, usePermissions } from "@/contexts/AuthContext"
@@ -24,23 +24,13 @@ export default function InvoicesPage() {
   const router = useRouter()
 
   // Hook principal pour les factures
-  const {
-    invoices,
-    overdueInvoices,
-    loading,
-    error,
-    getAll,
-    getOverdue,
-    create,
-    remove,
-    refresh,
-    clearError,
-  } = useInvoices(false) // Chargement manuel
-
+  const { invoices, overdueInvoices, loading, error, getAll, getOverdue, create, remove, refresh, clearError, } = useInvoices(false) // Chargement manuel
+  const { facture, loading: FactureLoading, error: FactureError, refreshFacture } = useListFacture();
   // Hook pour les statistiques
   const { stats } = useInvoiceStats(new Date().getFullYear())
 
   // États locaux pour les filtres
+  const [filteredFacture, setFilteredFacture] = useState<Facture[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | "all">("all")
   const [typeFilter, setTypeFilter] = useState<InvoiceType | "all">("all")
@@ -53,20 +43,45 @@ export default function InvoicesPage() {
       return
     }
     // Charger les données au montage
-    getAll()
-    getOverdue()
+   /*  getAll()
+    getOverdue() */
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, canAccessFinances, router])
 
   // Appliquer les filtres
-  useEffect(() => {
+
+  /* useEffect(() => {
     getAll({
       search: searchTerm,
       status: statusFilter,
       type: typeFilter,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, statusFilter, typeFilter])
+  }, [searchTerm, statusFilter, typeFilter]) */
+
+  useEffect(() => {
+    let filtered = facture
+         console.log('Data Facture:',facture)
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase()
+      filtered = filtered.filter(
+        (facture) =>
+          facture.numero.toLowerCase().includes(searchLower) ||
+          facture.titre.toLowerCase().includes(searchLower) ||
+          facture.client?.nom.toLowerCase().includes(searchLower))
+    }
+
+    if(statusFilter !=='all'){
+      filtered = filtered.filter((facture) => facture.statut === statusFilter)
+    }
+
+    if(typeFilter !=='all'){
+      filtered = filtered.filter((facture) => facture.type === typeFilter)
+    }
+
+    setFilteredFacture(filtered)
+console.log('valeur de filtered:',filtered)
+  }, [facture, searchTerm, statusFilter, typeFilter])
 
   // Auto-dismiss des erreurs
   useEffect(() => {
@@ -77,7 +92,7 @@ export default function InvoicesPage() {
   }, [error, clearError])
 
   // Gestion de la création
-  const handleCreateInvoice = async (invoiceData: any) => {
+  const handleCreateInvoice = async (invoiceData: CreateFactureRequest) => {
     const newInvoice = await create(invoiceData)
     if (newInvoice) {
       setIsInvoiceFormOpen(false)
@@ -110,6 +125,7 @@ export default function InvoicesPage() {
   }
 
   return (
+    
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
@@ -170,7 +186,7 @@ export default function InvoicesPage() {
                 <Receipt className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.total?stats.total:0}</div>
+                <div className="text-2xl font-bold">{stats.total ? stats.total : 0}</div>
               </CardContent>
             </Card>
             <Card>
@@ -179,7 +195,7 @@ export default function InvoicesPage() {
                 <AlertTriangle className="h-4 w-4 text-red-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.overdue?stats.overdue:0}</div>
+                <div className="text-2xl font-bold">{stats.overdue ? stats.overdue : 0}</div>
               </CardContent>
             </Card>
             <Card>
@@ -188,7 +204,7 @@ export default function InvoicesPage() {
                 <Euro className="h-4 w-4 text-red-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{formatCurrency(stats.totalUnpaid?stats.totalUnpaid:0)}</div>
+                <div className="text-2xl font-bold">{formatCurrency(stats.totalUnpaid ? stats.totalUnpaid : 0)}</div>
               </CardContent>
             </Card>
             <Card>
@@ -197,7 +213,7 @@ export default function InvoicesPage() {
                 <TrendingUp className="h-4 w-4 text-green-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{formatCurrency(stats.totalRevenue?stats.totalRevenue:0)}</div>
+                <div className="text-2xl font-bold">{formatCurrency(stats.totalRevenue ? stats.totalRevenue : 0)}</div>
               </CardContent>
             </Card>
           </div>
@@ -267,16 +283,16 @@ export default function InvoicesPage() {
         {/* Liste des factures */}
         <Card>
           <CardHeader>
-            <CardTitle>Liste des factures ({invoices.length})</CardTitle>
+            <CardTitle>Liste des factures ({filteredFacture.length})</CardTitle>
             <CardDescription>Gérez vos factures avec suivi des paiements</CardDescription>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {FactureLoading ? (
               <div className="text-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
                 <p className="text-muted-foreground mt-2">Chargement...</p>
               </div>
-            ) : invoices.length === 0 ? (
+            ) : filteredFacture.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-muted-foreground">Aucune facture trouvée</p>
               </div>
@@ -296,11 +312,11 @@ export default function InvoicesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {invoices.map((invoice) => (
+                  {filteredFacture.map((invoice) => (
                     <TableRow key={invoice.id}>
-                      <TableCell className="font-medium">{invoice.number}</TableCell>
+                      <TableCell className="font-medium">{invoice.numero}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{invoiceTypeLabels[invoice.type]}</Badge>
+                        <Badge variant="outline">{invoiceTypeLabels[invoice.typeFacture]}</Badge>
                       </TableCell>
                       <TableCell>
                         <div>
@@ -309,28 +325,28 @@ export default function InvoicesPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="max-w-48 truncate" title={invoice.projectTitle}>
-                          {invoice.projectTitle}
+                        <div className="max-w-48 truncate" title={invoice.titre}>
+                          {invoice.titre}
                         </div>
                       </TableCell>
-                      <TableCell className="font-medium">{formatCurrency(invoice.total)}</TableCell>
+                      <TableCell className="font-medium">{formatCurrency(invoice.montantTTC)}</TableCell>
                       <TableCell>
                         <div>
-                          <div className="font-medium text-green-600">{formatCurrency(invoice.paidAmount)}</div>
-                          {invoice.remainingAmount > 0 && (
-                            <div className="text-sm text-red-600">Reste: {formatCurrency(invoice.remainingAmount)}</div>
+                          <div className="font-medium text-green-600">{formatCurrency(invoice.montantPaye)}</div>
+                          {invoice.montantRestant > 0 && (
+                            <div className="text-sm text-red-600">Reste: {formatCurrency(invoice.montantRestant)}</div>
                           )}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={invoiceStatusColors[invoice.status]}>
-                          {invoiceStatusLabels[invoice.status]}
+                        <Badge className={invoiceStatusColors[invoice.statut]}>
+                          {invoiceStatusLabels[invoice.statut]}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
-                          <div>{new Date(invoice.dueDate).toLocaleDateString("fr-FR")}</div>
-                          {invoice.remindersSent > 0 && (
+                          <div>{new Date(invoice.dateEcheance).toLocaleDateString("fr-FR")}</div>
+                          {invoice.remindersSent && invoice.remindersSent > 0 && (
                             <div className="text-xs text-muted-foreground">{invoice.remindersSent} relance(s)</div>
                           )}
                         </div>
@@ -341,7 +357,7 @@ export default function InvoicesPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleDeleteInvoice(invoice.id, invoice.number)}
+                            onClick={() => handleDeleteInvoice(invoice.id.toString(), invoice.number)}
                             className="text-red-600 hover:text-red-700 hover:bg-red-50"
                             disabled={loading}
                           >

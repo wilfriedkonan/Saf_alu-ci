@@ -1,6 +1,6 @@
 // constants/invoiceConstants.ts - Constantes pour les factures
 
-import type { InvoiceStatus, InvoiceType } from "@/lib/invoices"
+import type { InvoiceStatus, InvoiceType } from "@/types/invoices"
 
 /**
  * Configuration des factures
@@ -52,7 +52,7 @@ export const INVOICE_STATUS_CONFIG: Record<
     canCancel: boolean
   }
 > = {
-  brouillon: {
+  Brouillon: {
     label: "Brouillon",
     color: "bg-gray-100 text-gray-800",
     icon: "FileEdit",
@@ -61,7 +61,7 @@ export const INVOICE_STATUS_CONFIG: Record<
     canPay: false,
     canCancel: true,
   },
-  envoyee: {
+  Envoyee: {
     label: "Envoyée",
     color: "bg-blue-100 text-blue-800",
     icon: "Send",
@@ -70,7 +70,7 @@ export const INVOICE_STATUS_CONFIG: Record<
     canPay: true,
     canCancel: true,
   },
-  payee: {
+  Payee: {
     label: "Payée",
     color: "bg-green-100 text-green-800",
     icon: "CheckCircle",
@@ -79,7 +79,7 @@ export const INVOICE_STATUS_CONFIG: Record<
     canPay: false,
     canCancel: false,
   },
-  en_retard: {
+  EnRetard: {
     label: "En retard",
     color: "bg-red-100 text-red-800",
     icon: "AlertTriangle",
@@ -88,7 +88,7 @@ export const INVOICE_STATUS_CONFIG: Record<
     canPay: true,
     canCancel: true,
   },
-  partiellement_payee: {
+  Payee: {
     label: "Partiellement payée",
     color: "bg-yellow-100 text-yellow-800",
     icon: "Clock",
@@ -97,7 +97,7 @@ export const INVOICE_STATUS_CONFIG: Record<
     canPay: true,
     canCancel: true,
   },
-  annulee: {
+  Annulee: {
     label: "Annulée",
     color: "bg-gray-100 text-gray-800",
     icon: "XCircle",
@@ -111,7 +111,7 @@ export const INVOICE_STATUS_CONFIG: Record<
 /**
  * Types de factures avec leurs propriétés
  */
-export const INVOICE_TYPE_CONFIG: Record<
+export const INVOICE_TYPE_CONFI : Record<
   InvoiceType,
   {
     label: string
@@ -121,21 +121,21 @@ export const INVOICE_TYPE_CONFIG: Record<
     requiresSubcontractor: boolean
   }
 > = {
-  facture_devis: {
+  Devis: {
     label: "Facture Devis",
     description: "Facture basée sur un devis client",
     icon: "FileText",
     requiresClient: true,
     requiresSubcontractor: false,
   },
-  facture_sous_traitant: {
+  SousTraitant: {
     label: "Facture Sous-traitant",
     description: "Facture pour un sous-traitant",
     icon: "Users",
     requiresClient: false,
     requiresSubcontractor: true,
   },
-  avoir: {
+  Avoir: {
     label: "Avoir",
     description: "Note de crédit ou remboursement",
     icon: "RefreshCcw",
@@ -148,12 +148,12 @@ export const INVOICE_TYPE_CONFIG: Record<
  * Modes de paiement disponibles
  */
 export const PAYMENT_METHODS = [
-  { value: "especes", label: "Espèces" },
+  { value: "Espèces", label: "Espèces" },
   { value: "virement", label: "Virement bancaire" },
   { value: "cheque", label: "Chèque" },
-  { value: "mobile_money", label: "Mobile Money" },
-  { value: "carte_bancaire", label: "Carte bancaire" },
-  { value: "autre", label: "Autre" },
+  { value: "Mobile Money", label: "Mobile Money" },
+  { value: "Carte bancaire", label: "Carte bancaire" },
+  { value: "Autre", label: "Autre" },
 ] as const
 
 /**
