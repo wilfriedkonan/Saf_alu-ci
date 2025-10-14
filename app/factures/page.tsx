@@ -107,9 +107,8 @@ export default function InvoicesPage() {
       await update(editingFacture.id, invoiceData) :
       await create(invoiceData)
 
-    console.log('debug newInvoice :', response)
+    refreshFacture()
     setIsInvoiceFormOpen(false)
-    refresh()
     setEditingFacture(null)
 
   }
