@@ -27,22 +27,22 @@ interface UseInvoicesResult {
   
   // Actions CRUD
   getAll: (filters?: FactureFilters) => Promise<void>
-  getById: (id: string) => Promise<void>
+  getById: (id: number) => Promise<void>
   create: (data: CreateFactureRequest) => Promise<Facture | null>
   createFromQuote: (quoteId: number) => Promise<Facture | null>
-  update: (id: string, data: UpdateFactureRequest) => Promise<boolean>
-  remove: (id: string) => Promise<boolean>
+  update: (id: number, data: UpdateFactureRequest) => Promise<boolean>
+  remove: (id: number) => Promise<boolean>
   
   // Actions spécifiques
-  send: (id: string) => Promise<boolean>
-  markAsPaid: (id: string, data: MarquerPayeRequest) => Promise<boolean>
-  cancel: (id: string, reason?: string) => Promise<boolean>
-  sendReminder: (id: string) => Promise<boolean>
+  send: (id: number) => Promise<boolean>
+  markAsPaid: (id: number, data: MarquerPayeRequest) => Promise<boolean>
+  cancel: (id: number, reason?: string) => Promise<boolean>
+  sendReminder: (id: number) => Promise<boolean>
   
   // Utilitaires
   getStats: (year?: number) => Promise<void>
   getOverdue: () => Promise<void>
-  downloadPDF: (id: string) => Promise<void>
+  downloadPDF: (id: number) => Promise<void>
   exportToExcel: (filters?: FactureFilters) => Promise<void>
   refresh: () => Promise<void>
   clearError: () => void
@@ -52,10 +52,10 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
   const [invoices, setInvoices] = useState<Facture[]>([])
   const [invoice, setInvoice] = useState<Facture | null>(null)
   const [stats, setStats] = useState<FactureStats | null>({
-    total: 0,
-    overdue: 0,
-    totalUnpaid: 0,
-    totalRevenue: 0,
+    totalFacturesGolbal: 0,
+    retardPayementGolbal: 0,
+     montantRestantARecouvrerGolbal: 0,
+    montantTotalPayeGolbal: 0,
   })
   const [overdueInvoices, setOverdueInvoices] = useState<Facture[]>([])
   const [loading, setLoading] = useState(false)
@@ -91,7 +91,7 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
   /**
    * Récupère une facture par ID
    */
-  const getById = useCallback(async (id: string) => {
+  const getById = useCallback(async (id: number) => {
     setLoading(true)
     setError(null)
     
@@ -178,7 +178,7 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
   /**
    * Met à jour une facture
    */
-  const update = useCallback(async (id: string, data: UpdateFactureRequest): Promise<boolean> => {
+  const update = useCallback(async (id: number, data: UpdateFactureRequest): Promise<boolean> => {
     setLoading(true)
     setError(null)
     
@@ -212,15 +212,15 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
   /**
    * Supprime une facture
    */
-  const remove = useCallback(async (id: string): Promise<boolean> => {
+  const remove = useCallback(async (id: number): Promise<boolean> => {
     setLoading(true)
     setError(null)
     
     try {
       await InvoiceService.deleteInvoice(id)
-      setInvoices((prev) => prev.filter((inv) => inv.id.toString() !== id))
+      setInvoices((prev) => prev.filter((inv) => inv.id!== id))
       
-      if (invoice?.id.toString() === id) {
+      if (invoice?.id === id) {
         setInvoice(null)
       }
       
@@ -247,7 +247,7 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
   /**
    * Envoie une facture
    */
-  const send = useCallback(async (id: string): Promise<boolean> => {
+  const send = useCallback(async (id: number): Promise<boolean> => {
     setLoading(true)
     setError(null)
     
@@ -280,7 +280,7 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
   /**
    * Marque une facture comme payée
    */
-  const markAsPaid = useCallback(async (id: string, data: MarquerPayeRequest): Promise<boolean> => {
+  const markAsPaid = useCallback(async (id: number, data: MarquerPayeRequest): Promise<boolean> => {
     setLoading(true)
     setError(null)
     
@@ -313,7 +313,7 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
   /**
    * Annule une facture
    */
-  const cancel = useCallback(async (id: string, reason?: string): Promise<boolean> => {
+  const cancel = useCallback(async (id: number, reason?: string): Promise<boolean> => {
     setLoading(true)
     setError(null)
     
@@ -346,7 +346,7 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
   /**
    * Envoie une relance
    */
-  const sendReminder = useCallback(async (id: string): Promise<boolean> => {
+  const sendReminder = useCallback(async (id: number): Promise<boolean> => {
     setLoading(true)
     setError(null)
     
@@ -415,7 +415,7 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
   /**
    * Télécharge le PDF
    */
-  const downloadPDF = useCallback(async (id: string) => {
+  const downloadPDF = useCallback(async (id: number) => {
     setLoading(true)
     setError(null)
     
@@ -578,7 +578,7 @@ export const useListFacture = () => {
 /**
  * Hook simplifié pour une seule facture
  */
-export function useInvoice(id?: string) {
+export function useInvoice(id?: number) {
   const {
     invoice,
     loading,
@@ -601,6 +601,7 @@ export function useInvoice(id?: string) {
   return {
     invoice,
     loading,
+    getById,
     error,
     update: (data: UpdateFactureRequest) => update(id!, data),
     send: () => send(id!),

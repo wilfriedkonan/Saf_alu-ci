@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,23 +13,32 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, Plus, Trash2 } from "lucide-react"
+import { CalendarIcon, Check, ChevronsUpDown, Loader2, Plus, Trash2, UserPlus } from "lucide-react"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 import { cn } from "@/lib/utils"
-import type { InvoiceType, LigneFacture, Echeancier } from "@/types/invoices"
+import type { InvoiceType, LigneFacture, Echeancier, Facture } from "@/types/invoices"
 
 import type { CreateFactureRequest } from "@/types/invoices"
+import { useClientActions, useClientsList } from "@/hooks/useClients"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../ui/command"
+import { Client } from "@/types/clients"
+import { ClientFormModal } from "@/components/clients/client-form-modal"
+import { toast } from "../ui/use-toast"
 
 interface InvoiceFormModalProps {
   isOpen: boolean
   onClose: () => void
   onSubmit: (invoice: CreateFactureRequest) => void
+  facture?: Facture // Pour l'édition
+  loading?: boolean
 }
 
-export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModalProps) {
+export function InvoiceFormModal({ isOpen, onClose, onSubmit, facture, loading=false }: InvoiceFormModalProps) {
+  const isEdit = !!facture
+
   const [formData, setFormData] = useState({
-    type: "Devis" as InvoiceType,
+    type: "Facture_Client" as InvoiceType,
     clientName: "",
     clientId: 0,
     clientEmail: "",
@@ -39,7 +48,7 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
     description: "",
     taxRate: 18,
     notes: "",
-    titre:"",
+    titre: "",
   })
 
   const [items, setItems] = useState<LigneFacture[]>([
@@ -49,11 +58,88 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
   const [paymentSchedule, setPaymentSchedule] = useState<Echeancier[]>([
     { id: 1, factureId: 1, ordre: 1, description: "Paiement unique", montantTTC: 0, dateEcheance: "", statut: "EnAttente" },
   ])
-
+  const [clientSearchOpen, setClientSearchOpen] = useState(false)
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false)
   const [dueDate, setDueDate] = useState<Date>()
 
+  //hook presonnalisé 
+  const { clients, loading: clientLoading, error: clientError, refreshCliens } = useClientsList();
+  const {createClient} = useClientActions()
+
+  // Fonction pour obtenir le client sélectionné
+  const getSelectedClient = () => {
+    if (formData.clientId > 0 && clients) {
+      return clients.find(client => client.id === formData.clientId)
+    }
+    return null
+  }
+   // Réinitialiser le formulaire quand la modal s'ouvre
+   useEffect(() => {
+    if (isOpen) {
+      if (isEdit && facture) {
+        // Mode édition - charger les données du devis
+        setFormData({
+          type: facture.typeFacture,
+          clientId: facture.clientId,
+          clientName: facture.detailDebiteur.nom,
+          clientEmail: facture.detailDebiteur?.email || "",
+          clientAddress: facture.detailDebiteur?.adresse,
+          clientPhone: facture.detailDebiteur?.telephone || "",
+          projectTitle: facture.titre || "",
+          description: facture.description || "", 
+          taxRate: facture.tauxTVA,
+          notes: facture.conditionsPaiement || "",
+          titre: facture.titre || "",
+        })
+
+        if (facture.lignes && facture.lignes.length > 0) {
+          setItems(facture.lignes.map(ligne => ({
+            id: ligne.id,
+            factureId :ligne.factureId,
+            ordre: ligne.ordre,
+            designation: ligne.designation,
+            description: ligne.description || "",
+            quantite: ligne.quantite,
+            unite: ligne.unite,
+            prixUnitaireHT: ligne.prixUnitaireHT,
+            totalHT : ligne.totalHT
+          })))
+        } 
+        if(facture.echeanciers && facture.echeanciers.length > 0){
+          setPaymentSchedule(facture.echeanciers.map(echancier=>({
+            id:echancier.id,
+            factureId: echancier.factureId,
+            ordre: echancier.ordre,
+            description: echancier.description,
+            montantTTC: echancier.montantTTC,
+            dateEcheance: echancier.dateEcheance ? echancier.dateEcheance.split('T')[0] : "",
+            statut: echancier.statut
+          })))
+          
+        }
+      } else {
+        // Mode création - formulaire vide
+        setFormData({
+    type: "Facture_Client" as InvoiceType,
+    clientName: "",
+    clientId: 0,
+    clientEmail: "",
+    clientPhone: "",
+    clientAddress: "",
+    projectTitle: "",
+    description: "",
+    taxRate: 18,
+    notes: "",
+    titre: "",
+        })
+        setItems([{  id: 1, factureId: 1, ordre: 1, designation: "", description: "", quantite: 1, unite: "unité", prixUnitaireHT: 0, totalHT: 0 }]),
+        setPaymentSchedule([{id: 1, factureId: 1, ordre: 1, description: "Paiement unique", montantTTC: 0, dateEcheance: "", statut: "EnAttente"}])
+      }
+    }
+  }, [isOpen, isEdit, facture])
+
   const addItem = () => {
-    const newItem : LigneFacture = {
+    const newItem: LigneFacture = {
       id: Date.now(), // Utiliser un ID unique basé sur le timestamp
       designation: "",
       description: "",
@@ -110,6 +196,39 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
   const subtotal = items.reduce((sum, item) => sum + item.totalHT, 0)
   const taxAmount = subtotal * (formData.taxRate / 100)
   const total = subtotal + taxAmount
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("fr-FR", {
+      style: "currency",
+      currency: "XOF",
+      minimumFractionDigits: 0,
+    }).format(amount)
+  }
+
+  const handleClientSelect = (client: Client) => {
+    setFormData({
+      ...formData,
+      clientId: client.id,
+      clientName: client.nom,
+      clientEmail: client.email,
+      clientPhone: client.telephone,
+      clientAddress: `${client.adresse}, ${client.ville}`,
+    })
+    setClientSearchOpen(false)
+  }
+// Gestionnaire création
+  const handleNewClient = async(newClient: any) => {
+    const response = await createClient(newClient)
+    toast({
+      title:  "Client créé",
+      description: response.message || ("Le Client a été créé avec succès"),
+    })
+    // Rafraîchir la liste des clients après création
+    refreshCliens()
+    handleClientSelect(response.data as Client)
+    // Fermer le modal
+    setIsClientModalOpen(false)
+    // Note: Le nouveau client sera automatiquement disponible après le refresh
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -172,8 +291,8 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Devis">Facture Devis</SelectItem>
-                          <SelectItem value="SousTraitant">Facture Sous-traitant</SelectItem>
+                          <SelectItem value="Facture_Client">Facture client</SelectItem>
+                          <SelectItem value="SousTraitant">Facture sous-traitant</SelectItem>
                           <SelectItem value="Avoir">Avoir</SelectItem>
                         </SelectContent>
                       </Select>
@@ -230,66 +349,108 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-                  <div >
-                  <Label htmlFor="clientId"> Client *</Label>
-                  <Select
-                    value={formData.clientId > 0 ? formData.clientId.toString() : ""}
-                    onValueChange={(value) => setFormData({ ...formData, clientId: parseInt(value) || 0 })}
-                  >
-                    <SelectTrigger className="text-sm h-9">
-                      <SelectValue placeholder="Sélectionner un client" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">Client Test 1</SelectItem>
-                      <SelectItem value="2">Client Test 2</SelectItem>
-                      <SelectItem value="3">Client Test 3</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                      <div className="md:col-span-2">
+                        <Label htmlFor="clientName">Sélectionner un client</Label>
+                        <div className="flex gap-2">
+                          <Popover open={clientSearchOpen} onOpenChange={setClientSearchOpen}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={clientSearchOpen}
+                                className="flex-1 justify-between bg-transparent"
+                              >
+                                {formData.clientName || "Rechercher un client..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[400px] p-0">
+                              <Command>
+                                <CommandInput placeholder="Rechercher un client..." />
+                                <CommandList>
+                                  <CommandEmpty>Aucun client trouvé.</CommandEmpty>
+                                  <CommandGroup>
+                                    {clients.map((client) => (
+                                      <CommandItem
+                                        key={client.id}
+                                        value={`${client.nom} ${client.telephone || ""} ${client.email}`}
+                                        onSelect={() => handleClientSelect(client)}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            getSelectedClient()?.id === client.id ? "opacity-100" : "opacity-0",
+                                          )}
+                                        />
+                                        <div className="flex flex-col">
+                                          <span className="font-medium">{client.nom }</span>
+                                          <span className="text-xs text-muted-foreground">
+                                            {client.email} • {client.telephone}
+                                          </span>
+                                        </div>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => setIsClientModalOpen(true)}
+                            title="Ajouter un nouveau client"
+                          >
+                            <UserPlus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
 
-                    <div >
-                      <Label htmlFor="clientEmail">Email</Label>
-                      <Input
-                        id="clientEmail"
-                        type="email"
-                        value={formData.clientEmail}
-                        onChange={(e) => setFormData({ ...formData, clientEmail: e.target.value })}
-                        required
-                      />
+                      <div className="md:col-span-2">
+                        <Label htmlFor="clientEmail">Email</Label>
+                        <Input
+                          id="clientEmail"
+                          type="email"
+                          value={formData.clientEmail}
+                          onChange={(e) => setFormData({ ...formData, clientEmail: e.target.value })}
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="clientPhone">Téléphone</Label>
+                        <Input
+                          id="clientPhone"
+                          value={formData.clientPhone}
+                          onChange={(e) => setFormData({ ...formData, clientPhone: e.target.value })}
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="taxRate">TVA (%)</Label>
+                        <Input
+                          id="taxRate"
+                          type="number"
+                          value={formData.taxRate}
+                          onChange={(e) =>
+                            setFormData({ ...formData, taxRate: Number.parseFloat(e.target.value) || 0 })
+                          }
+                          min="0"
+                          max="100"
+                          step="0.1"
+                        />
+                      </div>
                     </div>
 
-                    <div>
-                      <Label htmlFor="clientPhone">Téléphone</Label>
-                      <Input
-                        id="clientPhone"
-                        value={formData.clientPhone}
-                        onChange={(e) => setFormData({ ...formData, clientPhone: e.target.value })}
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="taxRate">TVA (%)</Label>
-                      <Input
-                        id="taxRate"
-                        type="number"
-                        value={formData.taxRate}
-                        onChange={(e) => setFormData({ ...formData, taxRate: Number.parseFloat(e.target.value) || 0 })}
-                        min="0"
-                        max="100"
-                        step="0.1"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-4">
-                    <Label htmlFor="clientAddress">Adresse</Label>
-                    <Textarea
-                      id="clientAddress"
-                      value={formData.clientAddress}
-                      onChange={(e) => setFormData({ ...formData, clientAddress: e.target.value })}
-                      rows={2}
-                    />
-                  </div>
+                    {getSelectedClient() && (
+                      <div className="mt-4">
+                        <Label htmlFor="clientAddress">Adresse</Label>
+                        <div className="text-blue-700">
+                          {getSelectedClient()?.adresse}
+                        </div>
+                      </div>
+                    )}
                 </CardContent>
               </Card>
 
@@ -484,11 +645,32 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit }: InvoiceFormModal
               Annuler
             </Button>
             <Button type="submit" onClick={handleSubmit}>
-              Créer la facture
+              {loading ? (
+                <> 
+                <Loader2 className="mr-2 h-4 w4 animate-spin"/>
+                { isEdit? "Modification en cours..." : "Création en cours..."}
+             </> )
+             : (
+              <> {isEdit? "Modifier la facture" : "Creer une facture"}
+               {total > 0 && (
+                      <span className="ml-2 text-xs">
+                        ({formatCurrency(total)})
+                      </span>
+                    )}
+              </>
+             )}
+             
             </Button>
           </div>
         </div>
       </DialogContent>
+
+      {/* Modal de création client */}
+      <ClientFormModal
+        open={isClientModalOpen}
+        onOpenChange={setIsClientModalOpen}
+        onSubmit={handleNewClient}
+      />
     </Dialog>
   )
 }

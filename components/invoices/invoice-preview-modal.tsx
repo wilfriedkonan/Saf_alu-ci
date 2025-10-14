@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { type Facture, invoiceStatusLabels, invoiceStatusColors, invoiceTypeLabels } from "@/types/invoices"
 import { Building2, Mail, Phone, MapPin } from "lucide-react"
+import { useInvoice } from "@/hooks/useInvoices"
 
 interface InvoicePreviewModalProps {
   invoice: Facture
@@ -23,20 +24,20 @@ export function InvoicePreviewModal({ invoice, open, onOpenChange }: InvoicePrev
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-6xl xl:max-w-7xl max-h-[92vh] overflow-y-auto sm:max-w-7xl">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
-            <span>Prévisualisation - {invoice.number}</span>
+            <span>Prévisualisation - {invoice.numero}</span>
             <div className="flex items-center space-x-2">
-              <Badge variant="outline">{invoiceTypeLabels[invoice.type]}</Badge>
-              <Badge className={invoiceStatusColors[invoice.status]}>{invoiceStatusLabels[invoice.status]}</Badge>
+              <Badge variant="outline">{invoiceTypeLabels[invoice.typeFacture]}</Badge>
+              <Badge className={invoiceStatusColors[invoice.statut]}>{invoiceStatusLabels[invoice.statut]}</Badge>
             </div>
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
           {/* Header */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-primary rounded-lg">
                 <Building2 className="h-6 w-6 text-primary-foreground" />
@@ -47,10 +48,10 @@ export function InvoicePreviewModal({ invoice, open, onOpenChange }: InvoicePrev
                 <p className="text-xs text-muted-foreground">Abidjan, Côte d'Ivoire</p>
               </div>
             </div>
-            <div className="text-right">
+            <div className="text-left md:text-right">
               <h3 className="text-lg font-semibold">FACTURE</h3>
-              <p className="text-sm text-muted-foreground">{invoice.number}</p>
-              <p className="text-xs text-muted-foreground">{invoiceTypeLabels[invoice.type]}</p>
+              <p className="text-sm text-muted-foreground">{invoice.numero}</p>
+              <p className="text-xs text-muted-foreground">{invoiceTypeLabels[invoice.typeFacture]}</p>
             </div>
           </div>
 
@@ -63,37 +64,37 @@ export function InvoicePreviewModal({ invoice, open, onOpenChange }: InvoicePrev
               <div className="space-y-2">
                 <div className="flex items-center space-x-2">
                   <Building2 className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">{invoice.clientName}</span>
+                  <span className="font-medium">{invoice.detailDebiteur?.nom}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span>{invoice.clientEmail}</span>
+                  <span>{invoice.detailDebiteur.email}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span>{invoice.clientPhone}</span>
+                  <span>{invoice.detailDebiteur.telephone}</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <span>{invoice.clientAddress}</span>
+                  <span>{invoice.detailDebiteur.adresse}</span>
                 </div>
               </div>
             </div>
             <div>
               <h4 className="font-semibold mb-3">Détails de la facture</h4>
               <div className="space-y-2">
-                <div className="flex justify-between">
+                <div className="justify-between">
                   <span className="text-muted-foreground">Date d'émission:</span>
-                  <span>{new Date(invoice.dateCreation).toLocaleDateString("fr-FR")}</span>
+                  <span> {new Date(invoice.dateCreation).toLocaleDateString("fr-FR")}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="justify-between">
                   <span className="text-muted-foreground">Date d'échéance:</span>
-                  <span>{new Date(invoice.dueDate).toLocaleDateString("fr-FR")}</span>
+                  <span> {new Date(invoice.dateEcheance).toLocaleDateString("fr-FR")}</span>
                 </div>
-                {invoice.dateEcheance && (
+                {invoice.datePaiement && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Date de paiement:</span>
-                    <span>{new Date(invoice.dateEcheance).toLocaleDateString("fr-FR")}</span>
+                    <span>{new Date(invoice.datePaiement).toLocaleDateString("fr-FR")}</span>
                   </div>
                 )}
                 {invoice.devisId && (
@@ -120,8 +121,8 @@ export function InvoicePreviewModal({ invoice, open, onOpenChange }: InvoicePrev
           {/* Items Table */}
           <div>
             <h4 className="font-semibold mb-3">Détail des prestations</h4>
-            <div className="border rounded-lg overflow-hidden">
-              <table className="w-full">
+            <div className="border rounded-lg overflow-x-auto">
+              <table className="w-full min-w-[600px]">
                 <thead className="bg-muted">
                   <tr>
                     <th className="text-left p-3">Description</th>
@@ -134,7 +135,7 @@ export function InvoicePreviewModal({ invoice, open, onOpenChange }: InvoicePrev
                 <tbody>
                   {invoice.lignes?.map((item, index) => (
                     <tr key={item.id} className={index % 2 === 0 ? "bg-background" : "bg-muted/50"}>
-                      <td className="p-3">{item.description}</td>
+                      <td className="p-3">{item.designation}</td>
                       <td className="text-right p-3">{item.quantite}</td>
                       <td className="text-right p-3">{item.unite}</td>
                       <td className="text-right p-3">{formatCurrency(item.prixUnitaireHT)}</td>
@@ -178,7 +179,7 @@ export function InvoicePreviewModal({ invoice, open, onOpenChange }: InvoicePrev
           </div>
 
           {/* Payment Schedule */}
-          {invoice.echeanciers?.length && (
+          {invoice.echeanciers && invoice?.echeanciers?.length > 1 && (
             <>
               <Separator />
               <div>
@@ -194,11 +195,11 @@ export function InvoicePreviewModal({ invoice, open, onOpenChange }: InvoicePrev
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium">{formatCurrency(payment.montantTTC)}</p>
+                        <p className="font-medium">{formatCurrency(payment?.montantTTC)}</p>
                         <Badge
                           variant="outline"
                           className={
-                            payment.statut === "payee"
+                            payment.statut === "Payee"
                               ? "bg-green-100 text-green-800"
                               : payment.statut === "en_retard"
                                 ? "bg-red-100 text-red-800"
@@ -220,7 +221,7 @@ export function InvoicePreviewModal({ invoice, open, onOpenChange }: InvoicePrev
           )}
 
           {/* Notes */}
-        {/*   {invoice. && (
+         {/*  {invoice.notes && (
             <>
               <Separator />
               <div>

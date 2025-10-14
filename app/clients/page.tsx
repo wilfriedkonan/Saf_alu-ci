@@ -90,7 +90,7 @@ export default function ClientsPage() {
   const [editingClient, setEditingClient] = useState<Client | null>(null)
 
   // Gestionnaire création/modification
-  const handleSubmitDevis = async (newClientData: any) => {
+  const handleSubmitClients = async (newClientData: any) => {
     try {
       const response = editingClient
         ? await updateClient(editingClient.id, newClientData)
@@ -424,7 +424,7 @@ export default function ClientsPage() {
                         setSelectedClient(undefined)
                     }
                 }}
-                onSubmit={handleSubmitDevis}
+                onSubmit={handleSubmitClients}
                 client={editingClient || selectedClient}
             />
 

@@ -1,12 +1,12 @@
 // Types pour les statuts et types de factures
-export type FactureStatut = "Brouillon" | "Envoyee" | "Payee" | "EnRetard" | "Annulee";
-export type FactureType = "Devis" | "SousTraitant" | "Avoir" | "Acompte";
+export type FactureStatut = "Brouillon" | "Envoyee" | "payee" | "en_retard" | "Annulee";
+export type FactureType = "Facture_Client" | "SousTraitant" | "Avoir" | "Acompte";
 
 export interface Facture {
   id: number;
   numero: string;
   typeFacture: FactureType;
-  clientId?: number;
+  clientId: number;
   sousTraitantId?: number;
   devisId?: number;
   projetId?: number;
@@ -30,12 +30,11 @@ export interface Facture {
   referenceClient?: string;
   cheminPDF?: string;
   utilisateurCreation: number;
+  detailDebiteur : DetailDebiteur;
   // Navigation properties
-  client?: any;
-  sousTraitant?: any;
   lignes?: LigneFacture[];
   echeanciers?: Echeancier[];
-  
+
   // Propriétés de compatibilité pour l'interface existante
   number: string; // alias pour numero
   status: FactureStatut; // alias pour statut
@@ -43,7 +42,7 @@ export interface Facture {
   clientName?: string; // alias pour client?.nom
   clientEmail?: string; // alias pour client?.email
   clientPhone: string;
-  clientAddress:String;
+  clientAddress: String;
   projectTitle?: string; // alias pour titre
   total: number; // alias pour montantTTC
   paidAmount: number; // alias pour montantPaye
@@ -114,6 +113,16 @@ export interface MarquerPayeRequest {
   datePaiement: string;
 }
 
+export interface DetailDebiteur {
+  id: number
+  nom: string
+  ncc: string
+  raisonSociale: string
+  email: string
+  telephone: string
+  adresse: string
+}
+
 // Types pour compatibilité avec l'interface existante
 export type InvoiceStatus = FactureStatut;
 export type InvoiceType = FactureType;
@@ -122,13 +131,13 @@ export type InvoiceType = FactureType;
 export const invoiceStatusLabels: Record<FactureStatut, string> = {
   Brouillon: "Brouillon",
   Envoyee: "Envoyée",
-  Payee: "Payée",
-  EnRetard: "En retard",
+  payee: "Payée",
+  en_retard: "En retard",
   Annulee: "Annulée"
 };
 
 export const invoiceTypeLabels: Record<FactureType, string> = {
-  Devis: "Facture Devis",
+  Facture_Client: "Facture client",
   SousTraitant: "Facture Sous-traitant",
   Avoir: "Avoir",
   Acompte: "Acompte"
@@ -137,7 +146,7 @@ export const invoiceTypeLabels: Record<FactureType, string> = {
 export const invoiceStatusColors: Record<FactureStatut, string> = {
   Brouillon: "bg-gray-100 text-gray-800",
   Envoyee: "bg-blue-100 text-blue-800",
-  Payee: "bg-green-100 text-green-800",
-  EnRetard: "bg-red-100 text-red-800",
+  payee: "bg-green-100 text-green-800",
+  en_retard: "bg-red-100 text-red-800",
   Annulee: "bg-orange-100 text-orange-800"
 };

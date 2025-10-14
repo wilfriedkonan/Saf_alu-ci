@@ -28,12 +28,10 @@ import type {
   }
   
   interface FactureStats {
-    total: number
-    overdue: number
-    totalUnpaid: number
-    totalRevenue: number
-    byStatus?: Record<FactureStatut, number>
-    byType?: Record<FactureType, number>
+    totalFacturesGolbal: number
+    retardPayementGolbal: number
+    montantTotalPayeGolbal: number
+    montantRestantARecouvrerGolbal: number
   }
   
   interface FactureFilters {
@@ -117,7 +115,7 @@ import type {
           data = data.filter(
             (inv) =>
               inv.numero.toLowerCase().includes(searchLower) ||
-              inv.client?.nom?.toLowerCase().includes(searchLower) ||
+              inv.detailDebiteur?.nom?.toLowerCase().includes(searchLower) ||
               inv.titre?.toLowerCase().includes(searchLower)
           )
         }
@@ -140,9 +138,10 @@ import type {
     /**
      * Récupère une facture par son ID
      */
-    static async getInvoiceById(id: string): Promise<Facture> {
+    static async getInvoiceById(id: number): Promise<Facture> {
       try {
         const response: AxiosResponse<Facture> = await apiClient.get(`/factures/${id}`);
+        console.log('Debug repose Facture:', response.data)
         return response.data;
       } catch (error) {
         console.error(`Erreur lors de la récupération de la facture ${id}:`, error);
@@ -181,7 +180,7 @@ import type {
     /**
      * Met à jour une facture (uniquement si statut = brouillon)
      */
-    static async updateInvoice(id: string, data: UpdateFactureRequest): Promise<ApiResponse<void>> {
+    static async updateInvoice(id: number, data: UpdateFactureRequest): Promise<ApiResponse<void>> {
       try {
         const response: AxiosResponse<ApiResponse<void>> = await apiClient.put(`/factures/${id}`, data);
         return response.data;
@@ -194,7 +193,7 @@ import type {
     /**
      * Envoie une facture (change le statut à envoyée)
      */
-    static async sendInvoice(id: string): Promise<ApiResponse<void>> {
+    static async sendInvoice(id: number): Promise<ApiResponse<void>> {
       try {
         const response: AxiosResponse<ApiResponse<void>> = await apiClient.post(`/factures/${id}/envoyer`);
         return response.data;
@@ -207,7 +206,7 @@ import type {
     /**
      * Marque une facture comme payée (partiellement ou totalement)
      */
-    static async markInvoiceAsPaid(id: string, data: MarquerPayeRequest): Promise<ApiResponse<void>> {
+    static async markInvoiceAsPaid(id: number, data: MarquerPayeRequest): Promise<ApiResponse<void>> {
       try {
         const response: AxiosResponse<ApiResponse<void>> = await apiClient.post(`/factures/${id}/marquer-payee`, data);
         return response.data;
@@ -220,7 +219,7 @@ import type {
     /**
      * Annule une facture
      */
-    static async cancelInvoice(id: string, reason?: string): Promise<ApiResponse<void>> {
+    static async cancelInvoice(id: number, reason?: string): Promise<ApiResponse<void>> {
       try {
         const response: AxiosResponse<ApiResponse<void>> = await apiClient.post(`/factures/${id}/annuler`, {
           motif: reason
@@ -235,7 +234,7 @@ import type {
     /**
      * Supprime une facture
      */
-    static async deleteInvoice(id: string): Promise<ApiResponse<void>> {
+    static async deleteInvoice(id: number): Promise<ApiResponse<void>> {
       try {
         const response: AxiosResponse<ApiResponse<void>> = await apiClient.delete(`/factures/${id}`);
         return response.data;
@@ -261,7 +260,7 @@ import type {
     /**
      * Envoie une relance pour une facture
      */
-    static async sendInvoiceReminder(id: string): Promise<ApiResponse<void>> {
+    static async sendInvoiceReminder(id: number): Promise<ApiResponse<void>> {
       try {
         const response: AxiosResponse<ApiResponse<void>> = await apiClient.post(`/factures/${id}/relance`);
         return response.data;
@@ -274,7 +273,7 @@ import type {
     /**
      * Télécharge le PDF d'une facture
      */
-    static async downloadInvoicePDF(id: string): Promise<{ blob: Blob; filename?: string }> {
+    static async downloadInvoicePDF(id: number): Promise<{ blob: Blob; filename?: string }> {
       try {
         const response: AxiosResponse<Blob> = await apiClient.get(`/factures/${id}/pdf`, {
           responseType: 'blob'

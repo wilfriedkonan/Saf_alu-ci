@@ -49,7 +49,7 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
     { designation: "", description: "", quantite: 1, unite: "U", prixUnitaireHT: 0 },
   ])
  
-  const {clients,loading: clientLoading, error: devisError, refreshCliens}=useClientsList()
+  const {clients,loading: clientLoading, error: clientError, refreshCliens}=useClientsList()
 
   // Fonction pour obtenir le client sélectionné
   const getSelectedClient = () => {
@@ -254,7 +254,7 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
                     <Label htmlFor="clientId" className="text-sm font-medium">
                       Client *
                     </Label>
-                    {devisError && (
+                    {clientError && (
                       <Button
                         type="button"
                         variant="ghost"
@@ -308,7 +308,7 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
                       )}
                     </SelectContent>
                   </Select>
-                  {devisError && (
+                  {clientError && (
                     <p className="text-xs text-red-600">Erreur lors du chargement des clients</p>
                   )}
                   {/* Affichage des informations du client sélectionné */}

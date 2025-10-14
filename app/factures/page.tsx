@@ -16,6 +16,9 @@ import { invoiceStatusLabels, invoiceStatusColors, invoiceTypeLabels } from "@/t
 import { InvoiceActions } from "@/components/invoices/invoice-actions"
 import { InvoiceFormModal } from "@/components/invoices/invoice-form-modal"
 import { useAuth, usePermissions } from "@/contexts/AuthContext"
+import { toast } from "@/hooks/use-toast"
+import { useClientActions } from "@/hooks/useClients"
+import { useInvoiceService } from "@/services/invoiceService"
 
 export default function InvoicesPage() {
   const { user } = useAuth()
@@ -24,10 +27,12 @@ export default function InvoicesPage() {
   const router = useRouter()
 
   // Hook principal pour les factures
-  const { invoices, overdueInvoices, loading, error, getAll, getOverdue, create, remove, refresh, clearError, } = useInvoices(false) // Chargement manuel
+  const { invoices, overdueInvoices, loading, error, getAll, getOverdue, create, update, remove, refresh, clearError, } = useInvoices(false) // Chargement manuel
   const { facture, loading: FactureLoading, error: FactureError, refreshFacture } = useListFacture();
   // Hook pour les statistiques
-  const { stats } = useInvoiceStats(new Date().getFullYear())
+  const { stats } = useInvoiceStats()
+  const { createClient } = useClientActions()
+  const { getInvoiceById } = useInvoiceService();
 
   // États locaux pour les filtres
   const [filteredFacture, setFilteredFacture] = useState<Facture[]>([])
@@ -35,7 +40,12 @@ export default function InvoicesPage() {
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | "all">("all")
   const [typeFilter, setTypeFilter] = useState<InvoiceType | "all">("all")
   const [isInvoiceFormOpen, setIsInvoiceFormOpen] = useState(false)
+  // État devis en édition
+  const [editingFacture, setEditingFacture] = useState<Facture | null>(null)
 
+  useEffect(() => {
+    console.log('Statue selectionne:', typeFilter)
+  }, [typeFilter])
   // Vérifier les permissions
   useEffect(() => {
     if (!user || !canAccessFinances) {
@@ -43,8 +53,8 @@ export default function InvoicesPage() {
       return
     }
     // Charger les données au montage
-   /*  getAll()
-    getOverdue() */
+    /*  getAll()
+     getOverdue() */
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, canAccessFinances, router])
 
@@ -61,26 +71,26 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     let filtered = facture
-         console.log('Data Facture:',facture)
+    console.log('Data Facture:', facture)
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase()
       filtered = filtered.filter(
         (facture) =>
           facture.numero.toLowerCase().includes(searchLower) ||
           facture.titre.toLowerCase().includes(searchLower) ||
-          facture.client?.nom.toLowerCase().includes(searchLower))
+          facture.detailDebiteur?.nom.toLowerCase().includes(searchLower))
     }
 
-    if(statusFilter !=='all'){
+    if (statusFilter !== 'all') {
       filtered = filtered.filter((facture) => facture.statut === statusFilter)
     }
 
-    if(typeFilter !=='all'){
-      filtered = filtered.filter((facture) => facture.type === typeFilter)
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter((facture) => facture.typeFacture === typeFilter)
     }
 
     setFilteredFacture(filtered)
-console.log('valeur de filtered:',filtered)
+    console.log('valeur de filtered:', filtered)
   }, [facture, searchTerm, statusFilter, typeFilter])
 
   // Auto-dismiss des erreurs
@@ -92,21 +102,40 @@ console.log('valeur de filtered:',filtered)
   }, [error, clearError])
 
   // Gestion de la création
-  const handleCreateInvoice = async (invoiceData: CreateFactureRequest) => {
-    const newInvoice = await create(invoiceData)
-    if (newInvoice) {
-      setIsInvoiceFormOpen(false)
-      refresh()
-    }
+  const handleCreateInvoice = async (invoiceData: any) => {
+    const response = editingFacture ?
+      await update(editingFacture.id, invoiceData) :
+      await create(invoiceData)
+
+    console.log('debug newInvoice :', response)
+    setIsInvoiceFormOpen(false)
+    refresh()
+    setEditingFacture(null)
+
   }
 
   // Gestion de la suppression
-  const handleDeleteInvoice = async (id: string, number: string) => {
+  const handleDeleteInvoice = async (id: number, number: string) => {
     if (confirm(`Êtes-vous sûr de vouloir supprimer la facture ${number} ?`)) {
       const success = await remove(id)
       if (success) {
         refresh()
       }
+    }
+  }
+
+  // Ouvrir modal en mode édition
+  const handleEditFacture = async (item: any) => {
+    try {
+      const full = await getInvoiceById(item.id)
+      setEditingFacture(full)
+      setIsInvoiceFormOpen(true)
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de charger la facture",
+        variant: "destructive",
+      })
     }
   }
 
@@ -125,7 +154,7 @@ console.log('valeur de filtered:',filtered)
   }
 
   return (
-    
+
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
@@ -186,7 +215,7 @@ console.log('valeur de filtered:',filtered)
                 <Receipt className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.total ? stats.total : 0}</div>
+                <div className="text-2xl font-bold">{stats.totalFacturesGolbal ? stats.totalFacturesGolbal : 0}</div>
               </CardContent>
             </Card>
             <Card>
@@ -195,7 +224,7 @@ console.log('valeur de filtered:',filtered)
                 <AlertTriangle className="h-4 w-4 text-red-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.overdue ? stats.overdue : 0}</div>
+                <div className="text-2xl font-bold">{stats.retardPayementGolbal ? stats.retardPayementGolbal : 0}</div>
               </CardContent>
             </Card>
             <Card>
@@ -204,7 +233,7 @@ console.log('valeur de filtered:',filtered)
                 <Euro className="h-4 w-4 text-red-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{formatCurrency(stats.totalUnpaid ? stats.totalUnpaid : 0)}</div>
+                <div className="text-2xl font-bold">{formatCurrency(stats.montantRestantARecouvrerGolbal ? stats.montantRestantARecouvrerGolbal : 0)}</div>
               </CardContent>
             </Card>
             <Card>
@@ -213,7 +242,7 @@ console.log('valeur de filtered:',filtered)
                 <TrendingUp className="h-4 w-4 text-green-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{formatCurrency(stats.totalRevenue ? stats.totalRevenue : 0)}</div>
+                <div className="text-2xl font-bold">{formatCurrency(stats.montantTotalPayeGolbal ? stats.montantTotalPayeGolbal : 0)}</div>
               </CardContent>
             </Card>
           </div>
@@ -243,12 +272,12 @@ console.log('valeur de filtered:',filtered)
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tous les statuts</SelectItem>
-                  <SelectItem value="brouillon">Brouillon</SelectItem>
-                  <SelectItem value="envoyee">Envoyée</SelectItem>
-                  <SelectItem value="payee">Payée</SelectItem>
-                  <SelectItem value="en_retard">En retard</SelectItem>
-                  <SelectItem value="partiellement_payee">Partiellement payée</SelectItem>
-                  <SelectItem value="annulee">Annulée</SelectItem>
+                  <SelectItem value="Brouillon">Brouillon</SelectItem>
+                  <SelectItem value="Envoyee">Envoyée</SelectItem>
+                  <SelectItem value="Payee">Payée</SelectItem>
+                  <SelectItem value="En_retard">En retard</SelectItem>
+                  <SelectItem value="Partiellement_payee">Partiellement payée</SelectItem>
+                  <SelectItem value="Annulee">Annulée</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as InvoiceType | "all")}>
@@ -257,8 +286,8 @@ console.log('valeur de filtered:',filtered)
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tous les types</SelectItem>
-                  <SelectItem value="facture_devis">Facture Devis</SelectItem>
-                  <SelectItem value="facture_sous_traitant">Facture Sous-traitant</SelectItem>
+                  <SelectItem value="Facture_Client">Facture client</SelectItem>
+                  <SelectItem value="facture_sous_traitant">Facture sous-traitant</SelectItem>
                   <SelectItem value="avoir">Avoir</SelectItem>
                 </SelectContent>
               </Select>
@@ -312,61 +341,69 @@ console.log('valeur de filtered:',filtered)
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredFacture.map((invoice) => (
-                    <TableRow key={invoice.id}>
-                      <TableCell className="font-medium">{invoice.numero}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{invoiceTypeLabels[invoice.typeFacture]}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{invoice.clientName}</div>
-                          <div className="text-sm text-muted-foreground">{invoice.clientEmail}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="max-w-48 truncate" title={invoice.titre}>
-                          {invoice.titre}
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">{formatCurrency(invoice.montantTTC)}</TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium text-green-600">{formatCurrency(invoice.montantPaye)}</div>
-                          {invoice.montantRestant > 0 && (
-                            <div className="text-sm text-red-600">Reste: {formatCurrency(invoice.montantRestant)}</div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={invoiceStatusColors[invoice.statut]}>
-                          {invoiceStatusLabels[invoice.statut]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div>{new Date(invoice.dateEcheance).toLocaleDateString("fr-FR")}</div>
-                          {invoice.remindersSent && invoice.remindersSent > 0 && (
-                            <div className="text-xs text-muted-foreground">{invoice.remindersSent} relance(s)</div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center gap-2 justify-end">
-                          <InvoiceActions invoice={invoice} onUpdate={refresh} />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeleteInvoice(invoice.id.toString(), invoice.number)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            disabled={loading}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {filteredFacture.map((invoice) => {
+                    console.log("Détail débiteur :", invoice.detailDebiteur)
+                    return (
+                      <TableRow key={invoice.id}>
+                        <TableCell className="font-medium">{invoice.numero}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{invoiceTypeLabels[invoice.typeFacture]}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            {<div className="font-medium">{invoice.detailDebiteur?.nom} </div>}
+                            <div className="text-sm text-muted-foreground">{invoice.detailDebiteur.email}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="max-w-48 truncate" title={invoice.titre}>
+                            {invoice.titre}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">{formatCurrency(invoice.montantTTC)}</TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium text-green-600">{formatCurrency(invoice.montantPaye)}</div>
+                            {invoice.montantRestant > 0 && (
+                              <div className="text-sm text-red-600">Reste: {formatCurrency(invoice.montantRestant)}</div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={invoiceStatusColors[invoice.statut]}>
+                            {invoiceStatusLabels[invoice.statut]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div>{new Date(invoice.dateEcheance).toLocaleDateString("fr-FR")}</div>
+                            {invoice.remindersSent && invoice.remindersSent > 0 && (
+                              <div className="text-xs text-muted-foreground">{invoice.remindersSent} relance(s)</div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center gap-2 justify-end">
+                            <InvoiceActions
+                              invoice={invoice}
+                              onUpdate={refresh
+
+                              }
+                              onEdit={handleEditFacture} />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteInvoice(invoice.id, invoice.number)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              disabled={loading}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
                 </TableBody>
               </Table>
             )}
@@ -379,6 +416,7 @@ console.log('valeur de filtered:',filtered)
         isOpen={isInvoiceFormOpen}
         onClose={() => setIsInvoiceFormOpen(false)}
         onSubmit={handleCreateInvoice}
+        facture={editingFacture || undefined}
       />
     </DashboardLayout>
   )
