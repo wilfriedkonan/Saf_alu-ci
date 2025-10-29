@@ -45,12 +45,14 @@ const navigation: NavigationItem[] = [
   { name: "Tableau de bord", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard" },
   { name: "Devis", href: "/devis", icon: FileText, permission: "devis" },
   { name: "Projets", href: "/projets", icon: Hammer, permission: "projets" },
+  { name: "DQE", href: "/dqe", icon: Bell, permission: "dqe" },
   { name: "Factures", href: "/factures", icon: Receipt, permission: "factures" },
   { name: "Clients", href: "/clients", icon: Users, permission: "clients" },
   { name: "Sous-traitants", href: "/sous-traitants", icon: Users, permission: "sous_traitants" },
   { name: "Trésorerie", href: "/tresorerie", icon: Wallet, permission: "tresorerie" },
   { name: "Paramètres", href: "/parametres", icon: UserCog, permission: "utilisateurs" },
   { name: "Notifications", href: "/notifications", icon: Bell, permission: "notifications" },
+
 ]
 
 interface DashboardLayoutProps {

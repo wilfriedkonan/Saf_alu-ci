@@ -53,10 +53,7 @@ export default function DevisPage() {
     console.log('stat verification:',stats)
 
   }, [user, canAccessQuotes, router])
-  useEffect(() => {
-    
-    console.log('stat after load:',stats)
-  }, [stats])
+
   // Filtrage des devis
   useEffect(() => {
     let filtered = devis
@@ -108,8 +105,8 @@ export default function DevisPage() {
   // Ouvrir modal en mode édition
   const handleEditDevis = async (item: any) => {
     try {
-      const full = await getDevisById(item.id)
-      setEditingDevis(full)
+      const theOne = await getDevisById(item.id)
+      setEditingDevis(theOne)
       setShowDevisForm(true)
     } catch (error) {
       toast({

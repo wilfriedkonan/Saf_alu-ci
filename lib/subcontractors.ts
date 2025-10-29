@@ -71,6 +71,13 @@ export type SubcontractorSpecialty =
   | "climatisation"
   | "securite"
   | "jardinage"
+  | "couverture"
+  | "isolation"
+  | "chauffage"
+  | "terrassement"
+ 
+
+
 
 export type SubcontractorStatus = "actif" | "inactif" | "suspendu" | "en_evaluation"
 export type DocumentType = "assurance" | "certification" | "licence" | "cv" | "autre"
@@ -87,6 +94,10 @@ export const specialtyLabels: Record<SubcontractorSpecialty, string> = {
   climatisation: "Climatisation",
   securite: "Sécurité",
   jardinage: "Jardinage",
+  couverture: "Couverture",
+  isolation:"Isolation",
+  chauffage:"Chauffage",
+  terrassement:"Terrassement",
 }
 
 export const statusLabels: Record<SubcontractorStatus, string> = {

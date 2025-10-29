@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Plus, Search, Filter, Star, Phone, Mail, MapPin, Award, Trash2 } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { Plus, Search, Filter, Star, Phone, Mail, MapPin, Award, Trash2, Edit } from "lucide-react"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,75 +9,39 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SubcontractorFormModal } from "@/components/subcontractors/subcontractor-form-modal"
-import { useAuth, usePermissions } from "@/contexts/AuthContext"
+import { SousTraitantService } from "@/services/sous-traitantService"
 import { useRouter } from "next/navigation"
+import { useAuth, usePermissions } from "@/contexts/AuthContext"
+import { useSousTraitantList, useSpecialiteList } from "@/hooks/useSoustraitant"
+import { SousTraitant, Specialite } from "@/types/sous-traitants"
+import { toast } from "@/hooks/use-toast"
 
-// Mock data pour remplacer getSubcontractors()
-const mockSubcontractors = [
-  {
-    id: 1,
-    name: "Jean Dupont",
-    company: "Plomberie Dupont",
-    specialties: ["plomberie", "chauffage"],
-    averageRating: 4.8,
-    phone: "01 23 45 67 89",
-    email: "jean@plomberie-dupont.fr",
-    address: "123 Rue de la Paix, Paris",
-    status: "actif",
-    completedProjects: 45,
-    evaluations: [
-      { id: 1, rating: 5, comment: "Excellent travail" },
-      { id: 2, rating: 4, comment: "Très professionnel" },
-    ],
-  },
-  {
-    id: 2,
-    name: "Marie Martin",
-    company: "Électricité Martin",
-    specialties: ["electricite", "domotique"],
-    averageRating: 4.2,
-    phone: "01 98 76 54 32",
-    email: "marie@elec-martin.fr",
-    address: "456 Avenue Victor Hugo, Lyon",
-    status: "actif",
-    completedProjects: 32,
-    evaluations: [
-      { id: 1, rating: 4, comment: "Bon travail" },
-      { id: 2, rating: 4, comment: "Respecte les délais" },
-    ],
-  },
-  {
-    id: 3,
-    name: "Pierre Leroy",
-    company: "Peinture Leroy",
-    specialties: ["peinture", "decoration"],
-    averageRating: 3.9,
-    phone: "01 11 22 33 44",
-    email: "pierre@peinture-leroy.fr",
-    address: "789 Boulevard Saint-Germain, Marseille",
-    status: "actif",
-    completedProjects: 28,
-    evaluations: [{ id: 1, rating: 4, comment: "Travail soigné" }],
-  },
-]
+// Données réelles fournies par le hook `useSousTraitantList`
 
 export default function SubcontractorsPage() {
-  const { user } = useAuth() 
-  const { canManageSousTraitants } = usePermissions()
-  const [subcontractors, setSubcontractors] = useState(mockSubcontractors)
   const [searchTerm, setSearchTerm] = useState("")
   const [specialtyFilter, setSpecialtyFilter] = useState("all")
   const [ratingFilter, setRatingFilter] = useState("all")
   const [isSubcontractorFormOpen, setIsSubcontractorFormOpen] = useState(false)
-  const router = useRouter()
+  const [editingSubcontractor, setEditingSubcontractor] = useState<SousTraitant |null>(null)
+  const [allSpecialties, setallSpecialties] = useState<Specialite[]>()
+  // hook personalisé 
 
+  const router = useRouter()
+  const { user } = useAuth()
+  const { canManageSousTraitants } = usePermissions()
+  const { sousTraitantList } = useSousTraitantList()
+  const { specialite } = useSpecialiteList()
+const {getSoustraitantsById}=SousTraitantService
+
+  // Vérification des permissions
   useEffect(() => {
-    if (!user || !canManageSousTraitants) {
+    if (!user || !canManageSousTraitants()) {
       router.push("/dashboard")
       return
     }
-  }, [user, router]
-  )
+  }, [user, canManageSousTraitants, router])
+
   const specialtyLabels: Record<string, string> = {
     plomberie: "Plomberie",
     electricite: "Électricité",
@@ -93,28 +57,40 @@ export default function SubcontractorsPage() {
     decoration: "Décoration",
   }
 
-  const filteredSubcontractors = subcontractors.filter((sub) => {
-    const matchesSearch =
-      sub.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      sub.company.toLowerCase().includes(searchTerm.toLowerCase())
-
-    const matchesSpecialty = specialtyFilter === "all" || sub.specialties.includes(specialtyFilter)
-
-    let matchesRating = true
-    if (ratingFilter === "5") {
-      matchesRating = sub.averageRating >= 4.5
-    } else if (ratingFilter === "4") {
-      matchesRating = sub.averageRating >= 3.5 && sub.averageRating < 4.5
-    } else if (ratingFilter === "3") {
-      matchesRating = sub.averageRating >= 2.5 && sub.averageRating < 3.5
-    } else if (ratingFilter === "low") {
-      matchesRating = sub.averageRating < 2.5
+  // Liste des spécialités disponibles (libellés)
+  useEffect(() => {
+    if (specialite) {
+      setallSpecialties(specialite)
+      console.log('Debug specialite:',specialite)
     }
+  }, [specialite])
 
-    return matchesSearch && matchesSpecialty && matchesRating
-  })
 
-  const allSpecialties = Array.from(new Set(subcontractors.flatMap((sub) => sub.specialties)))
+  // Filtrage des sous-traitants
+  const filteredSubcontractors = useMemo(() => {
+    return sousTraitantList.filter((sub) => {
+      const matchesSearch =
+        sub.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        sub.nomContact?.toLowerCase().includes(searchTerm.toLowerCase())
+
+      const matchesSpecialty =
+        specialtyFilter === "all" ||
+        (sub.specialites?.some((s) => s.specialiteId?.toString() === specialtyFilter) ?? false)
+
+      let matchesRating = true
+      if (ratingFilter === "5") {
+        matchesRating = sub.noteMoyenne >= 4.5
+      } else if (ratingFilter === "4") {
+        matchesRating = sub.noteMoyenne >= 3.5 && sub.noteMoyenne < 4.5
+      } else if (ratingFilter === "3") {
+        matchesRating = sub.noteMoyenne >= 2.5 && sub.noteMoyenne < 3.5
+      } else if (ratingFilter === "low") {
+        matchesRating = sub.noteMoyenne < 2.5
+      }
+
+      return matchesSearch && matchesSpecialty && matchesRating
+    })
+  }, [sousTraitantList, searchTerm, specialtyFilter, ratingFilter])
 
   const renderStars = (rating: number) => {
     const stars = []
@@ -148,35 +124,52 @@ export default function SubcontractorsPage() {
   }
 
   const averageRating =
-    subcontractors.length > 0
-      ? (subcontractors.reduce((acc, s) => acc + s.averageRating, 0) / subcontractors.length).toFixed(1)
+    sousTraitantList.length > 0
+      ? (
+        sousTraitantList.reduce((acc, s) => acc + (s.noteMoyenne || 0), 0) /
+        sousTraitantList.length
+      ).toFixed(1)
       : "0.0"
 
-  const handleCreateSubcontractor = (subcontractorData: any) => {
-    const newSubcontractor = {
-      ...subcontractorData,
-      id: Date.now(),
-      status: "actif",
-      completedProjects: 0,
-      evaluations: [],
-    }
-    setSubcontractors([...subcontractors, newSubcontractor])
+  const handleCreateSubcontractor = (_subcontractorData: any) => {
+    // Intégration API à implémenter. Pour l'instant, fermeture du modal.
+    setEditingSubcontractor(null)
   }
 
-  const handleDeleteSubcontractor = (subcontractorId: number) => {
+  const handleDeleteSubcontractor = (_subcontractorId: number) => {
     if (confirm("Êtes-vous sûr de vouloir supprimer ce sous-traitant ?")) {
-      setSubcontractors(subcontractors.filter((sub) => sub.id !== subcontractorId))
+      // Intégration API à implémenter
     }
   }
 
+  const handleEditSubcontractor = async (subcontractor: SousTraitant) => {
+    try{
+      const TheOne = await getSoustraitantsById(subcontractor.id)
+      setEditingSubcontractor(TheOne)
+      setIsSubcontractorFormOpen(true)
+    }catch(error){
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de charger le Sous-traitant",
+        variant: "destructive",
+      })
+    }
+   
+  }
+
+  const handleCloseModal = () => {
+    setIsSubcontractorFormOpen(false)
+    setEditingSubcontractor(null)
+  }
+
+  // Vérification des permissions avant rendu
   if (!user || !canManageSousTraitants) {
     return null
   }
-  
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Sous-traitants</h1>
@@ -188,7 +181,6 @@ export default function SubcontractorsPage() {
           </Button>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -196,7 +188,7 @@ export default function SubcontractorsPage() {
               <Award className="h-4 w-4 text-gray-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">{subcontractors.length}</div>
+              <div className="text-2xl font-bold text-gray-900">{sousTraitantList.length}</div>
               <p className="text-xs text-gray-500">sous-traitants actifs</p>
             </CardContent>
           </Card>
@@ -207,9 +199,7 @@ export default function SubcontractorsPage() {
               <Star className="h-4 w-4 text-yellow-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">
-                {subcontractors.filter((s) => s.averageRating >= 4.5).length}
-              </div>
+              <div className="text-2xl font-bold text-gray-900">{sousTraitantList.filter((s) => (s.noteMoyenne || 0) >= 4.5).length}</div>
               <p className="text-xs text-gray-500">note ≥ 4.5/5</p>
             </CardContent>
           </Card>
@@ -220,7 +210,7 @@ export default function SubcontractorsPage() {
               <MapPin className="h-4 w-4 text-gray-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">{allSpecialties.length}</div>
+              <div className="text-2xl font-bold text-gray-900">{allSpecialties?.length}</div>
               <p className="text-xs text-gray-500">domaines couverts</p>
             </CardContent>
           </Card>
@@ -237,7 +227,6 @@ export default function SubcontractorsPage() {
           </Card>
         </div>
 
-        {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -257,9 +246,9 @@ export default function SubcontractorsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Toutes spécialités</SelectItem>
-                {allSpecialties.map((specialty) => (
-                  <SelectItem key={specialty} value={specialty}>
-                    {getSpecialtyLabel(specialty)}
+                {allSpecialties?.map((specialty) => (
+                  <SelectItem key={specialty.id} value={specialty.id.toString()}>
+                    {specialty.description}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -283,7 +272,6 @@ export default function SubcontractorsPage() {
           </div>
         </div>
 
-        {/* Subcontractors Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredSubcontractors.map((subcontractor) => (
             <Card
@@ -293,13 +281,21 @@ export default function SubcontractorsPage() {
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <div>
-                    <CardTitle className="text-lg text-gray-900">{subcontractor.name}</CardTitle>
-                    <p className="text-sm text-gray-500">{subcontractor.company}</p>
+                    <CardTitle className="text-lg text-gray-900">{subcontractor.nom}</CardTitle>
+                    <p className="text-sm text-gray-500">{subcontractor.contact?.nom ||""}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="text-xs">
-                      {subcontractor.status === "actif" ? "Actif" : subcontractor.status}
+                      {subcontractor.actif === true ? "Actif" : "Inactif"}
                     </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEditSubcontractor(subcontractor)}
+                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 p-1 h-auto"
+                    >
+                      <Edit className="h-3 w-3" />
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -313,50 +309,45 @@ export default function SubcontractorsPage() {
               </CardHeader>
 
               <CardContent className="space-y-4">
-                {/* Rating */}
-                {renderStars(subcontractor.averageRating)}
+                {renderStars(subcontractor.noteMoyenne)}
 
-                {/* Specialties */}
                 <div className="flex flex-wrap gap-1">
-                  {subcontractor.specialties.slice(0, 3).map((specialty) => (
-                    <Badge key={specialty} variant="secondary" className="text-xs">
-                      {getSpecialtyLabel(specialty)}
+                  {subcontractor.specialites?.slice(0, 3).map((s) => (
+                    <Badge key={`${s.specialiteId}`} variant="secondary" className="text-xs">
+                      {getSpecialtyLabel(s.description || "test")}
                     </Badge>
                   ))}
-                  {subcontractor.specialties.length > 3 && (
+                  {(subcontractor.specialites?.length || 0) > 3 && (
                     <Badge variant="outline" className="text-xs">
-                      +{subcontractor.specialties.length - 3}
+                      +{(subcontractor.specialites?.length || 0) - 3}
                     </Badge>
                   )}
                 </div>
 
-                {/* Contact Info */}
                 <div className="space-y-2 text-sm text-gray-500">
                   <div className="flex items-center">
                     <Phone className="h-4 w-4 mr-2 flex-shrink-0" />
-                    <span className="truncate">{subcontractor.phone}</span>
+                    <span className="truncate">{subcontractor.telephone || subcontractor.contact?.telephoneContact || "-"}</span>
                   </div>
                   <div className="flex items-center">
                     <Mail className="h-4 w-4 mr-2 flex-shrink-0" />
-                    <span className="truncate">{subcontractor.email}</span>
+                    <span className="truncate">{subcontractor.email || subcontractor.contact?.emailContact || "-"}</span>
                   </div>
                   <div className="flex items-center">
                     <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
-                    <span className="truncate">{subcontractor.address}</span>
+                    <span className="truncate">{subcontractor.adresse || "-"}</span>
                   </div>
                 </div>
 
-                {/* Stats */}
                 <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-                  <span className="text-gray-500">{subcontractor.completedProjects} projets</span>
-                  <span className="text-gray-500">{subcontractor.evaluations.length} évaluations</span>
+                  <span className="text-gray-500">{subcontractor.specialites?.length || 0} spécialités</span>
+                  <span className="text-gray-500">{subcontractor.nombreEvaluations || 0} évaluations</span>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        {/* No Results */}
         {filteredSubcontractors.length === 0 && (
           <div className="text-center py-12">
             <div className="text-gray-400 mb-2">
@@ -368,11 +359,11 @@ export default function SubcontractorsPage() {
         )}
       </div>
 
-      {/* Subcontractor Form Modal */}
       <SubcontractorFormModal
         isOpen={isSubcontractorFormOpen}
-        onClose={() => setIsSubcontractorFormOpen(false)}
+        onClose={handleCloseModal}
         onSubmit={handleCreateSubcontractor}
+        editData={editingSubcontractor}
       />
     </DashboardLayout>
   )

@@ -266,6 +266,7 @@ export const usePermissions = () => {
     canAccessDashboard: () => hasPermission('dashboard'),
     canManageUsers: () => hasPermission('utilisateurs'),
     canManageProjects: () => hasPermission('projets'),
+    canManageDqe: () => hasPermission('dqe'),
     canManageFinances: () => hasPermission('factures') || hasPermission('tresorerie'),
     canManageClients: () => hasPermission('clients'),
     canManageQuotes: () => hasPermission('devis'),
