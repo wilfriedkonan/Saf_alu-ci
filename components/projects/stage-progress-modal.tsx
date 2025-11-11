@@ -1,270 +1,936 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Slider } from "@/components/ui/slider"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Slider } from "@/components/ui/slider"
 import { Badge } from "@/components/ui/badge"
-import { Star, Upload } from "lucide-react"
-import type { Project, ProjectStage } from "@/lib/projects"
-import { updateStageProgress, addStageEvaluation } from "@/lib/projects"
-import { toast } from "@/hooks/use-toast"
+import { Progress } from "@/components/ui/progress"
+import { Card, CardContent } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { 
+  Calendar,
+  Euro,
+  User,
+  Star,
+  MessageSquare,
+  Loader2,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Upload,
+  History,
+  Play,
+  Pause,
+  RotateCcw,
+  Ban
+} from "lucide-react"
+import type { Project, ProjectStage } from "@/types/projet"
+import { useProjetEtapes } from "@/hooks/useProjet"
+import { useAuth } from "@/contexts/AuthContext"
+import { toast } from "sonner"
+import { useSousTraitantEvaluations } from "@/hooks/useSoustraitant"
 
 interface StageProgressModalProps {
   stage: ProjectStage | null
-  project: Project
+  projet: Project
   open: boolean
   onOpenChange: (open: boolean) => void
   onUpdate: () => void
 }
 
-export function StageProgressModal({ stage, project, open, onOpenChange, onUpdate }: StageProgressModalProps) {
-  const [progress, setProgress] = useState(stage?.progress || 0)
-  const [rating, setRating] = useState(stage?.evaluation?.rating || 0)
-  const [comment, setComment] = useState(stage?.evaluation?.comment || "")
-  const [newAssignee, setNewAssignee] = useState(stage?.assignedTo || "")
-  const [changeReason, setChangeReason] = useState("")
+export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate }: StageProgressModalProps) {
+  const { user } = useAuth()
+  const { updateEtape, loading } = useProjetEtapes(projet.id)
+  
+  // ✅ CORRECTION: Utiliser le hook avec l'ID du sous-traitant si disponible
+  const sousTraitantId = stage?.idSousTraitant || stage?.sousTraitant?.id
+  const { 
+    createEvaluation, 
+    evaluations,
+    noteMoyenne,
+    totalEvaluations,
+    loading: evaluationLoading,
+    refreshEvaluations
+  } = useSousTraitantEvaluations(sousTraitantId)
+  
+  const [progression, setProgression] = useState(0)
+  const [note, setNote] = useState(0)
+  const [commentaire, setCommentaire] = useState("")
+  const [hoveredStar, setHoveredStar] = useState(0)
+  const [currentStatut, setCurrentStatut] = useState<string>("")
 
-  if (!stage) return null
+  const [criteresEvaluation, setCriteresEvaluation] = useState({
+    qualite: 0,
+    delais: 0,
+    communication: 0,
+    professionnalisme: 0,
+    proprete: 0
+  })
 
-  const handleSaveProgress = () => {
-    const success = updateStageProgress(project.id, stage.id, progress)
-    if (success) {
-      onUpdate()
-      toast({
-        title: "Progression mise à jour",
-        description: `La progression de "${stage.name}" a été mise à jour à ${progress}%`,
+  // ✅ CORRECTION: Charger les données de l'étape et réinitialiser l'évaluation
+  useEffect(() => {
+    if (stage && open) {
+      setProgression(stage.pourcentageAvancement)
+      setCurrentStatut(stage.statut)
+      // Réinitialiser les champs d'évaluation (on affichera les évaluations existantes séparément)
+      setNote(0)
+      setCommentaire("")
+      setCriteresEvaluation({
+        qualite: 0,
+        delais: 0,
+        communication: 0,
+        professionnalisme: 0,
+        proprete: 0
       })
     }
-  }
+  }, [stage, open])
 
-  const handleSaveEvaluation = () => {
-    if (rating === 0) {
-      toast({
-        title: "Évaluation requise",
-        description: "Veuillez donner une note avant de sauvegarder",
-        variant: "destructive",
-      })
+  // ✅ NOTE: Le hook useSousTraitantEvaluations charge automatiquement les évaluations 
+  // quand sousTraitantId change via son useEffect interne
+
+  const handleChangeStatut = async (newStatut: string) => {
+    if (!stage) return
+
+    // Validation des transitions de statut
+    const confirmMessages: Record<string, string> = {
+      EnCours: "Voulez-vous démarrer cette étape ?",
+      Suspendu: "Voulez-vous suspendre cette étape ?",
+      Termine: "Voulez-vous marquer cette étape comme terminée ?",
+      Annule: "Voulez-vous annuler cette étape ? Cette action est définitive.",
+    }
+
+    if (confirmMessages[newStatut] && !confirm(confirmMessages[newStatut])) {
       return
     }
 
-    const success = addStageEvaluation(project.id, stage.id, {
-      rating,
-      comment,
-      evaluatedBy: "Marie Dubois", // In real app, get from current user
-    })
+    try {
+      const updateData: Partial<ProjectStage> = {
+        statut: newStatut as any,
+      }
 
-    if (success) {
+      // Logique automatique selon le statut
+      if (newStatut === "EnCours" && stage.pourcentageAvancement === 0) {
+        updateData.pourcentageAvancement = 1 // Initialiser à 1% au démarrage
+        setProgression(1)
+      } else if (newStatut === "Termine") {
+        updateData.pourcentageAvancement = 100
+        updateData.dateFinReelle = new Date().toISOString()
+        setProgression(100)
+      }
+
+      if (!stage.id) {
+        toast.error("Impossible de mettre à jour l'étape: ID manquant")
+        return
+      }
+
+      await updateEtape(stage.id, updateData)
+      setCurrentStatut(newStatut)
+      toast.success(`Étape ${getStatusLabel(newStatut).toLowerCase()}`)
+      // ✅ Appeler onUpdate() seulement après une modification réussie
       onUpdate()
-      toast({
-        title: "Évaluation enregistrée",
-        description: `L'évaluation de "${stage.name}" a été enregistrée`,
-      })
+      // Ne pas fermer le modal, laisser l'utilisateur continuer à travailler
+    } catch (error) {
+      console.error("Erreur lors du changement de statut:", error)
+      toast.error("Erreur lors du changement de statut")
     }
   }
 
-  const handleAssigneeChange = () => {
-    if (newAssignee !== stage.assignedTo && changeReason.trim()) {
-      // In real app, update the assignee
-      toast({
-        title: "Assignation modifiée",
-        description: `"${stage.name}" a été réassigné à ${newAssignee}`,
-      })
+  // ✅ CORRECTION: Implémenter correctement la fonction de sauvegarde d'évaluation
+  const handleSaveEvaluation = async () => {
+    // Validation
+    if (!sousTraitantId) {
+      toast.error("Aucun sous-traitant assigné à cette étape")
+      return
+    }
+
+    if (note === 0) {
+      toast.error("Veuillez attribuer une note (1 à 5 étoiles)")
+      return
+    }
+
+    if (!stage) {
+      toast.error("Étape non trouvée")
+      return
+    }
+
+    if (!stage.id) {
+      toast.error("Impossible d'évaluer: l'étape n'a pas d'ID")
+      return
+    }
+
+    try {
+      // Préparer les données d'évaluation selon CreateEvaluationRequest
+      const evaluationData = {
+        sousTraitantId: sousTraitantId,
+        projetId: projet.id,
+        etapeProjetId: stage.id,
+        note: note,
+        commentaire: commentaire.trim() || null,
+        criteres: Object.values(criteresEvaluation).some(v => v > 0) ? criteresEvaluation : undefined
+      }
+
+      // Créer l'évaluation via le service
+      const response = await createEvaluation(sousTraitantId, evaluationData)
+
+      if (response.success) {
+        toast.success("Évaluation enregistrée avec succès")
+        // Réinitialiser les champs
+        setNote(0)
+        setCommentaire("")
+        setCriteresEvaluation({
+          qualite: 0,
+          delais: 0,
+          communication: 0,
+          professionnalisme: 0,
+          proprete: 0
+        })
+        // Rafraîchir les évaluations
+        refreshEvaluations()
+        // Rafraîchir les données du projet
+        onUpdate()
+      } else {
+        toast.error(response.error || "Erreur lors de l'enregistrement de l'évaluation")
+      }
+    } catch (error: any) {
+      console.error("Erreur lors de la création de l'évaluation:", error)
+      toast.error(error.message || "Une erreur est survenue lors de l'enregistrement de l'évaluation")
     }
   }
+
+  const canEditProgress = () => {
+    // On ne peut modifier la progression que si l'étape est en cours
+    return currentStatut === "EnCours"
+  }
+
+  const getAvailableActions = () => {
+    const actions = []
+    
+    switch (currentStatut) {
+      case "Planification":
+      case "NonCommence":
+        actions.push({
+          label: "Démarrer",
+          icon: Play,
+          color: "bg-blue-600 hover:bg-blue-700",
+          statut: "EnCours"
+        })
+        actions.push({
+          label: "Annuler",
+          icon: Ban,
+          color: "bg-red-600 hover:bg-red-700",
+          statut: "Annule"
+        })
+        break
+      
+      case "EnCours":
+        actions.push({
+          label: "Terminer",
+          icon: CheckCircle,
+          color: "bg-green-600 hover:bg-green-700",
+          statut: "Termine"
+        })
+        actions.push({
+          label: "Suspendre",
+          icon: Pause,
+          color: "bg-amber-600 hover:bg-amber-700",
+          statut: "Suspendu"
+        })
+        actions.push({
+          label: "Annuler",
+          icon: Ban,
+          color: "bg-red-600 hover:bg-red-700",
+          statut: "Annule"
+        })
+        break
+      
+      case "Suspendu":
+        actions.push({
+          label: "Reprendre",
+          icon: RotateCcw,
+          color: "bg-blue-600 hover:bg-blue-700",
+          statut: "EnCours"
+        })
+        actions.push({
+          label: "Annuler",
+          icon: Ban,
+          color: "bg-red-600 hover:bg-red-700",
+          statut: "Annule"
+        })
+        break
+      
+      case "Termine":
+      case "Annule":
+        // Aucune action disponible pour les étapes terminées ou annulées
+        break
+    }
+    
+    return actions
+  }
+
+  const handleSave = async () => {
+    if (!stage) return
+
+    if (!stage.id) {
+      toast.error("Impossible de sauvegarder: l'étape n'a pas d'ID")
+      return
+    }
+
+    // Vérifier si on peut modifier la progression
+    if (!canEditProgress() && progression !== stage.pourcentageAvancement) {
+      toast.error("Vous ne pouvez modifier la progression que si l'étape est en cours")
+      return
+    }
+
+    try {
+      const updateData: Partial<ProjectStage> = {
+        pourcentageAvancement: progression,
+      }
+
+      // ✅ NOTE: L'évaluation est gérée séparément via handleSaveEvaluation
+      // On ne sauvegarde plus l'évaluation ici, seulement la progression
+
+      // Mettre à jour le statut automatiquement selon la progression
+      if (progression === 100 && currentStatut !== "Termine" && currentStatut === "EnCours") {
+        updateData.statut = "Termine"
+        updateData.dateFinReelle = new Date().toISOString()
+        setCurrentStatut("Termine")
+      } else if (progression > 0 && progression < 100 && currentStatut === "NonCommence") {
+        updateData.statut = "EnCours"
+        setCurrentStatut("EnCours")
+      }
+
+      await updateEtape(stage.id, updateData)
+      
+      toast.success("Étape mise à jour avec succès")
+      // ✅ Appeler onUpdate() seulement après une modification réussie
+      onUpdate()
+      // Ne pas fermer automatiquement le modal, laisser l'utilisateur le fermer manuellement
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour:", error)
+      toast.error("Erreur lors de la mise à jour de l'étape")
+    }
+  }
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("fr-FR", {
+      style: "currency",
+      currency: "XOF",
+      minimumFractionDigits: 0,
+    }).format(amount)
+  }
+
+  const getStatusIcon = (statut: string) => {
+    switch (statut) {
+      case "Termine":
+        return <CheckCircle className="h-5 w-5 text-green-600" />
+      case "EnCours":
+        return <Clock className="h-5 w-5 text-blue-600" />
+      case "Suspendu":
+        return <XCircle className="h-5 w-5 text-amber-600" />
+      default:
+        return <Clock className="h-5 w-5 text-gray-400" />
+    }
+  }
+
+  const getStatusLabel = (statut: string) => {
+    const labels: Record<string, string> = {
+      Planification: "Planification",
+      NonCommence: "Non commencé",
+      EnCours: "En cours",
+      Termine: "Terminé",
+      Suspendu: "Suspendu",
+      Annule: "Annulé"
+    }
+    return labels[statut] || statut
+  }
+
+  const getStatusColor = (statut: string) => {
+    const colors: Record<string, string> = {
+      Planification: "bg-gray-100 text-gray-800",
+      NonCommence: "bg-gray-100 text-gray-800",
+      EnCours: "bg-blue-100 text-blue-800",
+      Termine: "bg-green-100 text-green-800",
+      Suspendu: "bg-amber-100 text-amber-800",
+      Annule: "bg-red-100 text-red-800"
+    }
+    return colors[statut] || "bg-gray-100 text-gray-800"
+  }
+
+  if (!stage) return null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span>Progression - {stage.name}</span>
-            <Badge variant="outline">{stage.status}</Badge>
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-6">
-          {/* Stage Info */}
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <Label className="text-sm font-medium">Description</Label>
-              <p className="text-sm text-muted-foreground mt-1">{stage.description}</p>
-            </div>
-            <div>
-              <Label className="text-sm font-medium">Période</Label>
-              <p className="text-sm text-muted-foreground mt-1">
-                {new Date(stage.startDate).toLocaleDateString("fr-FR")} -{" "}
-                {new Date(stage.endDate).toLocaleDateString("fr-FR")}
+          <DialogTitle className="flex items-center gap-3">
+            {getStatusIcon(currentStatut)}
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                {stage.nom}
+                <Badge className={getStatusColor(currentStatut)}>{getStatusLabel(currentStatut)}</Badge>
+              </div>
+              <p className="text-sm font-normal text-muted-foreground mt-1">
+                Étape {stage.ordre} - {projet.nom}
               </p>
             </div>
-          </div>
-
-          {/* Progress Slider */}
-          <div className="space-y-3">
-            <Label className="text-base font-medium">Progression ({progress}%)</Label>
-            <Slider
-              value={[progress]}
-              onValueChange={(value) => setProgress(value[0])}
-              max={100}
-              step={5}
-              className="w-full"
-            />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>0%</span>
-              <span>50%</span>
-              <span>100%</span>
-            </div>
-            <Button onClick={handleSaveProgress} size="sm">
-              Mettre à jour la progression
-            </Button>
-          </div>
-
-          {/* Evaluation */}
-          <div className="space-y-4">
-            <Label className="text-base font-medium">Évaluation de l'exécutant</Label>
-
-            <div className="space-y-2">
-              <Label className="text-sm">Note (1-5 étoiles)</Label>
-              <div className="flex items-center space-x-1">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    onClick={() => setRating(star)}
-                    className={`text-2xl ${star <= rating ? "text-yellow-400" : "text-gray-300"} hover:text-yellow-400 transition-colors`}
+          </DialogTitle>
+          
+          {/* Boutons de gestion de statut */}
+          {getAvailableActions().length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t">
+              <p className="text-sm text-muted-foreground w-full mb-2">Actions disponibles :</p>
+              {getAvailableActions().map((action) => {
+                const Icon = action.icon
+                return (
+                  <Button
+                    key={action.statut}
+                    onClick={() => handleChangeStatut(action.statut)}
+                    disabled={loading}
+                    size="sm"
+                    className={`${action.color} text-white`}
                   >
-                    <Star className="h-6 w-6 fill-current" />
-                  </button>
-                ))}
+                    <Icon className="h-4 w-4 mr-2" />
+                    {action.label}
+                  </Button>
+                )
+              })}
+            </div>
+          )}
+          
+          {(currentStatut === "Termine" || currentStatut === "Annule") && (
+            <div className="mt-4 pt-4 border-t">
+              <p className="text-sm text-muted-foreground">
+                {currentStatut === "Termine" 
+                  ? "✅ Cette étape est terminée. Aucune modification n'est possible."
+                  : "❌ Cette étape est annulée. Aucune modification n'est possible."}
+              </p>
+            </div>
+          )}
+        </DialogHeader>
+
+        <Tabs defaultValue="progress" className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="progress">Progression</TabsTrigger>
+            <TabsTrigger value="details">Détails</TabsTrigger>
+            <TabsTrigger value="evaluation">Évaluation</TabsTrigger>
+            <TabsTrigger value="history">Historique</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="progress" className="space-y-4">
+            {!canEditProgress() && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                <p className="text-sm text-amber-800 font-medium">
+                  ⚠️ La progression ne peut être modifiée que lorsque l'étape est "En cours"
+                </p>
+                <p className="text-xs text-amber-700 mt-1">
+                  {currentStatut === "Planification" || currentStatut === "NonCommence" 
+                    ? "Veuillez d'abord démarrer l'étape."
+                    : currentStatut === "Suspendu"
+                    ? "Veuillez d'abord reprendre l'étape."
+                    : "Cette étape ne peut plus être modifiée."}
+                </p>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="comment">Commentaire</Label>
-              <Textarea
-                id="comment"
-                placeholder="Commentaire sur la qualité du travail..."
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                rows={3}
-              />
-            </div>
-
-            {stage.evaluation ? (
-              <div className="p-3 bg-muted rounded-lg">
-                <p className="text-sm font-medium">Évaluation existante:</p>
-                <div className="flex items-center space-x-2 mt-1">
-                  <div className="flex">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`h-4 w-4 ${i < stage.evaluation!.rating ? "text-yellow-400 fill-current" : "text-gray-300"}`}
-                      />
-                    ))}
+            )}
+            
+            <Card>
+              <CardContent className="pt-6 space-y-6">
+                {/* Progression actuelle */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base font-medium">Progression actuelle</Label>
+                    <span className="text-2xl font-bold">{progression}%</span>
                   </div>
-                  <span className="text-sm text-muted-foreground">
-                    par {stage.evaluation.evaluatedBy} le{" "}
-                    {new Date(stage.evaluation.evaluatedAt).toLocaleDateString("fr-FR")}
-                  </span>
+                  <Progress value={progression} className="h-3" />
                 </div>
-                {stage.evaluation.comment && (
-                  <p className="text-sm text-muted-foreground mt-2">"{stage.evaluation.comment}"</p>
+
+                {/* Slider de progression */}
+                <div className="space-y-3">
+                  <Label htmlFor="progress-slider">Mettre à jour la progression</Label>
+                  <Slider
+                    id="progress-slider"
+                    value={[progression]}
+                    onValueChange={(value) => setProgression(value[0])}
+                    max={100}
+                    step={5}
+                    className="w-full"
+                    disabled={loading || !canEditProgress()}
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>0%</span>
+                    <span>25%</span>
+                    <span>50%</span>
+                    <span>75%</span>
+                    <span>100%</span>
+                  </div>
+                </div>
+
+                {/* Input direct */}
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="progress-input" className="whitespace-nowrap">
+                    Ou saisir directement:
+                  </Label>
+                  <Input
+                    id="progress-input"
+                    type="number"
+                    value={progression}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value)
+                      if (!isNaN(val) && val >= 0 && val <= 100) {
+                        setProgression(val)
+                      }
+                    }}
+                    min={0}
+                    max={100}
+                    disabled={loading || !canEditProgress()}
+                    className="w-24"
+                  />
+                  <span className="text-muted-foreground">%</span>
+                </div>
+
+                {/* Alerte si terminé */}
+                {progression === 100 && stage.statut !== "Termine" && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2 text-green-800">
+                      <CheckCircle className="h-5 w-5" />
+                      <p className="font-medium">Cette étape sera marquée comme terminée</p>
+                    </div>
+                  </div>
                 )}
-              </div>
-            ) : (
-              <Button onClick={handleSaveEvaluation} variant="outline" size="sm">
-                Enregistrer l'évaluation
-              </Button>
-            )}
-          </div>
 
-          {/* Photos Upload */}
-          <div className="space-y-3">
-            <Label className="text-base font-medium">Photos avant/après</Label>
-            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
-              <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">Glissez vos photos ici ou cliquez pour sélectionner</p>
-              <Button variant="outline" size="sm" className="mt-2 bg-transparent">
-                Choisir des fichiers
-              </Button>
-            </div>
-          </div>
+                {/* Alerte si démarré */}
+                {progression > 0 && progression < 100 && stage.statut === "NonCommence" && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2 text-blue-800">
+                      <Clock className="h-5 w-5" />
+                      <p className="font-medium">Cette étape sera marquée comme en cours</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-          {/* Change Assignee */}
-          <div className="space-y-3">
-            <Label className="text-base font-medium">Changer l'exécutant</Label>
-            <div className="grid md:grid-cols-2 gap-3">
-              <div>
-                <Label className="text-sm">Nouvel exécutant</Label>
-                <Select value={newAssignee} onValueChange={setNewAssignee}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {project.team.workers.map((worker) => (
-                      <SelectItem key={worker} value={worker}>
-                        {worker}
-                      </SelectItem>
-                    ))}
-                    {project.team.subcontractors.map((sub) => (
-                      <SelectItem key={sub} value={sub}>
-                        {sub}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-sm">Raison du changement</Label>
-                <Textarea
-                  placeholder="Raison..."
-                  value={changeReason}
-                  onChange={(e) => setChangeReason(e.target.value)}
-                  rows={2}
-                />
-              </div>
-            </div>
-            {newAssignee !== stage.assignedTo && (
-              <Button onClick={handleAssigneeChange} variant="outline" size="sm">
-                Confirmer le changement
-              </Button>
-            )}
-          </div>
-
-          {/* History */}
-          <div className="space-y-3">
-            <Label className="text-base font-medium">Historique des modifications</Label>
-            <div className="space-y-2">
-              <div className="flex items-start space-x-3 text-sm">
-                <div className="h-2 w-2 rounded-full bg-blue-500 mt-2" />
-                <div>
-                  <p>Progression mise à jour à {stage.progress}%</p>
-                  <p className="text-xs text-muted-foreground">Il y a 2 heures par Marie Dubois</p>
-                </div>
-              </div>
-              {stage.evaluation && (
-                <div className="flex items-start space-x-3 text-sm">
-                  <div className="h-2 w-2 rounded-full bg-green-500 mt-2" />
+          <TabsContent value="details" className="space-y-4">
+            <Card>
+              <CardContent className="pt-6 space-y-4">
+                {/* Description */}
+                {stage.description && (
                   <div>
-                    <p>Évaluation ajoutée ({stage.evaluation.rating} étoiles)</p>
-                    <p className="text-xs text-muted-foreground">
-                      Le {new Date(stage.evaluation.evaluatedAt).toLocaleDateString("fr-FR")} par{" "}
-                      {stage.evaluation.evaluatedBy}
+                    <Label className="text-sm font-medium">Description</Label>
+                    <p className="text-sm text-muted-foreground mt-1">{stage.description}</p>
+                  </div>
+                )}
+
+                {/* Dates */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-sm flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Date de début
+                    </Label>
+                    <p className="text-sm font-medium">
+                      {stage.dateDebut 
+                        ? new Date(stage.dateDebut).toLocaleDateString("fr-FR", {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric"
+                          })
+                        : "Non définie"}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Date de fin prévue
+                    </Label>
+                    <p className="text-sm font-medium">
+                      {stage.dateFinPrevue 
+                        ? new Date(stage.dateFinPrevue).toLocaleDateString("fr-FR", {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric"
+                          })
+                        : "Non définie"}
                     </p>
                   </div>
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
+
+                {/* Date de fin réelle si terminé */}
+                {stage.dateFinReelle && (
+                  <div className="space-y-1">
+                    <Label className="text-sm flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      Date de fin réelle
+                    </Label>
+                    <p className="text-sm font-medium text-green-600">
+                      {new Date(stage.dateFinReelle).toLocaleDateString("fr-FR", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric"
+                      })}
+                    </p>
+                  </div>
+                )}
+
+                {/* Budget */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-sm flex items-center gap-2">
+                      <Euro className="h-4 w-4" />
+                      Budget prévu
+                    </Label>
+                    <p className="text-sm font-medium">{formatCurrency(stage.budgetPrevu)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm flex items-center gap-2">
+                      <Euro className="h-4 w-4" />
+                      Coût réel
+                    </Label>
+                    <p className={`text-sm font-medium ${
+                      stage.coutReel > stage.budgetPrevu ? "text-red-600" : "text-green-600"
+                    }`}>
+                      {formatCurrency(stage.coutReel)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Budget restant */}
+                <div className="space-y-1">
+                  <Label className="text-sm flex items-center gap-2">
+                    <Euro className="h-4 w-4" />
+                    Budget restant
+                  </Label>
+                  <p className={`text-sm font-medium ${
+                    (stage.budgetPrevu - stage.coutReel) < 0 ? "text-red-600" : "text-green-600"
+                  }`}>
+                    {formatCurrency(stage.budgetPrevu - stage.coutReel)}
+                  </p>
+                </div>
+
+                {/* Responsable */}
+                <div className="space-y-1">
+                  <Label className="text-sm flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Type de responsable
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">
+                      {stage.typeResponsable === "Interne" ? "👨‍💼 Interne" : "🏢 Sous-traitant"}
+                    </Badge>
+                    <div className="flex flex-col">
+                      {stage.sousTraitant? stage.sousTraitant.nom : ""}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lien DQE */}
+                {stage.linkedDqeLotCode && (
+                  <div className="space-y-1 pt-3 border-t">
+                    <Label className="text-sm font-medium">Origine DQE</Label>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">{stage.linkedDqeLotCode}</Badge>
+                      {stage.linkedDqeLotName && (
+                        <span className="text-sm text-muted-foreground">
+                          {stage.linkedDqeLotName}
+                        </span>
+                      )}
+                    </div>
+                    {stage.linkedDqeReference && (
+                      <p className="text-xs text-muted-foreground">
+                        Référence: {stage.linkedDqeReference}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="evaluation" className="space-y-4">
+            {!sousTraitantId ? (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-center py-8 text-muted-foreground">
+                    <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-sm">
+                      {stage.typeResponsable === "Interne" 
+                        ? "Cette étape est gérée en interne. L'évaluation n'est disponible que pour les sous-traitants."
+                        : "Aucun sous-traitant n'est assigné à cette étape."}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {/* Informations sur le sous-traitant et note moyenne */}
+                {noteMoyenne > 0 && (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label className="text-sm font-medium text-muted-foreground">
+                            Sous-traitant: {stage.sousTraitant?.nom || "Non spécifié"}
+                          </Label>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {totalEvaluations} évaluation{totalEvaluations > 1 ? "s" : ""}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <div className="flex items-center gap-2">
+                            <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
+                            <span className="text-2xl font-bold">{noteMoyenne.toFixed(1)}</span>
+                            <span className="text-sm text-muted-foreground">/5</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">Note moyenne</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Formulaire de nouvelle évaluation */}
+                <Card>
+                  <CardContent className="pt-6 space-y-6">
+                    <div className="space-y-4">
+                      <Label className="text-base font-medium flex items-center gap-2">
+                        <Star className="h-5 w-5" />
+                        Nouvelle évaluation (sur 5 étoiles)
+                      </Label>
+                      <div className="flex items-center gap-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setNote(star)}
+                            onMouseEnter={() => setHoveredStar(star)}
+                            onMouseLeave={() => setHoveredStar(0)}
+                            className="text-4xl transition-colors focus:outline-none disabled:opacity-50"
+                            disabled={evaluationLoading}
+                          >
+                            <span
+                              className={
+                                star <= (hoveredStar || note)
+                                  ? "text-yellow-400"
+                                  : "text-gray-300"
+                              }
+                            >
+                              ★
+                            </span>
+                          </button>
+                        ))}
+                        {note > 0 && (
+                          <span className="ml-2 text-lg font-medium">{note}/5</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Commentaire */}
+                    <div className="space-y-2">
+                      <Label htmlFor="comment" className="flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4" />
+                        Commentaire (optionnel)
+                      </Label>
+                      <Textarea
+                        id="comment"
+                        value={commentaire}
+                        onChange={(e) => setCommentaire(e.target.value)}
+                        placeholder="Ajoutez vos remarques sur cette étape..."
+                        rows={4}
+                        disabled={evaluationLoading}
+                      />
+                    </div>
+
+                    {/* Bouton de sauvegarde */}
+                    <Button 
+                      onClick={handleSaveEvaluation}
+                      disabled={evaluationLoading || note === 0}
+                      className="w-full"
+                    >
+                      {evaluationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {evaluationLoading ? "Enregistrement..." : "Enregistrer l'évaluation"}
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Liste des évaluations existantes */}
+                {evaluations.length > 0 && (
+                  <Card>
+                    <CardContent className="pt-6 space-y-4">
+                      <Label className="text-base font-medium flex items-center gap-2">
+                        <History className="h-5 w-5" />
+                        Évaluations précédentes ({evaluations.length})
+                      </Label>
+                      <div className="space-y-4">
+                        {evaluations.map((evaluation, index) => {
+                          // Parser les critères si c'est une chaîne JSON
+                          let criteresParsed: Record<string, number> | null = null
+                          if (evaluation.criteres) {
+                            try {
+                              criteresParsed = typeof evaluation.criteres === 'string' 
+                                ? JSON.parse(evaluation.criteres) 
+                                : evaluation.criteres
+                            } catch (e) {
+                              console.error("Erreur parsing criteres:", e)
+                            }
+                          }
+
+                          return (
+                            <div 
+                              key={evaluation.id || index}
+                              className="bg-muted rounded-lg p-4 space-y-2 border"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className="flex">
+                                    {[...Array(5)].map((_, i) => (
+                                      <span
+                                        key={i}
+                                        className={`text-lg ${
+                                          i < evaluation.note ? "text-yellow-400" : "text-gray-300"
+                                        }`}
+                                      >
+                                        ★
+                                      </span>
+                                    ))}
+                                  </div>
+                                  <span className="text-sm font-medium">
+                                    {evaluation.note}/5
+                                  </span>
+                                </div>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(evaluation.dateEvaluation).toLocaleDateString("fr-FR", {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit"
+                                  })}
+                                </span>
+                              </div>
+                              {evaluation.commentaire && (
+                                <p className="text-sm text-muted-foreground italic mt-2">
+                                  "{evaluation.commentaire}"
+                                </p>
+                              )}
+                              {criteresParsed && Object.keys(criteresParsed).length > 0 && (
+                                <div className="mt-2 pt-2 border-t">
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">
+                                    Critères:
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {Object.entries(criteresParsed).map(([key, value]) => (
+                                      <Badge key={key} variant="outline" className="text-xs">
+                                        {key}: {value}/5
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Message si aucune évaluation */}
+                {evaluations.length === 0 && noteMoyenne === 0 && !evaluationLoading && (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="text-center py-4 text-muted-foreground">
+                        <Star className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">Aucune évaluation pour le moment</p>
+                        <p className="text-xs mt-1">Soyez le premier à évaluer ce sous-traitant</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            )}
+          </TabsContent>
+
+          <TabsContent value="history" className="space-y-4">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-4">
+                  <Label className="text-base font-medium flex items-center gap-2">
+                    <History className="h-5 w-5" />
+                    Historique des modifications
+                  </Label>
+                  
+                  <div className="space-y-3">
+                    {/* Historique de progression */}
+                    <div className="flex items-start space-x-3 text-sm">
+                      <div className="h-2 w-2 rounded-full bg-blue-500 mt-2 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium">Progression actuelle: {stage.pourcentageAvancement}%</p>
+                        <p className="text-xs text-muted-foreground">
+                          Statut: {getStatusLabel(stage.statut)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Évaluations */}
+                    {evaluations.length > 0 && (
+                      <div className="flex items-start space-x-3 text-sm">
+                        <div className="h-2 w-2 rounded-full bg-yellow-500 mt-2 flex-shrink-0" />
+                        <div>
+                          <p className="font-medium">
+                            {evaluations.length} évaluation{evaluations.length > 1 ? "s" : ""} enregistrée{evaluations.length > 1 ? "s" : ""}
+                            {noteMoyenne > 0 && ` (Moyenne: ${noteMoyenne.toFixed(1)}/5)`}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Dernière évaluation le {new Date(evaluations[0].dateEvaluation).toLocaleDateString("fr-FR")}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Date de fin réelle */}
+                    {stage.dateFinReelle && (
+                      <div className="flex items-start space-x-3 text-sm">
+                        <div className="h-2 w-2 rounded-full bg-green-500 mt-2 flex-shrink-0" />
+                        <div>
+                          <p className="font-medium">Étape terminée</p>
+                          <p className="text-xs text-muted-foreground">
+                            Le {new Date(stage.dateFinReelle).toLocaleDateString("fr-FR")}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Message si aucun historique */}
+                    {evaluations.length === 0 && !stage.dateFinReelle && stage.pourcentageAvancement === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Aucune modification enregistrée pour le moment
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Fermer
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+            Annuler
           </Button>
+          {(currentStatut !== "Termine" && currentStatut !== "Annule") && (
+            <Button 
+              onClick={handleSave} 
+              disabled={loading || (!canEditProgress() && progression !== stage.pourcentageAvancement)}
+            >
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {loading ? "Enregistrement..." : "Enregistrer"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

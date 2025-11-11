@@ -2,429 +2,425 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { DashboardLayout } from "@/components/dashboard-layout"
+import { Plus, Search, Filter, FileText, Download, Edit, Trash2, Eye, Briefcase, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import {
-  Search,
-  Plus,
-  FileDown,
-  MoreVertical,
-  Eye,
-  Edit,
-  Trash2,
-  RefreshCw,
-  FileText,
-  ArrowUpRight,
-} from "lucide-react"
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import {
-  mockDQEs,
-  getStatutLabel,
-  getStatutColor,
-  getConversionStateLabel,
-  getConversionStateColor,
-  formatCurrency,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { DashboardLayout } from "@/components/dashboard-layout"
+import { DQEFormModal } from "@/components/dqe/dqe-form-modal"
+import { useDqe, useDqeStats, useDqeExport } from "@/hooks/useDqe"
+import { 
+  formatCurrency, 
+  formatDate,
+  DQE_STATUT_LABELS, 
+  DQE_STATUT_COLORS,
+  isDQEConvertible,
+  getConversionStatus,
   type DQE,
-} from "@/lib/dqe"
-import { useAuth, usePermissions } from "@/contexts/AuthContext"
+  type DQEStatut
+} from "@/types/dqe"
+import { toast } from "sonner"
+import { Skeleton } from "@/components/ui/skeleton"
 
-export default function DQEPage() {
-
-  const [dqes, setDqes] = useState<DQE[]>(mockDQEs)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [statutFilter, setStatutFilter] = useState<string>("tous")
-  const [conversionFilter, setConversionFilter] = useState<string>("tous")
-  const [selectedDQEs, setSelectedDQEs] = useState<string[]>([])
-
+export default function DQEListPage() {
   const router = useRouter()
-  const { user } = useAuth() 
-  const { canManageDqe } = usePermissions()
-  const canAccesDqe = !!canManageDqe()
+  const [searchQuery, setSearchQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState<DQEStatut | "all">("all")
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editingDQE, setEditingDQE] = useState<DQE | null>(null)
 
-    // Vérification des permissions
-    useEffect(() => {
-      if (!user || !canAccesDqe) {
-        router.push("/dashboard")
-        return
-      }  
-    }, [user, canAccesDqe, router])
+  // Hooks personnalisés
+  const { dqes, loading, error, fetchDQE, deleteDQE, validateDQE } = useDqe()
+  const { stats, loading: statsLoading } = useDqeStats()
+  const { exportExcel, exportPDF, loading: exportLoading } = useDqeExport()
 
+  // Charger les DQE au montage du composant
+  useEffect(() => {
+    if (statusFilter === "all") {
+      fetchDQE()
+    } else {
+      fetchDQE({ statut: statusFilter })
+    }
+  }, [statusFilter, fetchDQE])
+
+  // Filtrer les DQE selon la recherche
   const filteredDQEs = dqes.filter((dqe) => {
-    const matchesSearch =
-      dqe.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      dqe.nomProjet.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      dqe.client.toLowerCase().includes(searchTerm.toLowerCase())
-
-    const matchesStatut = statutFilter === "tous" || dqe.statut === statutFilter
-
-    const matchesConversion = conversionFilter === "tous" || dqe.conversionState === conversionFilter
-
-    return matchesSearch && matchesStatut && matchesConversion
+    const matchesSearch = 
+      dqe.reference.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      dqe.nom.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      dqe.client?.nom.toLowerCase().includes(searchQuery.toLowerCase())
+    
+    return matchesSearch
   })
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedDQEs(filteredDQEs.map((dqe) => dqe.id))
-    } else {
-      setSelectedDQEs([])
+  const handleView = (id: number) => {
+    router.push(`/dqe/${id}`)
+  }
+
+  const handleEdit = (dqe: DQE) => {
+    setEditingDQE(dqe)
+    setShowCreateModal(true)
+  }
+
+  const handleDelete = async (id: number) => {
+    if (confirm("Êtes-vous sûr de vouloir supprimer ce DQE ?")) {
+      await deleteDQE(id)
     }
   }
 
-  const handleSelectDQE = (dqeId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedDQEs([...selectedDQEs, dqeId])
-    } else {
-      setSelectedDQEs(selectedDQEs.filter((id) => id !== dqeId))
+  const handleValidate = async (id: number) => {
+    if (confirm("Êtes-vous sûr de vouloir valider ce DQE ?")) {
+      await validateDQE(id)
     }
   }
 
-  const handleResetFilters = () => {
-    setSearchTerm("")
-    setStatutFilter("tous")
-    setConversionFilter("tous")
+  const handleConvert = (id: number) => {
+    router.push(`/dqe/${id}?action=convert`)
   }
 
-  const handleExport = () => {
-    console.log("Exporting DQEs to Excel...")
+  const handleExportExcel = async (id: number) => {
+    await exportExcel(id)
   }
 
-  const handleConvertToProject = (dqeId: string) => {
-    console.log("Converting DQE to project:", dqeId)
+  const handleExportPDF = async (id: number) => {
+    await exportPDF(id)
   }
 
-  const handleViewProject = (projectRef: string) => {
-    console.log("Viewing project:", projectRef)
+  const getStatusBadgeColor = (statut: DQEStatut) => {
+    const colors = DQE_STATUT_COLORS[statut]
+    return colors
   }
 
-  const handleViewDetails = (dqeId: string) => {
-    router.push(`/dqe/${dqeId}`)
-  }
-  
-// Vérification des permissions avant rendu
-  if (!user || !canAccesDqe) {
+  const getConversionBadge = (dqe: DQE) => {
+    const status = getConversionStatus(dqe)
+    
+    if (status === 'converted') {
+      return <Badge className="bg-purple-500">Converti</Badge>
+    } else if (status === 'convertible') {
+      return <Badge className="bg-emerald-500">Convertible</Badge>
+    }
     return null
   }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Gestion des DQE</h1>
-            <p className="text-muted-foreground">Décomposition Quantitative Estimative des projets</p>
+            <h1 className="text-3xl font-bold">DQE (Décomposition Quantitative Estimative)</h1>
+            <p className="text-muted-foreground mt-1">
+              Gérez vos DQE et convertissez-les en projets
+            </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={handleResetFilters}>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Réinitialiser
-            </Button>
-            <Button variant="outline" onClick={handleExport}>
-              <FileDown className="mr-2 h-4 w-4" />
-              Exporter Excel
-            </Button>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Nouveau DQE
-            </Button>
-          </div>
+          <Button onClick={() => setShowCreateModal(true)} size="lg">
+            <Plus className="h-5 w-5 mr-2" />
+            Nouveau DQE
+          </Button>
         </div>
+
+        {/* Stats Cards */}
+        {statsLoading ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {[...Array(4)].map((_, i) => (
+              <Card key={i}>
+                <CardHeader className="pb-3">
+                  <Skeleton className="h-4 w-24" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-8 w-32" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : stats ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Total DQE
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.total}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formatCurrency(stats.totalBudgetHT)}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Convertibles
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.convertible}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formatCurrency(stats.budgetConvertible)}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Convertis
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.converti}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {stats.tauxConversion.toFixed(1)}% de conversion
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  En brouillon
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.brouillon}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  En cours de création
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
 
         {/* Filters */}
         <Card>
-          <CardHeader>
-            <CardTitle>Filtres</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <CardContent className="pt-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Rechercher (réf, projet, client)..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
+                  placeholder="Rechercher par référence, nom ou client..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
                 />
               </div>
-              <Select value={statutFilter} onValueChange={setStatutFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Statut DQE" />
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => setStatusFilter(value as DQEStatut | "all")}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Filtrer par statut" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="tous">Tous les statuts</SelectItem>
+                  <SelectItem value="all">Tous les statuts</SelectItem>
                   <SelectItem value="brouillon">Brouillon</SelectItem>
                   <SelectItem value="en_cours">En cours</SelectItem>
                   <SelectItem value="validé">Validé</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={conversionFilter} onValueChange={setConversionFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="État conversion" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="tous">Tous les états</SelectItem>
-                  <SelectItem value="converted">Convertis</SelectItem>
-                  <SelectItem value="convertible">Convertibles</SelectItem>
-                  <SelectItem value="not_convertible">Non convertibles</SelectItem>
+                  <SelectItem value="refusé">Refusé</SelectItem>
+                  <SelectItem value="archivé">Archivé</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </CardContent>
         </Card>
 
-        {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total DQE</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{dqes.length}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Convertis</CardTitle>
-              <ArrowUpRight className="h-4 w-4 text-purple-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{dqes.filter((d) => d.conversionState === "converted").length}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Convertibles</CardTitle>
-              <ArrowUpRight className="h-4 w-4 text-emerald-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{dqes.filter((d) => d.conversionState === "convertible").length}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Budget Total</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatCurrency(dqes.reduce((sum, d) => sum + d.budgetTotalHT, 0))}
+        {/* Table */}
+        <Card>
+          <CardContent className="pt-6">
+            {loading ? (
+              <div className="space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
               </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Table - Desktop */}
-        <Card className="hidden md:block">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">
-                  <Checkbox
-                    checked={selectedDQEs.length === filteredDQEs.length && filteredDQEs.length > 0}
-                    onCheckedChange={handleSelectAll}
-                  />
-                </TableHead>
-                <TableHead>Référence</TableHead>
-                <TableHead>Projet</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead>Budget HT</TableHead>
-                <TableHead>État Conversion</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredDQEs.map((dqe) => (
-                <TableRow key={dqe.id}>
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedDQEs.includes(dqe.id)}
-                      onCheckedChange={(checked) => handleSelectDQE(dqe.id, checked as boolean)}
-                    />
-                  </TableCell>
-                  <TableCell className="font-medium">{dqe.reference}</TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="font-medium">{dqe.nomProjet}</div>
-                      <div className="text-sm text-muted-foreground">{dqe.client}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {dqe.dateCreation.toLocaleDateString("fr-FR")}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getStatutColor(dqe.statut)}>{getStatutLabel(dqe.statut)}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="font-medium">{formatCurrency(dqe.budgetTotalHT)}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {dqe.nombreLots} lot{dqe.nombreLots > 1 ? "s" : ""}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-2">
-                      <Badge className={getConversionStateColor(dqe.conversionState)}>
-                        {getConversionStateLabel(dqe.conversionState)}
-                      </Badge>
-                      {dqe.conversionState === "converted" && dqe.projetReference && (
-                        <div className="space-y-1">
-                          <div className="text-sm font-medium text-purple-600 dark:text-purple-400">
-                            {dqe.projetReference}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {dqe.projetStatut} - {dqe.projetAvancement}%
-                          </div>
-                        </div>
-                      )}
-                      {dqe.conversionState === "not_convertible" && (
-                        <div className="text-xs text-muted-foreground">Validez le DQE pour le convertir</div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleViewDetails(dqe.id)}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          Voir détails
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Modifier
-                        </DropdownMenuItem>
-                        {dqe.conversionState === "convertible" && (
-                          <DropdownMenuItem onClick={() => handleConvertToProject(dqe.id)}>
-                            <ArrowUpRight className="mr-2 h-4 w-4" />
-                            Convertir en projet
-                          </DropdownMenuItem>
-                        )}
-                        {dqe.conversionState === "converted" && dqe.projetReference && (
-                          <DropdownMenuItem onClick={() => handleViewProject(dqe.projetReference!)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Voir projet
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem className="text-destructive">
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Supprimer
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+            ) : error ? (
+              <div className="text-center py-8 text-red-500">
+                <p>{error}</p>
+                <Button onClick={() => fetchDQE()} className="mt-4">
+                  Réessayer
+                </Button>
+              </div>
+            ) : filteredDQEs.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Aucun DQE trouvé</p>
+                <Button onClick={() => setShowCreateModal(true)} className="mt-4">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Créer le premier DQE
+                </Button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Référence</TableHead>
+                      <TableHead>Nom</TableHead>
+                      <TableHead>Client</TableHead>
+                      <TableHead>Statut</TableHead>
+                      <TableHead>Conversion</TableHead>
+                      <TableHead className="text-right">Budget HT</TableHead>
+                      <TableHead>Date création</TableHead>
+                      <TableHead className="text-center">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredDQEs.map((dqe) => (
+                      <TableRow key={dqe.id} className="cursor-pointer hover:bg-muted/50">
+                        <TableCell 
+                          className="font-medium"
+                          onClick={() => handleView(dqe.id)}
+                        >
+                          {dqe.reference}
+                        </TableCell>
+                        <TableCell onClick={() => handleView(dqe.id)}>
+                          {dqe.nom}
+                        </TableCell>
+                        <TableCell onClick={() => handleView(dqe.id)}>
+                          {dqe.client?.nom || '-'}
+                        </TableCell>
+                        <TableCell onClick={() => handleView(dqe.id)}>
+                          <Badge className={getStatusBadgeColor(dqe.statut)}>
+                            {DQE_STATUT_LABELS[dqe.statut]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell onClick={() => handleView(dqe.id)}>
+                          {getConversionBadge(dqe)}
+                        </TableCell>
+                        <TableCell 
+                          className="text-right font-semibold"
+                          onClick={() => handleView(dqe.id)}
+                        >
+                          {formatCurrency(dqe.totalRevenueHT)}
+                        </TableCell>
+                        <TableCell onClick={() => handleView(dqe.id)}>
+                          {formatDate(dqe.dateCreation)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                Actions
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleView(dqe.id)}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                Voir
+                              </DropdownMenuItem>
+                              
+                              {!dqe.isConverted && (
+                                <>
+                                  <DropdownMenuItem onClick={() => handleEdit(dqe)}>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Modifier
+                                  </DropdownMenuItem>
+                                  
+                                  {dqe.statut === 'brouillon' && (
+                                    <DropdownMenuItem onClick={() => handleValidate(dqe.id)}>
+                                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                                      Valider
+                                    </DropdownMenuItem>
+                                  )}
+                                  
+                                  {isDQEConvertible(dqe) && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem 
+                                        onClick={() => handleConvert(dqe.id)}
+                                        className="text-emerald-600"
+                                      >
+                                        <Briefcase className="h-4 w-4 mr-2" />
+                                        Convertir en projet
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                </>
+                              )}
+                              
+                              <DropdownMenuSeparator />
+                              
+                              <DropdownMenuItem 
+                                onClick={() => handleExportPDF(dqe.id)}
+                                disabled={exportLoading}
+                              >
+                                <FileText className="h-4 w-4 mr-2" />
+                                Export PDF
+                              </DropdownMenuItem>
+                              
+                              <DropdownMenuItem 
+                                onClick={() => handleExportExcel(dqe.id)}
+                                disabled={exportLoading}
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                Export Excel
+                              </DropdownMenuItem>
+                              
+                              {!dqe.isConverted && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem 
+                                    onClick={() => handleDelete(dqe.id)}
+                                    className="text-red-600"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Supprimer
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
         </Card>
-
-        {/* Cards - Mobile */}
-        <div className="grid gap-4 md:hidden">
-          {filteredDQEs.map((dqe) => (
-            <Card key={dqe.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <CardTitle className="text-base">{dqe.reference}</CardTitle>
-                    <p className="text-sm text-muted-foreground">{dqe.nomProjet}</p>
-                  </div>
-                  <Checkbox
-                    checked={selectedDQEs.includes(dqe.id)}
-                    onCheckedChange={(checked) => handleSelectDQE(dqe.id, checked as boolean)}
-                  />
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Client:</span>
-                  <span className="font-medium">{dqe.client}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Statut:</span>
-                  <Badge className={getStatutColor(dqe.statut)}>{getStatutLabel(dqe.statut)}</Badge>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Budget HT:</span>
-                  <span className="font-medium">{formatCurrency(dqe.budgetTotalHT)}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Lots:</span>
-                  <span>{dqe.nombreLots}</span>
-                </div>
-                <div className="space-y-2 pt-2 border-t">
-                  <Badge className={getConversionStateColor(dqe.conversionState)}>
-                    {getConversionStateLabel(dqe.conversionState)}
-                  </Badge>
-                  {dqe.conversionState === "converted" && dqe.projetReference && (
-                    <div className="space-y-1">
-                      <div className="text-sm font-medium text-purple-600 dark:text-purple-400">
-                        {dqe.projetReference}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {dqe.projetStatut} - {dqe.projetAvancement}%
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="w-full bg-transparent"
-                        onClick={() => handleViewProject(dqe.projetReference!)}
-                      >
-                        <Eye className="mr-2 h-4 w-4" />
-                        Voir projet
-                      </Button>
-                    </div>
-                  )}
-                  {dqe.conversionState === "convertible" && (
-                    <Button size="sm" className="w-full" onClick={() => handleConvertToProject(dqe.id)}>
-                      <ArrowUpRight className="mr-2 h-4 w-4" />
-                      Convertir en projet
-                    </Button>
-                  )}
-                  {dqe.conversionState === "not_convertible" && (
-                    <div className="text-xs text-muted-foreground">Validez le DQE pour le convertir</div>
-                  )}
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1 bg-transparent"
-                    onClick={() => handleViewDetails(dqe.id)}
-                  >
-                    <Eye className="mr-2 h-4 w-4" />
-                    Voir
-                  </Button>
-                  <Button size="sm" variant="outline" className="flex-1 bg-transparent">
-                    <Edit className="mr-2 h-4 w-4" />
-                    Modifier
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {filteredDQEs.length === 0 && (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-lg font-medium">Aucun DQE trouvé</p>
-              <p className="text-sm text-muted-foreground">Essayez de modifier vos filtres ou créez un nouveau DQE</p>
-            </CardContent>
-          </Card>
-        )}
       </div>
+
+      {/* Modal de création/édition */}
+      <DQEFormModal
+        open={showCreateModal}
+        onOpenChange={(open) => {
+          setShowCreateModal(open)
+          if (!open) setEditingDQE(null)
+        }}
+        editData={editingDQE}
+        onSubmit={async (dqeData) => {
+          // La soumission sera gérée par le modal lui-même
+          setShowCreateModal(false)
+          setEditingDQE(null)
+          await fetchDQE()
+        }}
+      />
     </DashboardLayout>
   )
 }

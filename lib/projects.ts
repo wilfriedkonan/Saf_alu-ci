@@ -24,6 +24,13 @@ export interface Project {
   createdAt: string
   updatedAt: string
   notes?: string
+  // DQE linking properties
+  linkedDqeId?: string | null
+  linkedDqeReference?: string
+  linkedDqeName?: string
+  linkedDqeBudgetHT?: number
+  convertedAt?: string
+  convertedByName?: string
 }
 
 export interface ProjectTeam {
@@ -44,6 +51,9 @@ export interface ProjectStage {
   estimatedHours: number
   actualHours?: number
   evaluation?: StageEvaluation
+  linkedDqeLotCode?: string // "LOT 2"
+  linkedDqeLotName?: string // "GROS ŒUVRE"
+  linkedDqeReference?: string // "DQE-2024-023"
 }
 
 export interface StageEvaluation {
@@ -360,6 +370,112 @@ export const mockProjects: Project[] = [
     createdAt: "2024-01-15",
     updatedAt: "2024-02-15",
     notes: "Projet suspendu en attente de matériaux",
+  },
+  {
+    id: "46",
+    number: "PROJ-2024-046",
+    name: "Centre Médical Abobo",
+    description: "Construction d'un centre médical moderne à Abobo",
+    client: {
+      name: "SAMU Côte d'Ivoire",
+      email: "contact@samu.ci",
+      phone: "+225 27 20 21 22 23",
+      address: "Abobo, Abidjan",
+    },
+    status: "planification",
+    priority: "haute",
+    budget: 24350000,
+    actualCost: 0,
+    startDate: "2024-11-01",
+    endDate: "2025-05-31",
+    progress: 0,
+    team: {
+      projectManager: "Kouassi Jean",
+      workers: [],
+      subcontractors: [],
+    },
+    stages: [
+      {
+        id: "1",
+        name: "Gros Œuvre",
+        description: "Fondations, structure béton, maçonnerie",
+        startDate: "2024-11-01",
+        endDate: "2024-12-31",
+        progress: 0,
+        status: "en_attente",
+        assignedTo: "Kouassi Jean",
+        estimatedHours: 480,
+        linkedDqeLotCode: "LOT 2",
+        linkedDqeLotName: "GROS ŒUVRE",
+        linkedDqeReference: "DQE-2024-023",
+      },
+      {
+        id: "2",
+        name: "Charpente et Couverture",
+        description: "Installation charpente métallique et toiture",
+        startDate: "2025-01-01",
+        endDate: "2025-01-31",
+        progress: 0,
+        status: "en_attente",
+        assignedTo: "Kouassi Jean",
+        estimatedHours: 240,
+        linkedDqeLotCode: "LOT 3",
+        linkedDqeLotName: "CHARPENTE ET COUVERTURE",
+        linkedDqeReference: "DQE-2024-023",
+      },
+      {
+        id: "3",
+        name: "Électricité",
+        description: "Installation électrique complète",
+        startDate: "2025-02-01",
+        endDate: "2025-02-28",
+        progress: 0,
+        status: "en_attente",
+        assignedTo: "Kouassi Jean",
+        estimatedHours: 200,
+        linkedDqeLotCode: "LOT 4",
+        linkedDqeLotName: "ÉLECTRICITÉ",
+        linkedDqeReference: "DQE-2024-023",
+      },
+      {
+        id: "4",
+        name: "Plomberie et Sanitaires",
+        description: "Installation plomberie et équipements sanitaires",
+        startDate: "2025-03-01",
+        endDate: "2025-03-31",
+        progress: 0,
+        status: "en_attente",
+        assignedTo: "Kouassi Jean",
+        estimatedHours: 180,
+        linkedDqeLotCode: "LOT 5",
+        linkedDqeLotName: "PLOMBERIE ET SANITAIRES",
+        linkedDqeReference: "DQE-2024-023",
+      },
+      {
+        id: "5",
+        name: "Finitions",
+        description: "Peinture, revêtements, menuiseries",
+        startDate: "2025-04-01",
+        endDate: "2025-05-31",
+        progress: 0,
+        status: "en_attente",
+        assignedTo: "Kouassi Jean",
+        estimatedHours: 360,
+        linkedDqeLotCode: "LOT 6",
+        linkedDqeLotName: "FINITIONS",
+        linkedDqeReference: "DQE-2024-023",
+      },
+    ],
+    documents: [],
+    subcontractorOffers: [],
+    createdAt: "2024-10-25",
+    updatedAt: "2024-10-25",
+    linkedDqeId: "23",
+    linkedDqeReference: "DQE-2024-023",
+    linkedDqeName: "Centre Médical Abobo",
+    linkedDqeBudgetHT: 24350000,
+    convertedAt: "25/10/2024",
+    convertedByName: "Kouassi Jean",
   },
 ]
 

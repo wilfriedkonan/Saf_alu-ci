@@ -5,119 +5,271 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, Clock, AlertTriangle, Play } from "lucide-react"
-import type { Project, ProjectStage } from "@/lib/projects"
+import { CheckCircle, Clock, AlertTriangle, Play, Plus, Loader2 } from "lucide-react"
+import type { Project, ProjectStage } from "@/types/projet"
 import { StageProgressModal } from "./stage-progress-modal"
+import { useProjetEtapes } from "@/hooks/useProjet"
+import { toast } from "sonner"
 
 interface ProjectTimelineProps {
-  project: Project
+  projet: Project
   onUpdate: () => void
 }
 
-export function ProjectTimeline({ project, onUpdate }: ProjectTimelineProps) {
+export function ProjectTimeline({ projet, onUpdate }: ProjectTimelineProps) {
   const [selectedStage, setSelectedStage] = useState<ProjectStage | null>(null)
+  const { etapes, loading, addEtape, refreshEtapes } = useProjetEtapes(projet.id)
 
   const getStageIcon = (stage: ProjectStage) => {
-    switch (stage.status) {
-      case "termine":
+    switch (stage.statut) {
+      case "Termine":
         return <CheckCircle className="h-5 w-5 text-green-600" />
-      case "en_cours":
+      case "EnCours":
         return <Play className="h-5 w-5 text-blue-600" />
-      case "en_retard":
-        return <AlertTriangle className="h-5 w-5 text-red-600" />
+      case "Suspendu":
+        return <AlertTriangle className="h-5 w-5 text-amber-600" />
       default:
         return <Clock className="h-5 w-5 text-gray-400" />
     }
   }
 
   const getStageColor = (stage: ProjectStage) => {
-    switch (stage.status) {
-      case "termine":
+    switch (stage.statut) {
+      case "Termine":
         return "border-green-200 bg-green-50"
-      case "en_cours":
+      case "EnCours":
         return "border-blue-200 bg-blue-50"
-      case "en_retard":
-        return "border-red-200 bg-red-50"
+      case "Suspendu":
+        return "border-amber-200 bg-amber-50"
       default:
         return "border-gray-200 bg-gray-50"
     }
   }
 
+  const getStageStatusLabel = (statut: string) => {
+    const labels: Record<string, string> = {
+      NonCommence: "Non commencé",
+      EnCours: "En cours",
+      Termine: "Terminé",
+      Suspendu: "Suspendu"
+    }
+    return labels[statut] || statut
+  }
+
+  const handleStageClick = (stage: ProjectStage) => {
+    setSelectedStage(stage)
+  }
+
+  const handleModalClose = () => {
+    setSelectedStage(null)
+    // ✅ Ne pas appeler onUpdate() ici car cela déclenche un refresh complet
+    // onUpdate() sera appelé uniquement après une modification réussie dans le modal
+  }
+
+  const handleStageUpdate = () => {
+    // ✅ Rafraîchir uniquement les étapes localement (plus rapide et ne perturbe pas la page)
+    refreshEtapes()
+    // ✅ Rafraîchir aussi les données du projet pour mettre à jour les statistiques
+    // (progression globale, budget, etc.) mais de manière non-bloquante
+    onUpdate()
+  }
+
+  // Utiliser les étapes du hook ou celles du projet
+  const stages = etapes.length > 0 ? etapes : (projet.etapes || [])
+
+  // Trier les étapes par ordre
+  const sortedStages = [...stages].sort((a, b) => a.ordre - b.ordre)
+
+  if (loading && stages.length === 0) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <>
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Planning du projet</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {project.stages.map((stage, index) => (
-              <div key={stage.id} className="relative">
-                {/* Timeline line */}
-                {index < project.stages.length - 1 && <div className="absolute left-6 top-12 w-0.5 h-16 bg-border" />}
+          {sortedStages.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Aucune étape définie pour ce projet</p>
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={() => toast.info("Fonctionnalité d'ajout d'étape à venir")}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Créer la première étape
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {sortedStages.map((stage, index) => (
+                <div key={stage.id} className="relative">
+                  {/* Timeline line */}
+                  {index < sortedStages.length - 1 && (
+                    <div className="absolute left-6 top-12 w-0.5 h-16 bg-border" />
+                  )}
 
-                <div
-                  className={`flex items-start space-x-4 p-4 rounded-lg border cursor-pointer hover:shadow-md hover:border-[var(--hover-green)]/30 transition-all ${getStageColor(stage)}`}
-                  onClick={() => setSelectedStage(stage)}
-                >
-                  <div className="flex-shrink-0 mt-1">{getStageIcon(stage)}</div>
+                  <div
+                    className={`flex items-start space-x-4 p-4 rounded-lg border cursor-pointer hover:shadow-md transition-all ${getStageColor(stage)}`}
+                    onClick={() => handleStageClick(stage)}
+                  >
+                    <div className="flex-shrink-0 mt-1">{getStageIcon(stage)}</div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium text-sm">{stage.name}</h4>
-                      <Badge variant="outline" className="text-xs">
-                        {stage.progress}%
-                      </Badge>
-                    </div>
-
-                    <p className="text-sm text-muted-foreground mb-3">{stage.description}</p>
-
-                    <div className="space-y-2">
-                      <Progress value={stage.progress} className="h-2" />
-
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Assigné à: {stage.assignedTo}</span>
-                        <span>
-                          {new Date(stage.startDate).toLocaleDateString("fr-FR")} -{" "}
-                          {new Date(stage.endDate).toLocaleDateString("fr-FR")}
-                        </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-medium text-sm">{stage.nom}</h4>
+                          <Badge variant="outline" className="text-xs">
+                            Étape {index+1}
+                          </Badge>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {stage.pourcentageAvancement}%
+                        </Badge>
                       </div>
 
-                      {stage.evaluation && (
-                        <div className="flex items-center space-x-2 text-xs">
-                          <div className="flex items-center">
-                            {[...Array(5)].map((_, i) => (
-                              <span
-                                key={i}
-                                className={`text-xs ${i < stage.evaluation!.rating ? "text-yellow-400" : "text-gray-300"}`}
-                              >
-                                ★
-                              </span>
-                            ))}
-                          </div>
-                          <span className="text-muted-foreground">Évalué par {stage.evaluation.evaluatedBy}</span>
-                        </div>
+                      {stage.description && (
+                        <p className="text-sm text-muted-foreground mb-3">{stage.description}</p>
                       )}
-                    </div>
-                  </div>
 
-                  <Button variant="ghost" size="sm" className="flex-shrink-0">
-                    Détails
-                  </Button>
+                      <div className="space-y-2">
+                        <Progress value={stage.pourcentageAvancement} className="h-2" />
+
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <div className="flex items-center gap-4">
+                            {stage.typeResponsable && (
+                              <span>
+                                Type: {stage.typeResponsable === "Interne" ? "👨‍💼 Interne" : "🏢 Sous-traitant"}
+                                te
+                              </span>
+                            )}
+                            <div>
+                              {stage.sousTraitant?.nom ?? ""} </div>
+
+                            <Badge
+                              variant="secondary"
+                              className="text-xs"
+                            >
+                              {getStageStatusLabel(stage.statut)}
+                            </Badge>
+
+                          </div>
+                          <span>
+                            {stage.dateDebut && stage.dateFinPrevue ? (
+                              <>
+                                {new Date(stage.dateDebut).toLocaleDateString("fr-FR")} -{" "}
+                                {new Date(stage.dateFinPrevue).toLocaleDateString("fr-FR")}
+                              </>
+                            ) : (
+                              "Dates non définies"
+                            )}
+                          </span>
+                        </div>
+
+                        {/* Budget de l'étape */}
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">
+                            Budget: {new Intl.NumberFormat("fr-FR", {
+                              style: "currency",
+                              currency: "XOF",
+                              minimumFractionDigits: 0,
+                            }).format(stage.budgetPrevu)}
+                          </span>
+                          <div className="flex flex-col">
+                            <span className="text-muted-foreground">
+                              Coût réel: {new Intl.NumberFormat("fr-FR", {
+                                style: "currency",
+                                currency: "XOF",
+                                minimumFractionDigits: 0,
+                              }).format(stage.coutReel)}
+                            </span>
+                            <span className="text-muted-foreground">
+                              Marge: {new Intl.NumberFormat("fr-FR", {
+                                style: "currency",
+                                currency: "XOF",
+                                minimumFractionDigits: 0,
+                              }).format(stage.budgetPrevu - stage.coutReel)}
+                            </span>
+                          </div>
+                          <span className="text-muted-foreground">
+                            Dépensé: {new Intl.NumberFormat("fr-FR", {
+                              style: "currency",
+                              currency: "XOF",
+                              minimumFractionDigits: 0,
+                            }).format(stage.depense)}
+                          </span>
+                        </div>
+
+                        {/* Lien DQE si présent */}
+                        {stage.linkedDqeLotCode && (
+                          <div className="flex items-center gap-2 text-xs pt-2 border-t">
+                            <Badge variant="outline" className="text-xs">
+                              DQE: {stage.linkedDqeLotCode}
+                            </Badge>
+                            {stage.linkedDqeLotName && (
+                              <span className="text-muted-foreground">
+                                {stage.linkedDqeLotName}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Évaluation si présente */}
+                        {stage.evaluation && (
+                          <div className="flex items-center space-x-2 text-xs pt-2 border-t">
+                            <div className="flex items-center">
+                              {[...Array(5)].map((_, i) => (
+                                <span
+                                  key={i}
+                                  className={`text-xs ${i < stage.evaluation!.rating ? "text-yellow-400" : "text-gray-300"
+                                    }`}
+                                >
+                                  ★
+                                </span>
+                              ))}
+                            </div>
+                            <span className="text-muted-foreground">
+                              Évalué par {stage.evaluation.evaluatedBy}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <Button variant="ghost" size="sm" className="flex-shrink-0">
+                      Détails
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      <StageProgressModal
-        stage={selectedStage}
-        project={project}
-        open={!!selectedStage}
-        onOpenChange={(open) => !open && setSelectedStage(null)}
-        onUpdate={onUpdate}
-      />
+      {selectedStage && (
+        <StageProgressModal
+          stage={selectedStage as ProjectStage}
+          projet={projet}
+          open={!!selectedStage}
+          onOpenChange={(open) => {
+            if (!open) {
+              handleModalClose()
+            }
+          }}
+          onUpdate={handleStageUpdate}
+        />
+      )}
     </>
   )
 }

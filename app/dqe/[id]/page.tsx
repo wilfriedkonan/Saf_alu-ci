@@ -1,18 +1,74 @@
 "use client"
+
 import { useRouter } from "next/navigation"
-import { ArrowLeft, FileText, FileSpreadsheet, Briefcase, Edit, Link2, BarChart3 } from "lucide-react"
+import { useState, useEffect } from "react"
+import { 
+  ArrowLeft, 
+  FileText, 
+  FileSpreadsheet, 
+  Briefcase, 
+  Edit, 
+  Link2, 
+  BarChart3, 
+  Loader2,
+  CheckCircle2
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
 import { DashboardLayout } from "@/components/dashboard-layout"
-import { mockDQEs, getStatutLabel, getStatutColor, formatCurrency } from "@/lib/dqe"
+import { ConvertToProjectModal } from "@/components/dqe/convert-to-project-modal"
+import { useDqe, useDqeExport } from "@/hooks/useDqe"
+import { 
+  formatCurrency, 
+  formatDate,
+  formatDateTime,
+  DQE_STATUT_LABELS, 
+  DQE_STATUT_COLORS,
+  isDQEConvertible,
+  isDQEEditable,
+  getConversionStatus,
+} from "@/types/dqe"
 
 export default function DQEDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
-  const dqe = mockDQEs.find((d) => d.id === params.id)
+  const dqeId = parseInt(params.id)
+  const [showConvertModal, setShowConvertModal] = useState(false)
+
+  // Hooks
+  const { fetchDQEById, validateDQE, loading } = useDqe()
+  const { exportExcel, exportPDF, loading: exportLoading } = useDqeExport()
+  
+  const [dqe, setDqe] = useState<any>(null)
+  const [loadingDQE, setLoadingDQE] = useState(true)
+
+  // Charger le DQE
+  useEffect(() => {
+    const loadDQE = async () => {
+      setLoadingDQE(true)
+      const data = await fetchDQEById(dqeId)
+      setDqe(data)
+      setLoadingDQE(false)
+    }
+    
+    loadDQE()
+  }, [dqeId, fetchDQEById])
+
+  if (loadingDQE) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-96 w-full" />
+        </div>
+      </DashboardLayout>
+    )
+  }
 
   if (!dqe) {
     return (
@@ -31,23 +87,47 @@ export default function DQEDetailPage({ params }: { params: { id: string } }) {
     )
   }
 
-  const tva = dqe.budgetTotalHT * 0.18
-  const totalTTC = dqe.budgetTotalHT + tva
+  const tva = dqe.totalRevenueHT * (dqe.tauxTVA / 100)
+  const totalTTC = dqe.totalRevenueHT + tva
+  const conversionStatus = getConversionStatus(dqe)
 
   const handleConvertToProject = () => {
-    alert("Conversion en projet en cours...")
+    setShowConvertModal(true)
   }
 
   const handleEdit = () => {
-    alert("Édition du DQE...")
+    router.push(`/dqe/${dqeId}/edit`)
   }
 
-  const handleExportPDF = () => {
-    alert("Export PDF en cours...")
+  const handleValidate = async () => {
+    if (confirm("Êtes-vous sûr de vouloir valider ce DQE ?")) {
+      await validateDQE(dqeId)
+      // Recharger le DQE
+      const updatedDQE = await fetchDQEById(dqeId)
+      setDqe(updatedDQE)
+    }
   }
 
-  const handleExportExcel = () => {
-    alert("Export Excel en cours...")
+  const handleExportPDF = async () => {
+    await exportPDF(dqeId)
+  }
+
+  const handleExportExcel = async () => {
+    await exportExcel(dqeId)
+  }
+
+  const handleProjectConversion = async (projectData: any) => {
+    console.log("Converting DQE to project:", projectData)
+    setShowConvertModal(false)
+    
+    // Recharger le DQE pour voir le statut "converti"
+    const updatedDQE = await fetchDQEById(dqeId)
+    setDqe(updatedDQE)
+    
+    // Rediriger vers le projet créé
+    if (projectData.projetId) {
+      router.push(`/projets/${projectData.projetId}`)
+    }
   }
 
   return (
@@ -56,44 +136,61 @@ export default function DQEDetailPage({ params }: { params: { id: string } }) {
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="space-y-2">
-            <Button variant="ghost" size="sm" onClick={() => router.push("/dqe")} className="mb-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => router.push("/dqe")} 
+              className="mb-2"
+            >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Retour
             </Button>
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold">{dqe.reference}</h1>
-              <Badge className={getStatutColor(dqe.statut)}>{getStatutLabel(dqe.statut)}</Badge>
+              <Badge className={DQE_STATUT_COLORS[dqe.statut]}>
+                {DQE_STATUT_LABELS[dqe.statut]}
+              </Badge>
+              {dqe.isConverted && (
+                <Badge className="bg-purple-500">Converti</Badge>
+              )}
             </div>
-            <p className="text-lg text-muted-foreground">{dqe.nomProjet}</p>
+            <p className="text-lg text-muted-foreground">{dqe.nom}</p>
           </div>
         </div>
 
         {/* Conversion Banner - Converted */}
-        {dqe.conversionState === "converted" && (
+        {conversionStatus === "converted" && dqe.linkedProjectId && (
           <Alert className="border-purple-200 bg-purple-50 dark:border-purple-900 dark:bg-purple-950">
             <Link2 className="h-4 w-4 text-purple-600 dark:text-purple-400" />
             <AlertDescription className="ml-2">
               <div className="space-y-2">
-                <p className="font-semibold text-purple-900 dark:text-purple-100">CE DQE EST CONVERTI EN PROJET</p>
+                <p className="font-semibold text-purple-900 dark:text-purple-100">
+                  CE DQE EST CONVERTI EN PROJET
+                </p>
                 <div className="flex flex-col gap-2 text-sm text-purple-800 dark:text-purple-200">
                   <p>
                     Projet :{" "}
                     <span className="font-medium">
-                      {dqe.projetReference} - {dqe.nomProjet}
+                      {dqe.linkedProjectNumber} - {dqe.nom}
                     </span>
                   </p>
                   <p>
-                    Statut :{" "}
-                    <span className="font-medium">
-                      {dqe.projetStatut} ({dqe.projetAvancement}%)
-                    </span>
+                    Converti le : <span className="font-medium">{formatDateTime(dqe.convertedAt)}</span>
                   </p>
+                  {dqe.convertedBy && (
+                    <p>
+                      Par : <span className="font-medium">
+                        {dqe.convertedBy.prenom} {dqe.convertedBy.nom}
+                      </span>
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-2 mt-3">
                   <Button
                     size="sm"
                     variant="outline"
                     className="border-purple-300 text-purple-700 hover:bg-purple-100 dark:border-purple-700 dark:text-purple-300 dark:hover:bg-purple-900 bg-transparent"
+                    onClick={() => router.push(`/projets/${dqe.linkedProjectId}`)}
                   >
                     Voir le projet
                   </Button>
@@ -112,24 +209,35 @@ export default function DQEDetailPage({ params }: { params: { id: string } }) {
         )}
 
         {/* Conversion Banner - Convertible */}
-        {dqe.conversionState === "convertible" && (
+        {conversionStatus === "convertible" && (
           <Alert className="border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950">
             <Briefcase className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             <AlertDescription className="ml-2">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <p className="font-semibold text-emerald-900 dark:text-emerald-100">
-                  Ce DQE est validé et prêt à être converti
+                  Ce DQE est validé et prêt à être converti en projet
                 </p>
                 <div className="flex gap-2 flex-wrap">
-                  <Button size="sm" onClick={handleConvertToProject} className="bg-emerald-600 hover:bg-emerald-700">
+                  <Button 
+                    size="sm" 
+                    onClick={handleConvertToProject} 
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                  >
                     <Briefcase className="h-4 w-4 mr-2" />
                     Convertir en projet
                   </Button>
-                  <Button size="sm" variant="outline" onClick={handleEdit}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Éditer
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={handleExportPDF}>
+                  {isDQEEditable(dqe) && (
+                    <Button size="sm" variant="outline" onClick={handleEdit}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Éditer
+                    </Button>
+                  )}
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={handleExportPDF}
+                    disabled={exportLoading}
+                  >
                     <FileText className="h-4 w-4 mr-2" />
                     Exporter
                   </Button>
@@ -148,30 +256,32 @@ export default function DQEDetailPage({ params }: { params: { id: string } }) {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">Client</p>
-                <p className="font-medium">{dqe.client}</p>
+                <p className="font-medium">{dqe.client?.nom || '-'}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Date de création</p>
-                <p className="font-medium">{dqe.dateCreation.toLocaleDateString("fr-FR")}</p>
+                <p className="font-medium">{formatDate(dqe.dateCreation)}</p>
               </div>
               {dqe.dateValidation && (
                 <div>
                   <p className="text-sm text-muted-foreground">Date de validation</p>
-                  <p className="font-medium">{dqe.dateValidation.toLocaleDateString("fr-FR")}</p>
+                  <p className="font-medium">{formatDate(dqe.dateValidation)}</p>
                 </div>
               )}
-              {dqe.validePar && (
+              {dqe.validatedBy && (
                 <div>
                   <p className="text-sm text-muted-foreground">Validé par</p>
-                  <p className="font-medium">{dqe.validePar}</p>
+                  <p className="font-medium">
+                    {dqe.validatedBy.prenom} {dqe.validatedBy.nom}
+                  </p>
                 </div>
               )}
               <div>
                 <p className="text-sm text-muted-foreground">Budget Total HT</p>
-                <p className="font-medium text-lg">{formatCurrency(dqe.budgetTotalHT)}</p>
+                <p className="font-medium text-lg">{formatCurrency(dqe.totalRevenueHT)}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">TVA (18%)</p>
+                <p className="text-sm text-muted-foreground">TVA ({dqe.tauxTVA}%)</p>
                 <p className="font-medium text-lg">{formatCurrency(tva)}</p>
               </div>
               <div>
@@ -188,63 +298,77 @@ export default function DQEDetailPage({ params }: { params: { id: string } }) {
             <CardTitle>Structure du DQE</CardTitle>
           </CardHeader>
           <CardContent>
-            <Accordion type="multiple" className="w-full">
-              {dqe.lots.map((lot) => (
-                <AccordionItem key={lot.id} value={lot.id}>
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center justify-between w-full pr-4">
-                      <div className="flex items-center gap-3">
-                        <span className="font-bold text-lg">{lot.numero}</span>
-                        <Separator orientation="vertical" className="h-6" />
-                        <span className="font-semibold">{lot.designation}</span>
+            {dqe.lots && dqe.lots.length > 0 ? (
+              <Accordion type="multiple" className="w-full">
+                {dqe.lots.map((lot: any) => (
+                  <AccordionItem key={lot.id} value={lot.id.toString()}>
+                    <AccordionTrigger className="hover:no-underline">
+                      <div className="flex items-center justify-between w-full pr-4">
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold text-lg">{lot.code}</span>
+                          <Separator orientation="vertical" className="h-6" />
+                          <span className="font-semibold">{lot.nom}</span>
+                        </div>
+                        <span className="text-sm font-medium text-primary">
+                          {formatCurrency(lot.totalRevenueHT)}
+                        </span>
                       </div>
-                      <span className="text-sm font-medium text-primary">{formatCurrency(lot.montantHT)}</span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="pl-4 space-y-4">
-                      {lot.chapitres.map((chapitre) => (
-                        <div key={chapitre.id} className="border-l-2 border-muted pl-4 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-muted-foreground">{chapitre.numero}</span>
-                              <span className="font-medium">{chapitre.designation}</span>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="pl-4 space-y-4">
+                        {lot.chapters?.map((chapter: any) => (
+                          <div key={chapter.id} className="border-l-2 border-muted pl-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-muted-foreground">
+                                  {chapter.code}
+                                </span>
+                                <span className="font-medium">{chapter.nom}</span>
+                              </div>
+                              <span className="text-sm font-medium">
+                                {formatCurrency(chapter.totalRevenueHT)}
+                              </span>
                             </div>
-                            <span className="text-sm font-medium">{formatCurrency(chapitre.montantHT)}</span>
-                          </div>
 
-                          <div className="space-y-2">
-                            {chapitre.postes.map((poste) => (
-                              <div key={poste.id} className="bg-muted/50 rounded-lg p-3 space-y-2">
-                                <div className="flex items-start justify-between gap-4">
-                                  <div className="flex-1">
-                                    <p className="font-medium text-sm">
-                                      {poste.numero} - {poste.designation}
+                            <div className="space-y-2">
+                              {chapter.items?.map((item: any) => (
+                                <div key={item.id} className="bg-muted/50 rounded-lg p-3 space-y-2">
+                                  <div className="flex items-start justify-between gap-4">
+                                    <div className="flex-1">
+                                      <p className="font-medium text-sm">
+                                        {item.code} - {item.designation}
+                                      </p>
+                                    </div>
+                                    <p className="font-semibold text-sm whitespace-nowrap">
+                                      {formatCurrency(item.totalRevenueHT)}
                                     </p>
                                   </div>
-                                  <p className="font-semibold text-sm whitespace-nowrap">
-                                    {formatCurrency(poste.montantHT)}
-                                  </p>
+                                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                    <span className="font-medium">{item.unite}</span>
+                                    <Separator orientation="vertical" className="h-3" />
+                                    <span>{item.quantite.toLocaleString("fr-FR")}</span>
+                                    <span>×</span>
+                                    <span>{formatCurrency(item.prixUnitaireHT)}</span>
+                                    <span>→</span>
+                                    <span className="font-medium">
+                                      {formatCurrency(item.totalRevenueHT)}
+                                    </span>
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                  <span className="font-medium">{poste.unite}</span>
-                                  <Separator orientation="vertical" className="h-3" />
-                                  <span>{poste.quantite.toLocaleString("fr-FR")}</span>
-                                  <span>×</span>
-                                  <span>{formatCurrency(poste.prixUnitaire)}</span>
-                                  <span>→</span>
-                                  <span className="font-medium">{formatCurrency(poste.montantHT)}</span>
-                                </div>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
+                        ))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            ) : (
+              <p className="text-center text-muted-foreground py-8">
+                Aucun lot défini
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -257,11 +381,11 @@ export default function DQEDetailPage({ params }: { params: { id: string } }) {
             <div className="space-y-3">
               <div className="flex items-center justify-between text-lg">
                 <span className="text-muted-foreground">Total HT</span>
-                <span className="font-semibold">{formatCurrency(dqe.budgetTotalHT)}</span>
+                <span className="font-semibold">{formatCurrency(dqe.totalRevenueHT)}</span>
               </div>
               <Separator />
               <div className="flex items-center justify-between text-lg">
-                <span className="text-muted-foreground">TVA (18%)</span>
+                <span className="text-muted-foreground">TVA ({dqe.tauxTVA}%)</span>
                 <span className="font-semibold">{formatCurrency(tva)}</span>
               </div>
               <Separator />
@@ -275,21 +399,46 @@ export default function DQEDetailPage({ params }: { params: { id: string } }) {
 
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-3 pb-6">
-          <Button onClick={handleExportPDF} variant="outline">
-            <FileText className="h-4 w-4 mr-2" />
+          <Button 
+            onClick={handleExportPDF} 
+            variant="outline"
+            disabled={exportLoading}
+          >
+            {exportLoading ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <FileText className="h-4 w-4 mr-2" />
+            )}
             Exporter PDF
           </Button>
-          <Button onClick={handleExportExcel} variant="outline">
-            <FileSpreadsheet className="h-4 w-4 mr-2" />
+          <Button 
+            onClick={handleExportExcel} 
+            variant="outline"
+            disabled={exportLoading}
+          >
+            {exportLoading ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+            )}
             Exporter Excel
           </Button>
-          {dqe.conversionState === "convertible" && (
-            <Button onClick={handleConvertToProject} className="bg-emerald-600 hover:bg-emerald-700">
+          {dqe.statut === 'brouillon' && (
+            <Button onClick={handleValidate} variant="outline">
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Valider le DQE
+            </Button>
+          )}
+          {isDQEConvertible(dqe) && (
+            <Button 
+              onClick={handleConvertToProject} 
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
               <Briefcase className="h-4 w-4 mr-2" />
               Convertir en projet
             </Button>
           )}
-          {dqe.conversionState !== "converted" && (
+          {isDQEEditable(dqe) && (
             <Button onClick={handleEdit} variant="outline">
               <Edit className="h-4 w-4 mr-2" />
               Éditer
@@ -297,6 +446,16 @@ export default function DQEDetailPage({ params }: { params: { id: string } }) {
           )}
         </div>
       </div>
+
+      {/* Convert to Project Modal */}
+      {dqe && (
+        <ConvertToProjectModal
+          open={showConvertModal}
+          onOpenChange={setShowConvertModal}
+          dqe={dqe}
+          onConvert={handleProjectConversion}
+        />
+      )}
     </DashboardLayout>
   )
 }

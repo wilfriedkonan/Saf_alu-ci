@@ -10,59 +10,78 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { Plus, Search, AlertTriangle, Hammer, Euro, Eye, Trash2 } from "lucide-react"
+import { Plus, Search, AlertTriangle, Hammer, Euro, Eye, Trash2, Loader2 } from "lucide-react"
 import { ProjectFormModal } from "@/components/projects/project-form-modal"
 import {
-  getProjects,
-  getOverdueProjects,
   type Project,
   projectStatusLabels,
   projectStatusColors,
-  priorityLabels,
-  priorityColors,
   type ProjectStatus,
-} from "@/lib/projects"
+} from "@/types/projet"
 import { useAuth, usePermissions } from "@/contexts/AuthContext"
+import { useProjetsList, useProjetActions, useProjetStatistiques } from "@/hooks/useProjet"
+import { toast } from "sonner"
 
 export default function ProjectsPage() {
-  const {user}=useAuth();
-  const {canManageProjects}=usePermissions();
-  const [projects, setProjects] = useState<Project[]>([])
+  const { user } = useAuth()
+  const { canManageProjects } = usePermissions()
+  const router = useRouter()
+
+  // Hooks pour les projets
+  const { projets, loading: loadingProjets, error: errorProjets, refreshProjets } = useProjetsList()
+  const { 
+    loading: actionLoading, 
+    error: actionError, 
+    deleteProjet,
+    clearError 
+  } = useProjetActions()
+  const { stats, loading: loadingStats } = useProjetStatistiques()
+
+  // États locaux
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">("all")
   const [showProjectForm, setShowProjectForm] = useState(false)
-  const router = useRouter()
 
+  // Vérification des permissions
   useEffect(() => {
     if (!user || !canManageProjects) {
       router.push("/dashboard")
       return
     }
+  }, [user, router, canManageProjects])
 
-    const projectsData = getProjects()
-    setProjects(projectsData)
-    setFilteredProjects(projectsData)
-  }, [user, router])
-
+  // Filtrage des projets
   useEffect(() => {
-    let filtered = projects
+    let filtered = projets
 
     if (searchTerm) {
       filtered = filtered.filter(
         (project) =>
-          project.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          project.client.name.toLowerCase().includes(searchTerm.toLowerCase()),
+          project.numero?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          project.nom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          project.client?.nom?.toLowerCase().includes(searchTerm.toLowerCase()),
       )
     }
 
     if (statusFilter !== "all") {
-      filtered = filtered.filter((project) => project.status === statusFilter)
+      filtered = filtered.filter((project) => project.statut === statusFilter)
     }
 
     setFilteredProjects(filtered)
-  }, [projects, searchTerm, statusFilter])
+  }, [projets, searchTerm, statusFilter])
+
+
+
+  // Affichage des erreurs
+  useEffect(() => {
+    if (errorProjets) {
+      toast.error(errorProjets)
+    }
+    if (actionError) {
+      toast.error(actionError)
+    }
+  }, [errorProjets, actionError])
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("fr-FR", {
@@ -72,36 +91,57 @@ export default function ProjectsPage() {
     }).format(amount)
   }
 
-  const getProjectStats = () => {
-    const total = projects.length
-    const active = projects.filter((p) => p.status === "en_cours").length
-    const overdue = projects.filter((p) => p.status === "en_retard").length
-    const totalBudget = projects.reduce((sum, p) => sum + p.budget, 0)
-
-    return { total, active, overdue, totalBudget }
+  // Projets en retard (basés sur la date de fin prévue)
+  const getOverdueProjects = () => {
+    const today = new Date()
+    return projets.filter((p) => {
+      if (!p.dateFinPrevue || p.statut === "Termine") return false
+      const endDate = new Date(p.dateFinPrevue)
+      return endDate < today && (p.statut === "EnCours" || p.statut === "Planification")
+    })
   }
 
-  const handleCreateProject = (projectData: any) => {
-    const newProject = {
-      ...projectData,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString().split("T")[0],
-      updatedAt: new Date().toISOString().split("T")[0],
+  const handleCreateProject = async () => {
+    try {
+      // La logique de création sera gérée dans le modal
+      toast.success("Projet créé avec succès")
+      refreshProjets()
+      setShowProjectForm(false)
+    } catch (error) {
+      toast.error("Erreur lors de la création du projet")
     }
-    setProjects([...projects, newProject])
   }
 
-  const handleDeleteProject = (projectId: string) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer ce projet ?")) {
-      setProjects(projects.filter((project) => project.id !== projectId))
+  const handleDeleteProject = async (projectId: number) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer ce projet ?")) {
+      return
+    }
+
+    try {
+      await deleteProjet(projectId)
+      toast.success("Projet supprimé avec succès")
+      refreshProjets()
+    } catch (error) {
+      toast.error("Erreur lors de la suppression du projet")
     }
   }
 
   const overdueProjects = getOverdueProjects()
-  const stats = getProjectStats()
 
+  // Vérification des permissions avant rendu
   if (!user || !canManageProjects) {
     return null
+  }
+
+  // État de chargement initial
+  if (loadingProjets && projets.length === 0) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </DashboardLayout>
+    )
   }
 
   return (
@@ -112,7 +152,7 @@ export default function ProjectsPage() {
             <h1 className="text-3xl font-bold tracking-tight">Gestion des Projets</h1>
             <p className="text-muted-foreground">Suivez et gérez vos projets de construction</p>
           </div>
-          <Button onClick={() => setShowProjectForm(true)}>
+          <Button onClick={() => setShowProjectForm(true)} disabled={actionLoading}>
             <Plus className="mr-2 h-4 w-4" />
             Nouveau projet
           </Button>
@@ -132,9 +172,9 @@ export default function ProjectsPage() {
                 {overdueProjects.map((project) => (
                   <div key={project.id} className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium text-red-800">{project.name}</p>
+                      <p className="font-medium text-red-800">{project.nom}</p>
                       <p className="text-sm text-red-600">
-                        Prévu jusqu'au {new Date(project.endDate).toLocaleDateString("fr-FR")}
+                        Prévu jusqu'au {project.dateFinPrevue ? new Date(project.dateFinPrevue).toLocaleDateString("fr-FR") : "N/A"}
                       </p>
                     </div>
                     <Button variant="outline" size="sm" onClick={() => router.push(`/projets/${project.id}`)}>
@@ -156,16 +196,28 @@ export default function ProjectsPage() {
               <Hammer className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.total}</div>
+              <div className="text-2xl font-bold">
+                {loadingStats ? (
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                ) : (
+                  stats.totalProjets 
+                )}
+              </div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Projets actifs</CardTitle>
+              <CardTitle className="text-sm font-medium">Projets en cours</CardTitle>
               <Hammer className="h-4 w-4 text-blue-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.active}</div>
+              <div className="text-2xl font-bold">
+                {loadingStats ? (
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                ) : (
+                  stats.projetEncour
+                )}
+              </div>
             </CardContent>
           </Card>
           <Card>
@@ -174,7 +226,7 @@ export default function ProjectsPage() {
               <AlertTriangle className="h-4 w-4 text-red-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.overdue}</div>
+              <div className="text-2xl font-bold">{overdueProjects.length}</div>
             </CardContent>
           </Card>
           <Card>
@@ -183,7 +235,13 @@ export default function ProjectsPage() {
               <Euro className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(stats.totalBudget)}</div>
+              <div className="text-2xl font-bold">
+                {loadingStats ? (
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                ) : (
+                  formatCurrency(stats.budgetTotal)
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -212,11 +270,11 @@ export default function ProjectsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tous les statuts</SelectItem>
-                  <SelectItem value="planification">Planification</SelectItem>
-                  <SelectItem value="en_cours">En cours</SelectItem>
-                  <SelectItem value="en_retard">En retard</SelectItem>
-                  <SelectItem value="termine">Terminé</SelectItem>
-                  <SelectItem value="suspendu">Suspendu</SelectItem>
+                  <SelectItem value="Planification">Planification</SelectItem>
+                  <SelectItem value="EnCours">En cours</SelectItem>
+                  <SelectItem value="Suspendu">Suspendu</SelectItem>
+                  <SelectItem value="Termine">Terminé</SelectItem>
+                  <SelectItem value="Annule">Annulé</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -230,89 +288,123 @@ export default function ProjectsPage() {
             <CardDescription>Gérez vos projets de construction</CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Projet</TableHead>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Budget</TableHead>
-                  <TableHead>Progression</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead>Priorité</TableHead>
-                  <TableHead>Dates</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProjects.map((project) => (
-                  <TableRow key={project.id}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{project.name}</div>
-                        <div className="text-sm text-muted-foreground">{project.number}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{project.client.name}</div>
-                        <div className="text-sm text-muted-foreground">{project.client.address}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{formatCurrency(project.budget)}</div>
-                        <div className="text-sm text-muted-foreground">
-                          Dépensé: {formatCurrency(project.actualCost)}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <Progress value={project.progress} className="h-2" />
-                        <span className="text-sm text-muted-foreground">{project.progress}%</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={projectStatusColors[project.status]}>
-                        {projectStatusLabels[project.status]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={priorityColors[project.priority]}>{priorityLabels[project.priority]}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        <div>{new Date(project.startDate).toLocaleDateString("fr-FR")}</div>
-                        <div className="text-muted-foreground">
-                          {new Date(project.endDate).toLocaleDateString("fr-FR")}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center gap-2 justify-end">
-                        <Button variant="ghost" size="sm" onClick={() => router.push(`/projets/${project.id}`)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteProject(project.id)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+            {loadingProjets && projets.length === 0 ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : filteredProjects.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Aucun projet trouvé
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Projet</TableHead>
+                    <TableHead>Client</TableHead>
+                    <TableHead>Budget</TableHead>
+                    <TableHead>Progression</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead>Dates</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredProjects.map((project) => (
+                    <TableRow key={project.id}>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{project.nom}</div>
+                          <div className="text-sm text-muted-foreground">{project.numero}</div>
+                          {project.isFromDqeConversion && (
+                            <Badge variant="outline" className="mt-1 text-xs">
+                              Depuis DQE
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{project.client?.nom || "N/A"}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {project.villeChantier || project.client?.adresse || "N/A"}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{formatCurrency(project.budgetInitial)}</div>
+                          <div className="text-sm text-muted-foreground">
+                            Dépensé: {formatCurrency(project.coutReel)}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <Progress value={project.pourcentageAvancement} className="h-2" />
+                          <span className="text-sm text-muted-foreground">{project.pourcentageAvancement}%</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={projectStatusColors[project.statut]}>
+                          {projectStatusLabels[project.statut]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          <div>
+                            {project.dateDebut 
+                              ? new Date(project.dateDebut).toLocaleDateString("fr-FR") 
+                              : "N/A"}
+                          </div>
+                          <div className="text-muted-foreground">
+                            {project.dateFinPrevue 
+                              ? new Date(project.dateFinPrevue).toLocaleDateString("fr-FR") 
+                              : "N/A"}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center gap-2 justify-end">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => router.push(`/projets/${project.id}`)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteProject(project.id)}
+                            disabled={actionLoading}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            {actionLoading ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </div>
 
       {/* Project Form Modal */}
-      <ProjectFormModal open={showProjectForm} onOpenChange={setShowProjectForm} onSubmit={handleCreateProject} />
+      <ProjectFormModal 
+        open={showProjectForm} 
+        onOpenChange={setShowProjectForm}
+        onSuccess={() => {
+          refreshProjets()
+        }}
+      />
     </DashboardLayout>
   )
 }
