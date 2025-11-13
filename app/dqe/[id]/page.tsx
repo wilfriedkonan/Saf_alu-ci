@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useState, useEffect } from "react"
+import { use, useState, useEffect } from "react"
 import { 
   ArrowLeft, 
   FileText, 
@@ -24,6 +24,7 @@ import { DashboardLayout } from "@/components/dashboard-layout"
 import { ConvertToProjectModal } from "@/components/dqe/convert-to-project-modal"
 import { useDqe, useDqeExport } from "@/hooks/useDqe"
 import { 
+  type DQE,
   formatCurrency, 
   formatDate,
   formatDateTime,
@@ -34,16 +35,17 @@ import {
   getConversionStatus,
 } from "@/types/dqe"
 
-export default function DQEDetailPage({ params }: { params: { id: string } }) {
+export default function DQEDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
-  const dqeId = parseInt(params.id)
+  const { id } = use(params)
+  const dqeId = parseInt(id)
   const [showConvertModal, setShowConvertModal] = useState(false)
 
   // Hooks
   const { fetchDQEById, validateDQE, loading } = useDqe()
   const { exportExcel, exportPDF, loading: exportLoading } = useDqeExport()
   
-  const [dqe, setDqe] = useState<any>(null)
+  const [dqe, setDqe] = useState<DQE | null>(null)
   const [loadingDQE, setLoadingDQE] = useState(true)
 
   // Charger le DQE
@@ -174,9 +176,11 @@ export default function DQEDetailPage({ params }: { params: { id: string } }) {
                       {dqe.linkedProjectNumber} - {dqe.nom}
                     </span>
                   </p>
-                  <p>
-                    Converti le : <span className="font-medium">{formatDateTime(dqe.convertedAt)}</span>
-                  </p>
+                  {dqe.convertedAt && (
+                    <p>
+                      Converti le : <span className="font-medium">{formatDateTime(dqe.convertedAt)}</span>
+                    </p>
+                  )}
                   {dqe.convertedBy && (
                     <p>
                       Par : <span className="font-medium">

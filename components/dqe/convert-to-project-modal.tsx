@@ -505,29 +505,30 @@ export function ConvertToProjectModal({
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <p className="text-muted-foreground">Nom</p>
-                      <p className="font-medium">{preview.projectPreview.nomProjet}</p>
+                      <p className="font-medium">{preview.projectPreview?.nomProjet}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Numéro</p>
-                      <p className="font-medium">{preview.projectPreview.numeroProjet}</p>
+                      <p className="font-medium">{preview.projectPreview?.numeroProjet}</p>
                     </div>
-                    <div>
+                    <div>                         
+
                       <p className="text-muted-foreground">Date début</p>
-                      <p className="font-medium">{formatDate(preview.projectPreview.dateDebut)}</p>
+                      <p className="font-medium">{preview.projectPreview?.dateDebut ? format(preview.projectPreview?.dateDebut, "ppp",{locale:fr}): "Sélectionner"}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Date fin prévue</p>
-                      <p className="font-medium">{formatDate(preview.projectPreview.dateFinPrevue)}</p>
+                      <p className="font-medium">{preview.projectPreview?.dateFinPrevue ? format(preview.projectPreview?.dateFinPrevue, "ppp",{locale:fr}): "Sélectionner"}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Budget initial</p>
                       <p className="font-medium text-lg text-primary">
-                        {formatCurrency(preview.projectPreview.budgetInitial)}
+                        {formatCurrency(preview.projectPreview?.budgetInitial)}
                       </p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Nombre d'étapes</p>
-                      <p className="font-medium">{preview.projectPreview.nombreEtapes}</p>
+                      <p className="font-medium">{preview.projectPreview?.nombreEtapes}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -540,7 +541,7 @@ export function ConvertToProjectModal({
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {preview.stagesPreview.map((stage, index) => (
+                    {preview?.stagesPreview?.map((stage, index) => (
                       <div key={index} className="border rounded-lg p-3">
                         <div className="flex items-start justify-between mb-2">
                           <div>

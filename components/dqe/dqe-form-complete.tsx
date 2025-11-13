@@ -37,9 +37,15 @@ import {
   ClipboardList,
 } from "lucide-react"
 import { toast } from "sonner"
-import { clients } from "@/lib/clients"
-import { formatCurrency } from "@/lib/format"
-import type { DQE, DQELot, DQEChapitre, DQEPoste } from "@/lib/dqe"
+import { useClientsList } from "@/hooks/useClients"
+import { 
+  DQE, 
+  DQELot, 
+  DQEChapter, 
+  DQEItem,
+  UniteMesure,
+  formatCurrency 
+} from "@/types/dqe"
 
 interface DQEFormCompleteProps {
   mode: "create" | "edit"
@@ -63,13 +69,15 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
   const [currentStep, setCurrentStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Hook pour récupérer les clients
+  const { clients, loading: loadingClients } = useClientsList()
+
   // État principal du DQE
   const [dqe, setDqe] = useState<Partial<DQE>>({
     nom: initialData?.nom || "",
     description: initialData?.description || "",
-    clientId: initialData?.clientId || "",
-    clientName: initialData?.clientName || "",
-    devisId: initialData?.devisId || "",
+    clientId: initialData?.clientId || 0,
+    devisId: initialData?.devisId || 0,
     statut: initialData?.statut || "brouillon",
     tauxTVA: initialData?.tauxTVA || 18,
     totalRevenueHT: 0,
@@ -81,19 +89,19 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
   // États pour les dialogs
   const [isLotDialogOpen, setIsLotDialogOpen] = useState(false)
   const [isChapterDialogOpen, setIsChapterDialogOpen] = useState(false)
-  const [isPosteDialogOpen, setIsPosteDialogOpen] = useState(false)
+  const [isItemDialogOpen, setIsItemDialogOpen] = useState(false)
 
   // États pour l'édition
   const [editingLot, setEditingLot] = useState<DQELot | null>(null)
-  const [editingChapter, setEditingChapter] = useState<DQEChapitre | null>(null)
-  const [editingPoste, setEditingPoste] = useState<DQEPoste | null>(null)
+  const [editingChapter, setEditingChapter] = useState<DQEChapter | null>(null)
+  const [editingItem, setEditingItem] = useState<DQEItem | null>(null)
   const [currentLotIndex, setCurrentLotIndex] = useState<number | null>(null)
   const [currentChapterIndex, setCurrentChapterIndex] = useState<number | null>(null)
 
   // Formulaires temporaires
   const [lotForm, setLotForm] = useState({ code: "", nom: "", description: "" })
   const [chapterForm, setChapterForm] = useState({ code: "", nom: "", description: "" })
-  const [posteForm, setPosteForm] = useState({
+  const [itemForm, setItemForm] = useState({
     code: "",
     designation: "",
     description: "",
@@ -119,16 +127,16 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
     }
 
     const updatedLots = dqe.lots.map((lot) => {
-      const updatedChapitres = lot.chapitres.map((chapitre) => {
-        const totalChapitre = chapitre.postes.reduce((sum, poste) => sum + poste.quantite * poste.prixUnitaireHT, 0)
-        return { ...chapitre, totalRevenueHT: totalChapitre }
-      })
+      const updatedChapters = lot.chapters?.map((chapter) => {
+        const totalChapter = chapter.items?.reduce((sum, item) => sum + item.quantite * item.prixUnitaireHT, 0) || 0
+        return { ...chapter, totalRevenueHT: totalChapter }
+      }) || []
 
-      const totalLot = updatedChapitres.reduce((sum, ch) => sum + ch.totalRevenueHT, 0)
+      const totalLot = updatedChapters.reduce((sum, ch) => sum + ch.totalRevenueHT, 0)
 
       return {
         ...lot,
-        chapitres: updatedChapitres,
+        chapters: updatedChapters,
         totalRevenueHT: totalLot,
       }
     })
@@ -173,23 +181,23 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
       return
     }
 
-    const newLot: DQELot = {
+    const newLot: Partial<DQELot> = {
       code: lotForm.code,
       nom: lotForm.nom,
       description: lotForm.description,
       ordre: editingLot ? editingLot.ordre : (dqe.lots?.length || 0) + 1,
       totalRevenueHT: 0,
       pourcentageTotal: 0,
-      chapitres: editingLot ? editingLot.chapitres : [],
+      chapters: editingLot ? editingLot.chapters : [],
     }
 
     if (editingLot && currentLotIndex !== null) {
       const updatedLots = [...(dqe.lots || [])]
-      updatedLots[currentLotIndex] = newLot
+      updatedLots[currentLotIndex] = newLot as DQELot
       setDqe((prev) => ({ ...prev, lots: updatedLots }))
       toast.success("Lot modifié avec succès")
     } else {
-      setDqe((prev) => ({ ...prev, lots: [...(prev.lots || []), newLot] }))
+      setDqe((prev) => ({ ...prev, lots: [...(prev.lots || []), newLot as DQELot] }))
       toast.success("Lot ajouté avec succès")
     }
 
@@ -212,7 +220,7 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
     setIsChapterDialogOpen(true)
   }
 
-  const openEditChapterDialog = (lotIndex: number, chapter: DQEChapitre, chapterIndex: number) => {
+  const openEditChapterDialog = (lotIndex: number, chapter: DQEChapter, chapterIndex: number) => {
     setCurrentLotIndex(lotIndex)
     setCurrentChapterIndex(chapterIndex)
     setEditingChapter(chapter)
@@ -227,21 +235,21 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
     }
 
     const lot = dqe.lots![currentLotIndex]
-    const newChapter: DQEChapitre = {
+    const newChapter: Partial<DQEChapter> = {
       code: chapterForm.code,
       nom: chapterForm.nom,
       description: chapterForm.description,
-      ordre: editingChapter ? editingChapter.ordre : (lot.chapitres?.length || 0) + 1,
+      ordre: editingChapter ? editingChapter.ordre : (lot.chapters?.length || 0) + 1,
       totalRevenueHT: 0,
-      postes: editingChapter ? editingChapter.postes : [],
+      items: editingChapter ? editingChapter.items : [],
     }
 
     const updatedLots = [...dqe.lots!]
     if (editingChapter && currentChapterIndex !== null) {
-      updatedLots[currentLotIndex].chapitres[currentChapterIndex] = newChapter
+      updatedLots[currentLotIndex].chapters![currentChapterIndex] = newChapter as DQEChapter
       toast.success("Chapitre modifié avec succès")
     } else {
-      updatedLots[currentLotIndex].chapitres = [...lot.chapitres, newChapter]
+      updatedLots[currentLotIndex].chapters = [...(lot.chapters || []), newChapter as DQEChapter]
       toast.success("Chapitre ajouté avec succès")
     }
 
@@ -253,17 +261,17 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
 
   const deleteChapter = (lotIndex: number, chapterIndex: number) => {
     const updatedLots = [...dqe.lots!]
-    updatedLots[lotIndex].chapitres = updatedLots[lotIndex].chapitres.filter((_, i) => i !== chapterIndex)
+    updatedLots[lotIndex].chapters = updatedLots[lotIndex].chapters!.filter((_, i) => i !== chapterIndex)
     setDqe((prev) => ({ ...prev, lots: updatedLots }))
     toast.success("Chapitre supprimé")
   }
 
-  // Gestion des postes
-  const openAddPosteDialog = (lotIndex: number, chapterIndex: number) => {
+  // Gestion des items
+  const openAddItemDialog = (lotIndex: number, chapterIndex: number) => {
     setCurrentLotIndex(lotIndex)
     setCurrentChapterIndex(chapterIndex)
-    setEditingPoste(null)
-    setPosteForm({
+    setEditingItem(null)
+    setItemForm({
       code: "",
       designation: "",
       description: "",
@@ -271,46 +279,46 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
       quantite: 0,
       prixUnitaireHT: 0,
     })
-    setIsPosteDialogOpen(true)
+    setIsItemDialogOpen(true)
   }
 
-  const savePoste = () => {
-    if (!posteForm.code || !posteForm.designation || currentLotIndex === null || currentChapterIndex === null) {
+  const saveItem = () => {
+    if (!itemForm.code || !itemForm.designation || currentLotIndex === null || currentChapterIndex === null) {
       toast.error("Code et désignation du poste sont requis")
       return
     }
 
-    if (posteForm.quantite <= 0) {
+    if (itemForm.quantite <= 0) {
       toast.error("La quantité doit être supérieure à 0")
       return
     }
 
-    const newPoste: DQEPoste = {
-      code: posteForm.code,
-      designation: posteForm.designation,
-      description: posteForm.description,
-      unite: posteForm.unite,
-      quantite: posteForm.quantite,
-      prixUnitaireHT: posteForm.prixUnitaireHT,
-      totalRevenueHT: posteForm.quantite * posteForm.prixUnitaireHT,
-      ordre: (dqe.lots![currentLotIndex].chapitres[currentChapterIndex].postes?.length || 0) + 1,
+    const newItem: Partial<DQEItem> = {
+      code: itemForm.code,
+      designation: itemForm.designation,
+      description: itemForm.description,
+      unite: itemForm.unite as UniteMesure,
+      quantite: itemForm.quantite,
+      prixUnitaireHT: itemForm.prixUnitaireHT,
+      totalRevenueHT: itemForm.quantite * itemForm.prixUnitaireHT,
+      ordre: (dqe.lots![currentLotIndex].chapters![currentChapterIndex].items?.length || 0) + 1,
     }
 
     const updatedLots = [...dqe.lots!]
-    updatedLots[currentLotIndex].chapitres[currentChapterIndex].postes = [
-      ...updatedLots[currentLotIndex].chapitres[currentChapterIndex].postes,
-      newPoste,
+    updatedLots[currentLotIndex].chapters![currentChapterIndex].items = [
+      ...(updatedLots[currentLotIndex].chapters![currentChapterIndex].items || []),
+      newItem as DQEItem,
     ]
 
     setDqe((prev) => ({ ...prev, lots: updatedLots }))
-    setIsPosteDialogOpen(false)
+    setIsItemDialogOpen(false)
     toast.success("Poste ajouté avec succès")
   }
 
-  const deletePoste = (lotIndex: number, chapterIndex: number, posteIndex: number) => {
+  const deleteItem = (lotIndex: number, chapterIndex: number, itemIndex: number) => {
     const updatedLots = [...dqe.lots!]
-    updatedLots[lotIndex].chapitres[chapterIndex].postes = updatedLots[lotIndex].chapitres[chapterIndex].postes.filter(
-      (_, i) => i !== posteIndex,
+    updatedLots[lotIndex].chapters![chapterIndex].items = updatedLots[lotIndex].chapters![chapterIndex].items!.filter(
+      (_, i) => i !== itemIndex,
     )
     setDqe((prev) => ({ ...prev, lots: updatedLots }))
     toast.success("Poste supprimé")
@@ -336,14 +344,14 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
     }
 
     for (const lot of dqe.lots) {
-      if (!lot.chapitres || lot.chapitres.length === 0) {
+      if (!lot.chapters || lot.chapters.length === 0) {
         toast.error(`Le lot "${lot.nom}" doit contenir au moins un chapitre`)
         return false
       }
 
-      for (const chapitre of lot.chapitres) {
-        if (!chapitre.postes || chapitre.postes.length === 0) {
-          toast.error(`Le chapitre "${chapitre.nom}" doit contenir au moins un poste`)
+      for (const chapter of lot.chapters) {
+        if (!chapter.items || chapter.items.length === 0) {
+          toast.error(`Le chapitre "${chapter.nom}" doit contenir au moins un poste`)
           return false
         }
       }
@@ -386,7 +394,7 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
       }
 
       toast.success("Brouillon enregistré avec succès")
-      onSuccess?.(savedDqe as DQE)
+      onSuccess?.(savedDqe as unknown as DQE)
     } catch (error) {
       toast.error("Erreur lors de l'enregistrement")
     } finally {
@@ -417,7 +425,7 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
       }
 
       toast.success("DQE validé avec succès")
-      onSuccess?.(validatedDqe as DQE)
+      onSuccess?.(validatedDqe as unknown as DQE)
     } catch (error) {
       toast.error("Erreur lors de la validation")
     } finally {
@@ -472,22 +480,23 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
               Client <span className="text-destructive">*</span>
             </Label>
             <Select
-              value={dqe.clientId}
+              value={dqe.clientId?.toString()}
               onValueChange={(value) => {
-                const client = clients.find((c) => c.id === value)
+                const client = clients.find((c) => c.id === parseInt(value))
                 setDqe((prev) => ({
                   ...prev,
-                  clientId: value,
+                  clientId: parseInt(value),
                   clientName: client?.nom || "",
                 }))
               }}
+              disabled={loadingClients}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Sélectionner un client..." />
+                <SelectValue placeholder={loadingClients ? "Chargement..." : "Sélectionner un client..."} />
               </SelectTrigger>
               <SelectContent>
                 {clients.map((client) => (
-                  <SelectItem key={client.id} value={client.id}>
+                  <SelectItem key={client.id} value={client.id.toString()}>
                     {client.nom}
                   </SelectItem>
                 ))}
@@ -588,9 +597,9 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
                         Ajouter un chapitre
                       </Button>
 
-                      {lot.chapitres && lot.chapitres.length > 0 ? (
+                      {lot.chapters && lot.chapters.length > 0 ? (
                         <Accordion type="multiple" className="space-y-3">
-                          {lot.chapitres.map((chapitre, chapterIndex) => (
+                          {lot.chapters.map((chapter, chapterIndex) => (
                             <AccordionItem
                               key={chapterIndex}
                               value={`chapter-${chapterIndex}`}
@@ -600,13 +609,13 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
                                 <div className="flex items-center justify-between w-full pr-3">
                                   <div className="flex items-center gap-2">
                                     <Badge variant="outline" className="bg-green-100 dark:bg-green-900">
-                                      {chapitre.code}
+                                      {chapter.code}
                                     </Badge>
-                                    <span className="font-medium text-sm">{chapitre.nom}</span>
+                                    <span className="font-medium text-sm">{chapter.nom}</span>
                                   </div>
                                   <div className="flex items-center gap-3">
                                     <span className="text-sm text-green-600 dark:text-green-400">
-                                      {formatCurrency(chapitre.totalRevenueHT)}
+                                      {formatCurrency(chapter.totalRevenueHT)}
                                     </span>
                                     <div className="flex gap-1">
                                       <Button
@@ -614,7 +623,7 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
                                         variant="ghost"
                                         onClick={(e) => {
                                           e.stopPropagation()
-                                          openEditChapterDialog(lotIndex, chapitre, chapterIndex)
+                                          openEditChapterDialog(lotIndex, chapter, chapterIndex)
                                         }}
                                       >
                                         <Edit className="h-3 w-3" />
@@ -638,13 +647,13 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => openAddPosteDialog(lotIndex, chapterIndex)}
+                                    onClick={() => openAddItemDialog(lotIndex, chapterIndex)}
                                   >
                                     <Plus className="mr-2 h-3 w-3" />
                                     Ajouter un poste
                                   </Button>
 
-                                  {chapitre.postes && chapitre.postes.length > 0 ? (
+                                  {chapter.items && chapter.items.length > 0 ? (
                                     <div className="rounded-lg border bg-white dark:bg-gray-950">
                                       <Table>
                                         <TableHeader>
@@ -659,25 +668,25 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
                                           </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                          {chapitre.postes.map((poste, posteIndex) => (
-                                            <TableRow key={posteIndex}>
-                                              <TableCell className="font-mono text-xs">{poste.code}</TableCell>
-                                              <TableCell>{poste.designation}</TableCell>
-                                              <TableCell className="text-center">{poste.unite}</TableCell>
+                                          {chapter.items.map((item, itemIndex) => (
+                                            <TableRow key={itemIndex}>
+                                              <TableCell className="font-mono text-xs">{item.code}</TableCell>
+                                              <TableCell>{item.designation}</TableCell>
+                                              <TableCell className="text-center">{item.unite}</TableCell>
                                               <TableCell className="text-right">
-                                                {poste.quantite.toLocaleString("fr-FR")}
+                                                {item.quantite.toLocaleString("fr-FR")}
                                               </TableCell>
                                               <TableCell className="text-right">
-                                                {formatCurrency(poste.prixUnitaireHT)}
+                                                {formatCurrency(item.prixUnitaireHT)}
                                               </TableCell>
                                               <TableCell className="text-right font-medium">
-                                                {formatCurrency(poste.totalRevenueHT)}
+                                                {formatCurrency(item.totalRevenueHT)}
                                               </TableCell>
                                               <TableCell>
                                                 <Button
                                                   size="sm"
                                                   variant="ghost"
-                                                  onClick={() => deletePoste(lotIndex, chapterIndex, posteIndex)}
+                                                  onClick={() => deleteItem(lotIndex, chapterIndex, itemIndex)}
                                                 >
                                                   <Trash2 className="h-3 w-3 text-destructive" />
                                                 </Button>
@@ -713,9 +722,8 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
             </Accordion>
           ) : (
             <Alert>
-              <AlertDescription>
-                Aucun lot ajouté. Cliquez sur "Ajouter un lot" pour commencer à structurer votre DQE.
-              </AlertDescription>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>Aucun lot ajouté. Cliquez sur "Ajouter un lot" pour commencer.</AlertDescription>
             </Alert>
           )}
         </CardContent>
@@ -723,242 +731,192 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
     </div>
   )
 
-  const renderStep3 = () => {
-    const totalLots = dqe.lots?.length || 0
-    const totalChapitres = dqe.lots?.reduce((sum, lot) => sum + (lot.chapitres?.length || 0), 0) || 0
-    const totalPostes =
-      dqe.lots?.reduce((sum, lot) => sum + lot.chapitres.reduce((s, ch) => s + (ch.postes?.length || 0), 0), 0) || 0
-
-    return (
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Récapitulatif du DQE
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Informations générales */}
-            <div>
-              <h3 className="font-semibold mb-3">Informations générales</h3>
-              <div className="grid gap-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Référence :</span>
-                  <span className="font-medium">{dqeId || "DQE-2024-XXX"}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Nom :</span>
-                  <span className="font-medium">{dqe.nom}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Client :</span>
-                  <span className="font-medium">{dqe.clientName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">TVA :</span>
-                  <span className="font-medium">{dqe.tauxTVA}%</span>
-                </div>
-              </div>
+  const renderStep3 = () => (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <CheckCircle className="h-5 w-5" />
+          Récapitulatif du DQE
+        </CardTitle>
+        <CardDescription>Vérifiez les informations avant validation</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Informations générales */}
+        <div className="space-y-4">
+          <h3 className="font-semibold text-lg">Informations générales</h3>
+          <div className="grid gap-3">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Référence :</span>
+              <span className="font-medium">{dqeId || "DQE-2024-XXX"}</span>
             </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Nom :</span>
+              <span className="font-medium">{dqe.nom}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Client :</span>
+              <span className="font-medium">{dqe.client?.nom}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Taux TVA :</span>
+              <span className="font-medium">{dqe.tauxTVA}%</span>
+            </div>
+          </div>
+        </div>
 
+        <Separator />
+
+        {/* Structure */}
+        <div className="space-y-4">
+          <h3 className="font-semibold text-lg">Structure</h3>
+          <div className="grid gap-3">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Nombre de lots :</span>
+              <span className="font-medium">{dqe.lots?.length || 0}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Nombre de chapitres :</span>
+              <span className="font-medium">
+                {dqe.lots?.reduce((sum, lot) => sum + (lot.chapters?.length || 0), 0) || 0}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Nombre de postes :</span>
+              <span className="font-medium">
+                {dqe.lots?.reduce(
+                  (sum, lot) =>
+                    sum + (lot.chapters?.reduce((chSum, ch) => chSum + (ch.items?.length || 0), 0) || 0),
+                  0,
+                ) || 0}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Montants */}
+        <div className="space-y-4">
+          <h3 className="font-semibold text-lg">Montants</h3>
+          <div className="space-y-3">
+            <div className="flex justify-between text-lg">
+              <span>Total HT :</span>
+              <span className="font-bold">{formatCurrency(dqe.totalRevenueHT ? dqe.totalRevenueHT : 0)}</span>
+            </div>
+            <div className="flex justify-between text-lg">
+              <span>TVA ({dqe.tauxTVA}%) :</span>
+              <span className="font-bold">{formatCurrency(dqe.montantTVA ? dqe.montantTVA :0)}</span>
+            </div>
             <Separator />
-
-            {/* Structure */}
-            <div>
-              <h3 className="font-semibold mb-3">Structure</h3>
-              <div className="grid grid-cols-3 gap-4">
-                <Card>
-                  <CardContent className="pt-6 text-center">
-                    <Package className="h-8 w-8 mx-auto mb-2 text-blue-600" />
-                    <div className="text-2xl font-bold">{totalLots}</div>
-                    <div className="text-sm text-muted-foreground">Lots</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-6 text-center">
-                    <FileText className="h-8 w-8 mx-auto mb-2 text-green-600" />
-                    <div className="text-2xl font-bold">{totalChapitres}</div>
-                    <div className="text-sm text-muted-foreground">Chapitres</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-6 text-center">
-                    <ClipboardList className="h-8 w-8 mx-auto mb-2 text-purple-600" />
-                    <div className="text-2xl font-bold">{totalPostes}</div>
-                    <div className="text-sm text-muted-foreground">Postes</div>
-                  </CardContent>
-                </Card>
-              </div>
+            <div className="flex justify-between text-xl">
+              <span className="font-semibold">Total TTC :</span>
+              <span className="font-bold text-primary">{formatCurrency(dqe.totalTTC ? dqe.totalTTC : 0)}</span>
             </div>
-
-            <Separator />
-
-            {/* Totaux financiers */}
-            <div>
-              <h3 className="font-semibold mb-3">Totaux financiers</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between text-lg">
-                  <span>Total HT</span>
-                  <span className="font-semibold">{formatCurrency(dqe.totalRevenueHT || 0)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">TVA ({dqe.tauxTVA}%)</span>
-                  <span>{formatCurrency(dqe.montantTVA || 0)}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-xl font-bold text-blue-600">
-                  <span>Total TTC</span>
-                  <span>{formatCurrency(dqe.totalTTC || 0)}</span>
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Détail par lot */}
-            <div>
-              <h3 className="font-semibold mb-3">Détail par lot</h3>
-              <Accordion type="single" collapsible className="space-y-2">
-                {dqe.lots?.map((lot, index) => (
-                  <AccordionItem key={index} value={`recap-lot-${index}`} className="border rounded-lg">
-                    <AccordionTrigger className="px-4 hover:no-underline">
-                      <div className="flex items-center justify-between w-full pr-4">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">{lot.code}</Badge>
-                          <span className="font-medium">{lot.nom}</span>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-semibold">{formatCurrency(lot.totalRevenueHT)}</div>
-                          <div className="text-xs text-muted-foreground">{lot.pourcentageTotal.toFixed(1)}%</div>
-                        </div>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="px-4 pb-4">
-                      <div className="space-y-1 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Chapitres :</span>
-                          <span>{lot.chapitres.length}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Postes :</span>
-                          <span>{lot.chapitres.reduce((sum, ch) => sum + ch.postes.length, 0)}</span>
-                        </div>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            </div>
-
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                Vérifiez tous les montants avant validation. Un DQE validé ne pourra plus être modifié.
-              </AlertDescription>
-            </Alert>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto py-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={onCancel}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Retour
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">{mode === "create" ? "Créer un DQE" : "Modifier le DQE"}</h1>
+        <div>
+          <h1 className="text-3xl font-bold">
+            {mode === "create" ? "Créer un DQE" : "Modifier le DQE"}
+          </h1>
+          <p className="text-muted-foreground">
+            {mode === "create"
+              ? "Créez une décomposition quantitative estimative pour votre projet"
+              : "Modifiez les informations du DQE"}
+          </p>
+        </div>
+        <Button variant="outline" onClick={onCancel}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Retour
+        </Button>
+      </div>
+
+      {/* Stepper */}
+      <div className="flex items-center justify-center space-x-4">
+        {[1, 2, 3].map((step) => (
+          <div key={step} className="flex items-center">
+            <div
+              className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
+                currentStep >= step
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground border-muted"
+              }`}
+            >
+              {step}
+            </div>
+            {step < 3 && (
+              <div
+                className={`w-20 h-0.5 ${currentStep > step ? "bg-primary" : "bg-muted"}`}
+              />
+            )}
           </div>
+        ))}
+      </div>
+
+      {/* Step names */}
+      <div className="flex items-center justify-center space-x-8 text-sm">
+        <span className={currentStep === 1 ? "font-semibold" : "text-muted-foreground"}>
+          Informations
+        </span>
+        <span className={currentStep === 2 ? "font-semibold" : "text-muted-foreground"}>
+          Structure
+        </span>
+        <span className={currentStep === 3 ? "font-semibold" : "text-muted-foreground"}>
+          Récapitulatif
+        </span>
+      </div>
+
+      {/* Content */}
+      <div className="min-h-[500px]">
+        {currentStep === 1 && renderStep1()}
+        {currentStep === 2 && renderStep2()}
+        {currentStep === 3 && renderStep3()}
+      </div>
+
+      {/* Actions */}
+      <div className="flex justify-between pt-6">
+        <div>
+          {currentStep > 1 && (
+            <Button variant="outline" onClick={handlePrevious}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Précédent
+            </Button>
+          )}
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleSaveDraft} disabled={isSubmitting}>
             <Save className="mr-2 h-4 w-4" />
-            Enregistrer brouillon
+            Enregistrer le brouillon
           </Button>
-          {currentStep === 3 && (
+          {currentStep < 3 ? (
+            <Button onClick={handleNext}>
+              Suivant
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          ) : (
             <Button onClick={handleValidate} disabled={isSubmitting}>
               <CheckCircle className="mr-2 h-4 w-4" />
-              Valider DQE
+              Valider le DQE
             </Button>
           )}
         </div>
       </div>
-
-      {/* Progression */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                  currentStep >= 1 ? "bg-primary text-primary-foreground" : "bg-muted"
-                }`}
-              >
-                1
-              </div>
-              <span className={currentStep >= 1 ? "font-medium" : "text-muted-foreground"}>Infos générales</span>
-            </div>
-            <div className="h-px flex-1 bg-border mx-4" />
-            <div className="flex items-center gap-2">
-              <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                  currentStep >= 2 ? "bg-primary text-primary-foreground" : "bg-muted"
-                }`}
-              >
-                2
-              </div>
-              <span className={currentStep >= 2 ? "font-medium" : "text-muted-foreground"}>Lots & Détails</span>
-            </div>
-            <div className="h-px flex-1 bg-border mx-4" />
-            <div className="flex items-center gap-2">
-              <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                  currentStep >= 3 ? "bg-primary text-primary-foreground" : "bg-muted"
-                }`}
-              >
-                3
-              </div>
-              <span className={currentStep >= 3 ? "font-medium" : "text-muted-foreground"}>Récapitulatif</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Contenu */}
-      <ScrollArea className="h-[calc(100vh-300px)]">
-        {currentStep === 1 && renderStep1()}
-        {currentStep === 2 && renderStep2()}
-        {currentStep === 3 && renderStep3()}
-      </ScrollArea>
-
-      {/* Footer */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex justify-between">
-            <Button variant="outline" onClick={handlePrevious} disabled={currentStep === 1}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Précédent
-            </Button>
-            <Button onClick={handleNext} disabled={currentStep === 3}>
-              Suivant
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Dialog Lot */}
       <Dialog open={isLotDialogOpen} onOpenChange={setIsLotDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingLot ? "Modifier le lot" : "Ajouter un lot"}</DialogTitle>
-            <DialogDescription>Renseignez les informations du lot</DialogDescription>
+            <DialogDescription>
+              Renseignez les informations du lot. Les montants seront calculés automatiquement.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -1060,15 +1018,15 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
       </Dialog>
 
       {/* Dialog Poste */}
-      <Dialog open={isPosteDialogOpen} onOpenChange={setIsPosteDialogOpen}>
+      <Dialog open={isItemDialogOpen} onOpenChange={setIsItemDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Ajouter un poste</DialogTitle>
             <DialogDescription>
               {currentLotIndex !== null && currentChapterIndex !== null && dqe.lots && (
                 <Badge variant="secondary" className="mt-2">
-                  Parent : {dqe.lots[currentLotIndex].chapitres[currentChapterIndex].code} -{" "}
-                  {dqe.lots[currentLotIndex].chapitres[currentChapterIndex].nom}
+                  Parent : {dqe.lots[currentLotIndex].chapters![currentChapterIndex].code} -{" "}
+                  {dqe.lots[currentLotIndex].chapters![currentChapterIndex].nom}
                 </Badge>
               )}
             </DialogDescription>
@@ -1076,23 +1034,23 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
           <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="poste-code">
+                <Label htmlFor="item-code">
                   Code du poste <span className="text-destructive">*</span>
                 </Label>
                 <Input
-                  id="poste-code"
-                  value={posteForm.code}
-                  onChange={(e) => setPosteForm((prev) => ({ ...prev, code: e.target.value }))}
+                  id="item-code"
+                  value={itemForm.code}
+                  onChange={(e) => setItemForm((prev) => ({ ...prev, code: e.target.value }))}
                   placeholder="Ex: 1.1.1"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="poste-unite">
+                <Label htmlFor="item-unite">
                   Unité <span className="text-destructive">*</span>
                 </Label>
                 <Select
-                  value={posteForm.unite}
-                  onValueChange={(value) => setPosteForm((prev) => ({ ...prev, unite: value }))}
+                  value={itemForm.unite}
+                  onValueChange={(value) => setItemForm((prev) => ({ ...prev, unite: value }))}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -1109,23 +1067,23 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="poste-designation">
+              <Label htmlFor="item-designation">
                 Désignation <span className="text-destructive">*</span>
               </Label>
               <Input
-                id="poste-designation"
-                value={posteForm.designation}
-                onChange={(e) => setPosteForm((prev) => ({ ...prev, designation: e.target.value }))}
+                id="item-designation"
+                value={itemForm.designation}
+                onChange={(e) => setItemForm((prev) => ({ ...prev, designation: e.target.value }))}
                 placeholder="Ex: Déblai manuel"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="poste-description">Description</Label>
+              <Label htmlFor="item-description">Description</Label>
               <Textarea
-                id="poste-description"
-                value={posteForm.description}
-                onChange={(e) => setPosteForm((prev) => ({ ...prev, description: e.target.value }))}
+                id="item-description"
+                value={itemForm.description}
+                onChange={(e) => setItemForm((prev) => ({ ...prev, description: e.target.value }))}
                 placeholder="Description du poste..."
                 rows={2}
               />
@@ -1133,28 +1091,28 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="poste-quantite">
+                <Label htmlFor="item-quantite">
                   Quantité <span className="text-destructive">*</span>
                 </Label>
                 <Input
-                  id="poste-quantite"
+                  id="item-quantite"
                   type="number"
-                  value={posteForm.quantite}
-                  onChange={(e) => setPosteForm((prev) => ({ ...prev, quantite: Number(e.target.value) }))}
+                  value={itemForm.quantite}
+                  onChange={(e) => setItemForm((prev) => ({ ...prev, quantite: Number(e.target.value) }))}
                   placeholder="150.00"
                   step="0.01"
                   min="0"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="poste-prix">
+                <Label htmlFor="item-prix">
                   Prix unitaire HT (FCFA) <span className="text-destructive">*</span>
                 </Label>
                 <Input
-                  id="poste-prix"
+                  id="item-prix"
                   type="number"
-                  value={posteForm.prixUnitaireHT}
-                  onChange={(e) => setPosteForm((prev) => ({ ...prev, prixUnitaireHT: Number(e.target.value) }))}
+                  value={itemForm.prixUnitaireHT}
+                  onChange={(e) => setItemForm((prev) => ({ ...prev, prixUnitaireHT: Number(e.target.value) }))}
                   placeholder="2500"
                   step="1"
                   min="0"
@@ -1166,16 +1124,16 @@ export function DQEFormComplete({ mode, dqeId, initialData, onSuccess, onCancel 
               <div className="flex justify-between items-center">
                 <span className="font-medium">Total HT</span>
                 <span className="text-xl font-bold text-primary">
-                  {formatCurrency(posteForm.quantite * posteForm.prixUnitaireHT)}
+                  {formatCurrency(itemForm.quantite * itemForm.prixUnitaireHT)}
                 </span>
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsPosteDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsItemDialogOpen(false)}>
               Annuler
             </Button>
-            <Button onClick={savePoste}>Enregistrer</Button>
+            <Button onClick={saveItem}>Enregistrer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -106,8 +106,8 @@ export const useDqe = () => {
   const updateDQE = useCallback(async (id: number, dqeData: UpdateDQERequest): Promise<boolean> => {
     setLoading(true);
     setError(null);
-    
-    try {
+    console.log('Requette arrive au service ? oui')
+    try { 
       const response = await DQEService.updateDQE(id, dqeData);
       toast.success(response.message || 'DQE mis à jour avec succès');
       

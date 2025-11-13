@@ -190,6 +190,7 @@ export interface DQE {
     clientId: number;
     devisId?: number;
     tauxTVA: number;
+    statut:string;
     lots?: CreateDQELotRequest[];
   }
   
@@ -433,7 +434,7 @@ export interface DQE {
   /**
    * Unités de Mesure
    */
-  export type UniteMesure = 'm³' | 'ml' | 'm²' | 'ens' | 'forf' | 'u';
+  export type UniteMesure = 'm³' | 'ml' | 'm²' | 'ens' | 'forf' | 'u'|'kg';
   
   /**
    * Constantes Statuts
@@ -456,6 +457,7 @@ export interface DQE {
     ENSEMBLE: 'ens' as UniteMesure,
     FORFAIT: 'forf' as UniteMesure,
     UNITE: 'u' as UniteMesure,
+    POIDS: 'kg' as UniteMesure
   };
   
   /**
@@ -490,6 +492,7 @@ export interface DQE {
     'ens': 'Ensemble',
     'forf': 'Forfait',
     'u': 'Unité',
+    'kg': 'Kilogramme',
   };
   
   // ========================================
@@ -581,22 +584,24 @@ export interface DQE {
    * Formate une date
    */
   export const formatDate = (date: string | Date): string => {
+    const dateObj = date instanceof Date ? date : new Date(date);
     return new Intl.DateTimeFormat('fr-FR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
-    }).format(new Date(date));
+    }).format(dateObj);
   };
   
   /**
    * Formate une date avec heure
    */
   export const formatDateTime = (date: string | Date): string => {
+    const dateObj = date instanceof Date ? date : new Date(date);
     return new Intl.DateTimeFormat('fr-FR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-    }).format(new Date(date));
+    }).format(dateObj);
   };
