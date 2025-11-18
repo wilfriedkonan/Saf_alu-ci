@@ -106,6 +106,7 @@ export interface DQE {
     quantite: number;
     prixUnitaireHT: number;
     totalRevenueHT: number;
+    deboursseSec: number;
     
     // Navigation property
     chapter?: DQEChapter;
@@ -175,6 +176,7 @@ export interface DQE {
     unite: UniteMesure;
     quantite: number;
     prixUnitaireHT: number;
+    deboursseSec: number;
   }
   
   // ========================================
@@ -246,9 +248,9 @@ export interface DQE {
    * Réponse Prévisualisation Conversion
    */
   export interface ConversionPreviewResponse {
-    dqeSummary: DQESummary;
-    projectPreview: ProjectPreview;
-    stagesPreview: StagePreview[];
+    dqe: DQESummary;
+    projetPrevu: ProjectPreview;
+    etapesPrevues: StagePreview[];
     calculations: ConversionCalculations;
   }
   
@@ -256,11 +258,11 @@ export interface DQE {
    * Résumé DQE
    */
   export interface DQESummary {
-    dqeId: number;
+    id: number;
     reference: string;
     nom: string;
-    totalHT: number;
-    nombreLots: number;
+    totalRevenueHT: number;
+    lotsCount: number;
     clientNom: string;
   }
   
@@ -268,7 +270,7 @@ export interface DQE {
    * Prévisualisation Projet
    */
   export interface ProjectPreview {
-    nomProjet: string;
+    nom: string;
     numeroProjet: string;
     dateDebut: string;
     dateFinPrevue: string;

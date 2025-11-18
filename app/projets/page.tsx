@@ -29,11 +29,11 @@ export default function ProjectsPage() {
 
   // Hooks pour les projets
   const { projets, loading: loadingProjets, error: errorProjets, refreshProjets } = useProjetsList()
-  const { 
-    loading: actionLoading, 
-    error: actionError, 
+  const {
+    loading: actionLoading,
+    error: actionError,
     deleteProjet,
-    clearError 
+    clearError
   } = useProjetActions()
   const { stats, loading: loadingStats } = useProjetStatistiques()
 
@@ -200,7 +200,7 @@ export default function ProjectsPage() {
                 {loadingStats ? (
                   <Loader2 className="h-6 w-6 animate-spin" />
                 ) : (
-                  stats.totalProjets 
+                  stats.totalProjets
                 )}
               </div>
             </CardContent>
@@ -312,7 +312,9 @@ export default function ProjectsPage() {
                 <TableBody>
                   {filteredProjects.map((project) => (
                     <TableRow key={project.id}>
-                      <TableCell>
+                      <TableCell
+                        onClick={() => router.push(`/projets/${project.id}`)}
+                      >
                         <div>
                           <div className="font-medium">{project.nom}</div>
                           <div className="text-sm text-muted-foreground">{project.numero}</div>
@@ -323,7 +325,9 @@ export default function ProjectsPage() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell
+                        onClick={() => router.push(`/projets/${project.id}`)}
+                      >
                         <div>
                           <div className="font-medium">{project.client?.nom || "N/A"}</div>
                           <div className="text-sm text-muted-foreground">
@@ -331,7 +335,9 @@ export default function ProjectsPage() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell
+                        onClick={() => router.push(`/projets/${project.id}`)}
+                      >
                         <div>
                           <div className="font-medium">{formatCurrency(project.budgetInitial)}</div>
                           <div className="text-sm text-muted-foreground">
@@ -339,36 +345,42 @@ export default function ProjectsPage() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell
+                        onClick={() => router.push(`/projets/${project.id}`)}
+                      >
                         <div className="space-y-1">
                           <Progress value={project.pourcentageAvancement} className="h-2" />
                           <span className="text-sm text-muted-foreground">{project.pourcentageAvancement}%</span>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell
+                        onClick={() => router.push(`/projets/${project.id}`)}
+                      >
                         <Badge className={projectStatusColors[project.statut]}>
                           {projectStatusLabels[project.statut]}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell
+                        onClick={() => router.push(`/projets/${project.id}`)}
+                      >
                         <div className="text-sm">
                           <div>
-                            {project.dateDebut 
-                              ? new Date(project.dateDebut).toLocaleDateString("fr-FR") 
+                            {project.dateDebut
+                              ? new Date(project.dateDebut).toLocaleDateString("fr-FR")
                               : "N/A"}
                           </div>
                           <div className="text-muted-foreground">
-                            {project.dateFinPrevue 
-                              ? new Date(project.dateFinPrevue).toLocaleDateString("fr-FR") 
+                            {project.dateFinPrevue
+                              ? new Date(project.dateFinPrevue).toLocaleDateString("fr-FR")
                               : "N/A"}
                           </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center gap-2 justify-end">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => router.push(`/projets/${project.id}`)}
                           >
                             <Eye className="h-4 w-4" />
@@ -398,8 +410,8 @@ export default function ProjectsPage() {
       </div>
 
       {/* Project Form Modal */}
-      <ProjectFormModal 
-        open={showProjectForm} 
+      <ProjectFormModal
+        open={showProjectForm}
         onOpenChange={setShowProjectForm}
         onSuccess={() => {
           refreshProjets()

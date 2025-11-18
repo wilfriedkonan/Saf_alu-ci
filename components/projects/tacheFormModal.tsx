@@ -1,0 +1,551 @@
+// components/projets/TacheFormModal.tsx
+"use client"
+
+import React, { useState, useEffect } from 'react'
+import { 
+  TacheProjet, 
+  CreateTacheProjetRequest,
+  UpdateTacheProjetRequest,
+  UniteMesure,
+  TacheStatus,
+  ResponsableType,
+  uniteLabels,
+  tacheStatusLabels
+} from '@/types/projet'
+import { X } from 'lucide-react'
+
+interface TacheFormModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onSubmit: (data: CreateTacheProjetRequest | UpdateTacheProjetRequest) => Promise<void>
+  tache?: TacheProjet // Si fourni, mode édition
+  etapeId: number
+  mode: 'create' | 'edit'
+}
+
+export default function TacheFormModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  tache,
+  etapeId,
+  mode
+}: TacheFormModalProps) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Form state
+  const [formData, setFormData] = useState({
+    code: '',
+    nom: '',
+    description: '',
+    ordre: 1,
+    unite: 'm³' as UniteMesure,
+    quantitePrevue: 0,
+    quantiteRealisee: 0,
+    prixUnitairePrevu: 0,
+    prixUnitaireReel: 0,
+    statut: 'NonCommence' as TacheStatus,
+    pourcentageAvancement: 0,
+    dateDebut: '',
+    dateFinPrevue: '',
+    dateFinReelle: '',
+    responsableId: undefined as number | undefined,
+    typeResponsable: 'Interne' as ResponsableType
+  })
+
+  // Initialiser le formulaire avec les données de la tâche en mode édition
+  useEffect(() => {
+    if (mode === 'edit' && tache) {
+      setFormData({
+        code: tache.code,
+        nom: tache.nom,
+        description: tache.description || '',
+        ordre: tache.ordre,
+        unite: tache.unite,
+        quantitePrevue: tache.quantitePrevue,
+        quantiteRealisee: tache.quantiteRealisee,
+        prixUnitairePrevu: tache.prixUnitairePrevu,
+        prixUnitaireReel: tache.prixUnitaireReel || 0,
+        statut: tache.statut,
+        pourcentageAvancement: tache.pourcentageAvancement,
+        dateDebut: tache.dateDebut ? tache.dateDebut.split('T')[0] : '',
+        dateFinPrevue: tache.dateFinPrevue ? tache.dateFinPrevue.split('T')[0] : '',
+        dateFinReelle: tache.dateFinReelle ? tache.dateFinReelle.split('T')[0] : '',
+        responsableId: tache.responsableId,
+        typeResponsable: tache.typeResponsable
+      })
+    } else {
+      // Reset pour mode création
+      setFormData({
+        code: '',
+        nom: '',
+        description: '',
+        ordre: 1,
+        unite: 'm³',
+        quantitePrevue: 0,
+        quantiteRealisee: 0,
+        prixUnitairePrevu: 0,
+        prixUnitaireReel: 0,
+        statut: 'NonCommence',
+        pourcentageAvancement: 0,
+        dateDebut: '',
+        dateFinPrevue: '',
+        dateFinReelle: '',
+        responsableId: undefined,
+        typeResponsable: 'Interne'
+      })
+    }
+  }, [mode, tache])
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const { name, value, type } = e.target
+    
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'number' ? parseFloat(value) || 0 : value
+    }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+
+    try {
+      // Calculer le budget prévu
+      const budgetPrevu = formData.quantitePrevue * formData.prixUnitairePrevu
+
+      if (mode === 'create') {
+        const createData: CreateTacheProjetRequest = {
+          code: formData.code,
+          nom: formData.nom,
+          description: formData.description || undefined,
+          ordre: formData.ordre,
+          unite: formData.unite,
+          quantitePrevue: formData.quantitePrevue,
+          prixUnitairePrevu: formData.prixUnitairePrevu,
+          dateDebut: formData.dateDebut || undefined,
+          dateFinPrevue: formData.dateFinPrevue || undefined,
+          responsableId: formData.responsableId,
+          typeResponsable: formData.typeResponsable
+        }
+        
+        await onSubmit(createData)
+      } else {
+        const updateData: UpdateTacheProjetRequest = {
+          nom: formData.nom,
+          description: formData.description || undefined,
+          unite: formData.unite,
+          quantitePrevue: formData.quantitePrevue,
+          quantiteRealisee: formData.quantiteRealisee,
+          prixUnitairePrevu: formData.prixUnitairePrevu,
+          prixUnitaireReel: formData.prixUnitaireReel || undefined,
+          coutReel: formData.quantiteRealisee * (formData.prixUnitaireReel || formData.prixUnitairePrevu),
+          statut: formData.statut,
+          pourcentageAvancement: formData.pourcentageAvancement,
+          dateDebut: formData.dateDebut || undefined,
+          dateFinPrevue: formData.dateFinPrevue || undefined,
+          dateFinReelle: formData.dateFinReelle || undefined,
+          responsableId: formData.responsableId
+        }
+        
+        await onSubmit(updateData)
+      }
+
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+        onClick={onClose}
+      />
+
+      {/* Modal */}
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="relative bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-900">
+              {mode === 'create' ? 'Créer une tâche' : 'Modifier la tâche'}
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Body */}
+          <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[calc(90vh-180px)]">
+            <div className="p-6 space-y-6">
+              {/* Erreur */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm text-red-800">{error}</p>
+                </div>
+              )}
+
+              {/* Section: Informations de base */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">
+                  Informations de base
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Code */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Code *
+                    </label>
+                    <input
+                      type="text"
+                      name="code"
+                      value={formData.code}
+                      onChange={handleChange}
+                      required
+                      disabled={mode === 'edit'}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+                      placeholder="Ex: T001"
+                    />
+                  </div>
+
+                  {/* Ordre */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Ordre *
+                    </label>
+                    <input
+                      type="number"
+                      name="ordre"
+                      value={formData.ordre}
+                      onChange={handleChange}
+                      required
+                      min="1"
+                      disabled={mode === 'edit'}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+                    />
+                  </div>
+
+                  {/* Nom */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nom de la tâche *
+                    </label>
+                    <input
+                      type="text"
+                      name="nom"
+                      value={formData.nom}
+                      onChange={handleChange}
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Ex: Déblai manuel"
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Description
+                    </label>
+                    <textarea
+                      name="description"
+                      value={formData.description}
+                      onChange={handleChange}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Description détaillée de la tâche..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section: Quantités et Budget */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">
+                  Quantités et Budget
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Unité */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Unité de mesure *
+                    </label>
+                    <select
+                      name="unite"
+                      value={formData.unite}
+                      onChange={handleChange}
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      {Object.entries(uniteLabels).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label} ({value})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Quantité prévue */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Quantité prévue *
+                    </label>
+                    <input
+                      type="number"
+                      name="quantitePrevue"
+                      value={formData.quantitePrevue}
+                      onChange={handleChange}
+                      required
+                      min="0"
+                      step="0.01"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  {/* Prix unitaire prévu */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Prix unitaire prévu (FCFA) *
+                    </label>
+                    <input
+                      type="number"
+                      name="prixUnitairePrevu"
+                      value={formData.prixUnitairePrevu}
+                      onChange={handleChange}
+                      required
+                      min="0"
+                      step="0.01"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  {/* Budget prévu (calculé) */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Budget prévu (FCFA)
+                    </label>
+                    <input
+                      type="text"
+                      value={new Intl.NumberFormat('fr-FR').format(
+                        formData.quantitePrevue * formData.prixUnitairePrevu
+                      )}
+                      disabled
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                    />
+                  </div>
+
+                  {/* Mode édition uniquement: Réalisé */}
+                  {mode === 'edit' && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Quantité réalisée
+                        </label>
+                        <input
+                          type="number"
+                          name="quantiteRealisee"
+                          value={formData.quantiteRealisee}
+                          onChange={handleChange}
+                          min="0"
+                          step="0.01"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Prix unitaire réel (FCFA)
+                        </label>
+                        <input
+                          type="number"
+                          name="prixUnitaireReel"
+                          value={formData.prixUnitaireReel}
+                          onChange={handleChange}
+                          min="0"
+                          step="0.01"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Section: Statut et Avancement (mode édition) */}
+              {mode === 'edit' && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-4">
+                    Statut et Avancement
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Statut */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Statut *
+                      </label>
+                      <select
+                        name="statut"
+                        value={formData.statut}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        {Object.entries(tacheStatusLabels).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Avancement */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Avancement (%)
+                      </label>
+                      <input
+                        type="number"
+                        name="pourcentageAvancement"
+                        value={formData.pourcentageAvancement}
+                        onChange={handleChange}
+                        min="0"
+                        max="100"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Section: Dates */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">
+                  Planning
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Date de début
+                    </label>
+                    <input
+                      type="date"
+                      name="dateDebut"
+                      value={formData.dateDebut}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Date de fin prévue
+                    </label>
+                    <input
+                      type="date"
+                      name="dateFinPrevue"
+                      value={formData.dateFinPrevue}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  {mode === 'edit' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Date de fin réelle
+                      </label>
+                      <input
+                        type="date"
+                        name="dateFinReelle"
+                        value={formData.dateFinReelle}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Section: Responsable */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">
+                  Responsable
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Type de responsable
+                    </label>
+                    <select
+                      name="typeResponsable"
+                      value={formData.typeResponsable}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="Interne">Interne</option>
+                      <option value="SousTraitant">Sous-traitant</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      ID Responsable
+                    </label>
+                    <input
+                      type="number"
+                      name="responsableId"
+                      value={formData.responsableId || ''}
+                      onChange={handleChange}
+                      min="1"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Optionnel"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={loading}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                    Enregistrement...
+                  </span>
+                ) : (
+                  mode === 'create' ? 'Créer la tâche' : 'Enregistrer'
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -2,14 +2,14 @@
 
 import { useRouter } from "next/navigation"
 import { use, useState, useEffect } from "react"
-import { 
-  ArrowLeft, 
-  FileText, 
-  FileSpreadsheet, 
-  Briefcase, 
-  Edit, 
-  Link2, 
-  BarChart3, 
+import {
+  ArrowLeft,
+  FileText,
+  FileSpreadsheet,
+  Briefcase,
+  Edit,
+  Link2,
+  BarChart3,
   Loader2,
   CheckCircle2
 } from "lucide-react"
@@ -23,12 +23,12 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { ConvertToProjectModal } from "@/components/dqe/convert-to-project-modal"
 import { useDqe, useDqeExport } from "@/hooks/useDqe"
-import { 
+import {
   type DQE,
-  formatCurrency, 
+  formatCurrency,
   formatDate,
   formatDateTime,
-  DQE_STATUT_LABELS, 
+  DQE_STATUT_LABELS,
   DQE_STATUT_COLORS,
   isDQEConvertible,
   isDQEEditable,
@@ -44,7 +44,7 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
   // Hooks
   const { fetchDQEById, validateDQE, loading } = useDqe()
   const { exportExcel, exportPDF, loading: exportLoading } = useDqeExport()
-  
+
   const [dqe, setDqe] = useState<DQE | null>(null)
   const [loadingDQE, setLoadingDQE] = useState(true)
 
@@ -56,7 +56,7 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
       setDqe(data)
       setLoadingDQE(false)
     }
-    
+
     loadDQE()
   }, [dqeId, fetchDQEById])
 
@@ -91,6 +91,21 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
 
   const tva = dqe.totalRevenueHT * (dqe.tauxTVA / 100)
   const totalTTC = dqe.totalRevenueHT + tva
+  
+  // Calcul du total des déboursés secs pour tous les lots
+  const totalDeboursseSec = dqe.lots?.reduce((lotTotal: number, lot: any) => {
+    const chapterTotal = lot.chapters?.reduce((chapterSum: number, chapter: any) => {
+      const itemsTotal = chapter.items?.reduce((itemSum: number, item: any) => {
+        return itemSum + (item.deboursseSec || 0);
+      }, 0) || 0;
+      return chapterSum + itemsTotal;
+    }, 0) || 0;
+    return lotTotal + chapterTotal;
+  }, 0) || 0
+  
+  // Calcul de la marge bénéficiaire globale
+  const margeBeneficiaire = dqe.totalRevenueHT - totalDeboursseSec
+  
   const conversionStatus = getConversionStatus(dqe)
 
   const handleConvertToProject = () => {
@@ -121,11 +136,11 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
   const handleProjectConversion = async (projectData: any) => {
     console.log("Converting DQE to project:", projectData)
     setShowConvertModal(false)
-    
+
     // Recharger le DQE pour voir le statut "converti"
     const updatedDQE = await fetchDQEById(dqeId)
     setDqe(updatedDQE)
-    
+
     // Rediriger vers le projet créé
     if (projectData.projetId) {
       router.push(`/projets/${projectData.projetId}`)
@@ -138,10 +153,10 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="space-y-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => router.push("/dqe")} 
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push("/dqe")}
               className="mb-2"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -222,9 +237,9 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
                   Ce DQE est validé et prêt à être converti en projet
                 </p>
                 <div className="flex gap-2 flex-wrap">
-                  <Button 
-                    size="sm" 
-                    onClick={handleConvertToProject} 
+                  <Button
+                    size="sm"
+                    onClick={handleConvertToProject}
                     className="bg-emerald-600 hover:bg-emerald-700"
                   >
                     <Briefcase className="h-4 w-4 mr-2" />
@@ -236,9 +251,9 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
                       Éditer
                     </Button>
                   )}
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
+                  <Button
+                    size="sm"
+                    variant="outline"
                     onClick={handleExportPDF}
                     disabled={exportLoading}
                   >
@@ -285,6 +300,14 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
                 <p className="font-medium text-lg">{formatCurrency(dqe.totalRevenueHT)}</p>
               </div>
               <div>
+                <p className="text-sm text-muted-foreground">Débourssé séc Total</p>
+                <p className="font-medium text-lg">{formatCurrency(totalDeboursseSec)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Marge bénéficiaire globale</p>
+                <p className="font-medium text-lg text-emerald-600">{formatCurrency(margeBeneficiaire)}</p>
+              </div>
+              <div>
                 <p className="text-sm text-muted-foreground">TVA ({dqe.tauxTVA}%)</p>
                 <p className="font-medium text-lg">{formatCurrency(tva)}</p>
               </div>
@@ -313,9 +336,21 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
                           <Separator orientation="vertical" className="h-6" />
                           <span className="font-semibold">{lot.nom}</span>
                         </div>
-                        <span className="text-sm font-medium text-primary">
-                          {formatCurrency(lot.totalRevenueHT)}
-                        </span>
+                        <div className="flex flex-col items-end text-sm">
+                          <span className="font-medium text-primary">
+                            {formatCurrency(lot.totalRevenueHT)}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            Déboursés secs: {formatCurrency(
+                              lot.chapters?.reduce((chapterTotal: number, chapter: any) => {
+                                const itemsTotal = chapter.items?.reduce((itemTotal: number, item: any) => {
+                                  return itemTotal + (item.deboursseSec || 0);
+                                }, 0) || 0;
+                                return chapterTotal + itemsTotal;
+                              }, 0) || 0
+                            )}
+                          </span>
+                        </div>
                       </div>
                     </AccordionTrigger>
                     <AccordionContent>
@@ -346,6 +381,7 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
                                     <p className="font-semibold text-sm whitespace-nowrap">
                                       {formatCurrency(item.totalRevenueHT)}
                                     </p>
+                                    
                                   </div>
                                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                     <span className="font-medium">{item.unite}</span>
@@ -357,7 +393,12 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
                                     <span className="font-medium">
                                       {formatCurrency(item.totalRevenueHT)}
                                     </span>
-                                  </div>
+                                    <span>déboursé sec:</span>
+                                    <span>{formatCurrency(item.deboursseSec)}</span>
+                                    <span>Marge brute:</span>
+                                    <span className={item.deboursseSec > 0 ? "text-green-600" : "text-red-600"}>
+                                      {item.deboursseSec > 0 ? formatCurrency(item.totalRevenueHT - item.deboursseSec ) : "Veuillez renseigner le débourssé sec"}
+                                    </span>                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -403,8 +444,8 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
 
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-3 pb-6">
-          <Button 
-            onClick={handleExportPDF} 
+          <Button
+            onClick={handleExportPDF}
             variant="outline"
             disabled={exportLoading}
           >
@@ -415,8 +456,8 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
             )}
             Exporter PDF
           </Button>
-          <Button 
-            onClick={handleExportExcel} 
+          <Button
+            onClick={handleExportExcel}
             variant="outline"
             disabled={exportLoading}
           >
@@ -434,8 +475,8 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
             </Button>
           )}
           {isDQEConvertible(dqe) && (
-            <Button 
-              onClick={handleConvertToProject} 
+            <Button
+              onClick={handleConvertToProject}
               className="bg-emerald-600 hover:bg-emerald-700"
             >
               <Briefcase className="h-4 w-4 mr-2" />

@@ -20,9 +20,6 @@ import {
   type DQEItem,
   type CreateDQERequest,
   type UpdateDQERequest,
-  type CreateDQELotRequest,
-  type CreateDQEChapterRequest,
-  type CreateDQEItemRequest,
   type UniteMesure
 } from "@/types/dqe"
 
@@ -57,12 +54,12 @@ export function DQEFormModal({ open, onOpenChange, onSubmit, editData }: DQEForm
         try {
           // ✅ Charger le DQE complet avec toute sa structure
           const fullDQE = await fetchDQEById(editData.id)
-          
+          console.log('editData:',editData)
           if (fullDQE) {
             setFormData({
               nom: fullDQE.nom,
               description: fullDQE.description || "",
-              clientId: fullDQE.clientId,
+              clientId: fullDQE.client?.id,
               statut: fullDQE.statut,
               lots: fullDQE.lots || [],
             })
@@ -102,7 +99,7 @@ export function DQEFormModal({ open, onOpenChange, onSubmit, editData }: DQEForm
         description: formData.description,
         clientId: formData.clientId,
         tauxTVA: tauxTVA,
-        statut:formData.statut,
+        statut:formData?.statut,
         lots: formData.lots?.map((lot, lotIndex) => ({
           code: lot.code,
           nom: lot.nom,
@@ -120,6 +117,7 @@ export function DQEFormModal({ open, onOpenChange, onSubmit, editData }: DQEForm
               unite: item.unite,
               quantite: item.quantite,
               prixUnitaireHT: item.prixUnitaireHT,
+              deboursseSec: item.deboursseSec,
               ordre: itemIndex + 1,
             })) || [],
           })) || [],
@@ -131,6 +129,7 @@ export function DQEFormModal({ open, onOpenChange, onSubmit, editData }: DQEForm
         console.log('Debug update dqe start data: ',dqeData)
         const success = await updateDQE(editData.id, dqeData as UpdateDQERequest)
         if (success) {
+        
           onSubmit(formData)
           onOpenChange(false)
         }
@@ -216,6 +215,7 @@ export function DQEFormModal({ open, onOpenChange, onSubmit, editData }: DQEForm
       quantite: 0,
       prixUnitaireHT: 0,
       totalRevenueHT: 0,
+      deboursseSec:0,
       ordre: (updatedLots[lotIndex].chapters![chapterIndex].items?.length || 0) + 1,
     }
     updatedLots[lotIndex].chapters![chapterIndex].items = [
@@ -254,7 +254,9 @@ export function DQEFormModal({ open, onOpenChange, onSubmit, editData }: DQEForm
     }
     setFormData({ ...formData, lots: updatedLots })
   }
-
+useEffect(()=>{
+console.log('formData:',formData)
+},[formData])
   // Calcul des totaux
   const calculateTotals = () => {
     let totalHT = 0
@@ -318,12 +320,16 @@ export function DQEFormModal({ open, onOpenChange, onSubmit, editData }: DQEForm
               <div className="space-y-2">
                 <Label htmlFor="client">Client *</Label>
                 <Select
-                  value={formData.clientId?.toString()}
+                  value={formData.clientId?.toString() || undefined}
                   onValueChange={(value) => setFormData({ ...formData, clientId: parseInt(value) })}
                   disabled={loadingClients}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder={loadingClients ? "Chargement..." : "Sélectionner un client"} />
+                    <SelectValue placeholder={loadingClients ? "Chargement..." : "Sélectionner un client"}>
+                      {formData.clientId && clients.length > 0
+                        ? clients.find((c) => c.id === formData.clientId)?.nom || "Sélectionner un client"
+                        : "Sélectionner un client"}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {clients.map((client) => (
@@ -511,7 +517,7 @@ export function DQEFormModal({ open, onOpenChange, onSubmit, editData }: DQEForm
                                               )
                                             }
                                           >
-                                            <SelectTrigger className="text-xs col-span-2">
+                                            <SelectTrigger className="text-xs col-span-1">
                                               <SelectValue placeholder="Unité" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -535,7 +541,7 @@ export function DQEFormModal({ open, onOpenChange, onSubmit, editData }: DQEForm
                                               )
                                             }
                                             placeholder="Qté"
-                                            className="text-xs col-span-2"
+                                            className="text-xs col-span-1"
                                           />
                                           <Input
                                             type="number"
@@ -550,6 +556,21 @@ export function DQEFormModal({ open, onOpenChange, onSubmit, editData }: DQEForm
                                               )
                                             }
                                             placeholder="PU HT"
+                                            className="text-xs col-span-2"
+                                          />
+                                           <Input
+                                            type="number"
+                                            value={item.deboursseSec}
+                                            onChange={(e) =>
+                                              updateItem(
+                                                lotIndex,
+                                                chapterIndex,
+                                                itemIndex,
+                                                "deboursseSec",
+                                                Number(e.target.value),
+                                              )
+                                            }
+                                            placeholder="déboursé sec"
                                             className="text-xs col-span-2"
                                           />
                                           <Button

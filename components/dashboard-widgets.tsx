@@ -49,14 +49,14 @@ const {canAccessDashboard}=usePermissions();
             color: "text-blue-600",
           },
           {
-            title: "Devis en attente",
+            title: "Objectif annuel",
             value: "8",
             change: "-2",
             icon: FileText,
             color: "text-orange-600",
           },
           {
-            title: "Sous-traitants",
+            title: "Solde des comptes",
             value: "15",
             change: "+1",
             icon: Users,

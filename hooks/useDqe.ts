@@ -1,7 +1,7 @@
 // hooks/useDqe.ts
 
 import { useState, useEffect, useCallback } from 'react';
-import { toast } from 'sonner'; // ou votre système de toast
+import { toast } from 'sonner';
 import DQEService from '@/services/dqeService';
 import {
   DQE,
@@ -52,7 +52,7 @@ export const useDqe = () => {
   }, []);
 
   /**
-   * Récupère un DQE par ID
+   * Récupère un DQE par ID avec structure complète
    */
   const fetchDQEById = useCallback(async (id: number): Promise<DQE | null> => {
     setLoading(true);
@@ -106,7 +106,7 @@ export const useDqe = () => {
   const updateDQE = useCallback(async (id: number, dqeData: UpdateDQERequest): Promise<boolean> => {
     setLoading(true);
     setError(null);
-    console.log('Requette arrive au service ? oui')
+    
     try { 
       const response = await DQEService.updateDQE(id, dqeData);
       toast.success(response.message || 'DQE mis à jour avec succès');
@@ -126,7 +126,7 @@ export const useDqe = () => {
   }, [fetchDQE]);
 
   /**
-   * Supprime un DQE
+   * Supprime un DQE (soft delete)
    */
   const deleteDQE = useCallback(async (id: number): Promise<boolean> => {
     setLoading(true);
@@ -190,6 +190,7 @@ export const useDqe = () => {
 
 /**
  * Hook pour la conversion DQE → Projet
+ * Version améliorée avec gestion d'erreurs robuste
  */
 export const useDqeConversion = () => {
   const [loading, setLoading] = useState(false);
@@ -207,7 +208,7 @@ export const useDqeConversion = () => {
       const response = await DQEService.canConvert(id);
       
       if (!response.canConvert) {
-        toast.warning(response.reason);
+        toast.warning(response.reason || 'Ce DQE ne peut pas être converti');
       }
       
       return response.canConvert;
@@ -234,9 +235,10 @@ export const useDqeConversion = () => {
     try {
       const data = await DQEService.getConversionPreview(id, request);
       setPreview(data);
+      toast.success('Prévisualisation générée avec succès');
       return data;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la prévisualisation';
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la génération de la prévisualisation';
       setError(errorMessage);
       toast.error(errorMessage);
       return null;
@@ -260,7 +262,7 @@ export const useDqeConversion = () => {
       toast.success(response.message || 'DQE converti en projet avec succès');
       return response.projetId;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la conversion';
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la conversion du DQE';
       setError(errorMessage);
       toast.error(errorMessage);
       return null;
@@ -289,7 +291,7 @@ export const useDqeConversion = () => {
 };
 
 /**
- * Hook pour les DQE filtrés
+ * Hook pour les DQE filtrés par statut
  */
 export const useDqeFiltered = () => {
   const [convertedDQE, setConvertedDQE] = useState<DQE[]>([]);
@@ -311,7 +313,7 @@ export const useDqeFiltered = () => {
       setConvertedDQE(data);
       return data;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la récupération';
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la récupération des DQE convertis';
       setError(errorMessage);
       toast.error(errorMessage);
       return [];
@@ -321,7 +323,7 @@ export const useDqeFiltered = () => {
   }, []);
 
   /**
-   * Récupère les DQE convertibles
+   * Récupère les DQE convertibles (validés et non convertis)
    */
   const fetchConvertibleDQE = useCallback(async () => {
     setLoading(true);
@@ -332,7 +334,7 @@ export const useDqeFiltered = () => {
       setConvertibleDQE(data);
       return data;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la récupération';
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la récupération des DQE convertibles';
       setError(errorMessage);
       toast.error(errorMessage);
       return [];
@@ -353,7 +355,7 @@ export const useDqeFiltered = () => {
       setBrouillonDQE(data);
       return data;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la récupération';
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la récupération des brouillons';
       setError(errorMessage);
       toast.error(errorMessage);
       return [];
@@ -374,7 +376,7 @@ export const useDqeFiltered = () => {
       setValideDQE(data);
       return data;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la récupération';
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la récupération des DQE validés';
       setError(errorMessage);
       toast.error(errorMessage);
       return [];
