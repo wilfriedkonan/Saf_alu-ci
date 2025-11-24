@@ -78,7 +78,15 @@ export function ProjectTimeline({ projet, onUpdate }: ProjectTimelineProps) {
   const stages = etapes.length > 0 ? etapes : (projet.etapes || [])
 
   // Trier les étapes par ordre
-  const sortedStages = [...stages].sort((a, b) => a.ordre - b.ordre)
+  const sortedStages = [...stages]
+
+  const getNiveauProgress = (niveau: ProjectStage["niveau"]) => {
+    if (niveau === undefined || niveau === null) return 0
+    const niveauStages = sortedStages.filter((stage) => stage.niveau === niveau)
+    if (niveauStages.length === 0) return 0
+    const total = niveauStages.reduce((sum, stage) => sum + (stage.pourcentageAvancement || 0), 0)
+    return total / niveauStages.length
+  }
 
   if (loading && stages.length === 0) {
     return (
@@ -89,7 +97,7 @@ export function ProjectTimeline({ projet, onUpdate }: ProjectTimelineProps) {
       </Card>
     )
   }
-
+  let linkedStageCounter = 0
   return (
     <>
       <Card>
@@ -112,16 +120,18 @@ export function ProjectTimeline({ projet, onUpdate }: ProjectTimelineProps) {
             </div>
           ) : (
             <div className="space-y-4">
-              {sortedStages.map((stage, index) => (
-                <div key={stage.id} className="relative">
-                  {/* Timeline line */}
+              {sortedStages.map((stage, index) => {
+                const linkedOrder = stage.linkedDqeLotName ? null : ++linkedStageCounter
+                return (
+                  <div key={stage.id} className="relative">
+                    {/* Timeline line */}
                   {index < sortedStages.length - 1 && (
                     <div className="absolute left-6 top-12 w-0.5 h-16 bg-border" />
                   )}
 
-                  <div
-                    className={`flex items-start space-x-4 p-4 rounded-lg border cursor-pointer hover:shadow-md transition-all ${getStageColor(stage)}`}
-                    onClick={() => handleStageClick(stage)}
+                    <div
+                      className={`flex items-start space-x-4 p-4 rounded-lg border cursor-pointer hover:shadow-md transition-all ${getStageColor(stage)}`}
+                      onClick={linkedOrder !== null ? () => handleStageClick(stage) : undefined}
                   >
                     <div className="flex-shrink-0 mt-1">{getStageIcon(stage)}</div>
 
@@ -129,12 +139,17 @@ export function ProjectTimeline({ projet, onUpdate }: ProjectTimelineProps) {
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <h4 className="font-medium text-sm">{stage.nom}</h4>
-                          <Badge variant="outline" className="text-xs">
-                            Étape {index+1}
-                          </Badge>
+                          {linkedOrder !== null && (
+                            <Badge variant="outline" className="text-xs">
+                              Étape {linkedOrder}
+                            </Badge>
+                          )}
                         </div>
                         <Badge variant="outline" className="text-xs">
-                          {stage.pourcentageAvancement}%
+                          {stage.linkedDqeLotName
+                            ? getNiveauProgress(stage.niveau)
+                            : stage.pourcentageAvancement}
+                          %
                         </Badge>
                       </div>
 
@@ -143,10 +158,17 @@ export function ProjectTimeline({ projet, onUpdate }: ProjectTimelineProps) {
                       )}
 
                       <div className="space-y-2">
-                        <Progress value={stage.pourcentageAvancement} className="h-2" />
+                        <Progress
+                          value={
+                            stage.linkedDqeLotName
+                              ? getNiveauProgress(stage.niveau)
+                              : stage.pourcentageAvancement
+                          }
+                          className="h-2"
+                        />
 
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <div className="flex items-center gap-4">
+                          {linkedOrder !== null && <div className="flex items-center gap-4">
                             {stage.typeResponsable && (
                               <span>
                                 Type: {stage.typeResponsable === "Interne" ? "👨‍💼 Interne" : "🏢 Sous-traitant"}
@@ -163,8 +185,8 @@ export function ProjectTimeline({ projet, onUpdate }: ProjectTimelineProps) {
                               {getStageStatusLabel(stage.statut)}
                             </Badge>
 
-                          </div>
-                          <span>
+                          </div>}
+                          {linkedOrder !== null && <span>
                             {stage.dateDebut && stage.dateFinPrevue ? (
                               <>
                                 {new Date(stage.dateDebut).toLocaleDateString("fr-FR")} -{" "}
@@ -173,11 +195,11 @@ export function ProjectTimeline({ projet, onUpdate }: ProjectTimelineProps) {
                             ) : (
                               "Dates non définies"
                             )}
-                          </span>
+                          </span>}
                         </div>
 
                         {/* Budget de l'étape */}
-                        <div className="flex items-center justify-between text-xs">
+                        {linkedOrder !== null &&   <div className="flex items-center justify-between text-xs">
                           <span className="text-muted-foreground">
                             Budget: {new Intl.NumberFormat("fr-FR", {
                               style: "currency",
@@ -208,7 +230,7 @@ export function ProjectTimeline({ projet, onUpdate }: ProjectTimelineProps) {
                               minimumFractionDigits: 0,
                             }).format(stage.depense)}
                           </span>
-                        </div>
+                        </div>}
 
                         {/* Lien DQE si présent */}
                         {stage.linkedDqeLotCode && (
@@ -246,12 +268,13 @@ export function ProjectTimeline({ projet, onUpdate }: ProjectTimelineProps) {
                       </div>
                     </div>
 
-                    <Button variant="ghost" size="sm" className="flex-shrink-0">
+                    {linkedOrder !== null && <Button variant="ghost" size="sm" className="flex-shrink-0">
                       Détails
-                    </Button>
+                    </Button>}
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </CardContent>

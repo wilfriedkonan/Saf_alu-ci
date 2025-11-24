@@ -28,7 +28,6 @@ export function LoginForm() {
 
     try {
       const result = await login(email, password)
-      
       if (result.success) {
         // Connexion réussie, rediriger vers le dashboard
         router.push("/dashboard")

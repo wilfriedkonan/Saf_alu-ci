@@ -13,30 +13,31 @@ export default function DashboardPage() {
   const { user, logout } = useAuth() 
   const { canAccessDashboard } = usePermissions()
 
-  useEffect(() => {
-    const currentUser = getStoredUser()
-    if (!currentUser) {
-      router.push("/")
-    } /* else {
-      setUser(currentUser)
-    } */
-  }, [router])
+  // Vérification des permissions
+  useEffect(() => {      console.log('debug User:',user,'canAccessDashboard:',canAccessDashboard)
 
-  if (!user) {
-    return null
-  }
+    /* if (!user || !canAccessDashboard) {
+      router.push("/")
+      return
+    } */
+  }, [user, router, canAccessDashboard])
+
+ // Vérification des permissions avant rendu
+/*  if (!user || !canAccessDashboard) {
+  return null
+} */
 
   return (
     <DashboardLayout>
-      {canAccessDashboard() &&<div className="space-y-6">
+      <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Tableau de bord</h1>
           <p className="text-muted-foreground">
-            Bienvenue, {user.Prenom} {user.Nom} - {[user.Role?.Nom as UserRole]}
+          Bienvenue, {user?.Prenom} {user?.Nom} - {[user?.Role?.Nom as UserRole]}
           </p>
         </div>
-        <DashboardWidgets user={user} />
-      </div>}
+{        <DashboardWidgets user={user} />
+}      </div>
     </DashboardLayout>
   )
 }

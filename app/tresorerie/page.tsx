@@ -1,17 +1,17 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import {
-  Plus,
-  Download,
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  CreditCard,
   AlertTriangle,
-  Calendar,
+  CreditCard,
+  DollarSign,
+  Download,
+  Plus,
+  RefreshCw,
   Search,
-  Trash2,
+  TrendingDown,
+  TrendingUp,
 } from "lucide-react"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
@@ -19,73 +19,292 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { CashFlowChart } from "@/components/treasury/cash-flow-chart"
-import { ExpenseBreakdown } from "@/components/treasury/expense-breakdown"
-import { RecentTransactions } from "@/components/treasury/recent-transactions"
-import { TransactionFormModal } from "@/components/treasury/transaction-form-modal"
-import { useRouter } from "next/navigation"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuth, usePermissions } from "@/contexts/AuthContext"
+import {
+  useMouvementsList,
+  useTresorerie,
+  useTresorerieStatistiques,
+} from "@/hooks/useTresorerie"
+import {
+  categoriesMouvementList,
+  calculateSoldeTotal,
+  formatCurrency,
+  formatDate,
+  isSoldeFaible,
+  isSoldeNegatif,
+  typeMouvementColors,
+  typeMouvementLabels,
+  typesMouvementList,
+  TypeCompte,
+  TypeMouvement,
+} from "@/types/tresorerie"
+import { TransactionFormModal } from "@/components/treasury/transaction-form-modal"
+import { CreateCompteRequest } from "@/types/tresorerie"
+import { useToast } from "@/components/ui/use-toast"
+import { ExpenseBreakdown } from "@/components/treasury/expense-breakdown"
+import { CashFlowChart } from "@/components/treasury/cash-flow-chart"
+import { RecentTransactions } from "@/components/treasury/recent-transactions"
 
-// Mock treasury data
-const mockTreasuryData = {
-  totalBalance: 125000,
-  monthlyIncome: 45000,
-  monthlyExpenses: 32000,
-  pendingPayments: 18000,
-  accounts: [
-    { id: 1, name: "Compte Principal", bank: "BNP Paribas", balance: 85000, type: "courant" },
-    { id: 2, name: "Compte Épargne", bank: "Crédit Agricole", balance: 40000, type: "epargne" },
-  ],
-  alerts: [
-    { id: 1, type: "warning", message: "Facture client ABC en retard de 15 jours", amount: 5500 },
-    { id: 2, type: "info", message: "Paiement fournisseur prévu demain", amount: 3200 },
-  ],
+type PeriodFilter = "week" | "month" | "quarter" | "year"
+
+const initialCompteForm = {
+  nom: "",
+  banque: "",
+  numero: "",
+  typeCompte: "Courant" as TypeCompte,
+  soldeInitial: "",
 }
 
 export default function TreasuryPage() {
-  const { user } = useAuth();
-  const { canManageTresorerie } = usePermissions();
   const router = useRouter()
-  const [selectedPeriod, setSelectedPeriod] = useState("month")
+  const { user } = useAuth()
+  const { canManageTresorerie } = usePermissions()
+  const { toast } = useToast()
+
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>("month")
+  const [selectedCompteId, setSelectedCompteId] = useState<string>("all")
+  const [selectedType, setSelectedType] = useState<"all" | TypeMouvement>("all")
+  const [selectedCategorie, setSelectedCategorie] = useState<string>("all")
+  const [searchTerm, setSearchTerm] = useState("")
   const [showAddTransaction, setShowAddTransaction] = useState(false)
   const [showAddAccount, setShowAddAccount] = useState(false)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [accounts, setAccounts] = useState(mockTreasuryData.accounts)
-  const [alerts, setAlerts] = useState(mockTreasuryData.alerts)
+  const [compteForm, setCompteForm] = useState(initialCompteForm)
+  const [reportRange, setReportRange] = useState(() => {
+    const end = new Date()
+    const start = new Date()
+    start.setMonth(start.getMonth() - 1)
+    return {
+      dateDebut: start.toISOString().slice(0, 10),
+      dateFin: end.toISOString().slice(0, 10),
+    }
+  })
 
+  const {
+    comptes: comptesData = [],
+    loadingComptes,
+    errorComptes,
+    refreshComptes,
+    createCompte,
+    loadingCompteActions,
+    exporterRapportPDF,
+    exporterRapportExcel,
+    loadingRapport,
+    errorRapport,
+  } = useTresorerie()
+
+  const comptes = Array.isArray(comptesData) ? comptesData : []
+
+  const statsParams = useMemo(() => {
+    if (!reportRange.dateDebut || !reportRange.dateFin) {
+      return undefined
+    }
+    return {
+      dateDebut: new Date(reportRange.dateDebut).toISOString(),
+      dateFin: new Date(reportRange.dateFin).toISOString(),
+    }
+  }, [reportRange])
+
+  const {
+    stats,
+    loading: loadingStats,
+    error: statsError,
+    refreshStats,
+  } = useTresorerieStatistiques(statsParams)
+
+  const mouvementParams = useMemo(() => {
+    const end = new Date()
+    const start = new Date(end)
+
+    switch (selectedPeriod) {
+      case "week":
+        start.setDate(end.getDate() - 7)
+        break
+      case "quarter":
+        start.setMonth(end.getMonth() - 3)
+        break
+      case "year":
+        start.setFullYear(end.getFullYear() - 1)
+        break
+      default:
+        start.setMonth(end.getMonth() - 1)
+    }
+
+    const params: {
+      compteId?: number
+      typeMouvement?: string
+      categorie?: string
+      dateDebut: string
+      dateFin: string
+    } = {
+      dateDebut: start.toISOString(),
+      dateFin: end.toISOString(),
+    }
+
+    if (selectedCompteId && selectedCompteId !== "all") {
+      params.compteId = Number(selectedCompteId)
+      console.log("Compte envoyé =", params.compteId);
+    }else {
+      console.log("Aucun compte filtré");
+    }
+    if (selectedType !== "all") {
+      params.typeMouvement = selectedType
+    }
+    if (selectedCategorie !== "all") {
+      params.categorie = selectedCategorie
+    }
+
+    return params
+  }, [selectedPeriod, selectedCompteId, selectedType, selectedCategorie])
+
+  const {
+    mouvements,
+    loading: loadingMouvements,
+    error: mouvementsError,
+    refreshMouvements,
+  } = useMouvementsList(mouvementParams)
 
   useEffect(() => {
-    if (!user || !canManageTresorerie) {
-      router.push("/dashboard")
+    if (user && !canManageTresorerie) {
+      router.replace("/dashboard")
+    }
+  }, [user, canManageTresorerie, router])
+
+  const comptesMap = useMemo(() => {
+    return new Map(comptes.map((compte) => [compte.id, compte]))
+  }, [comptes])
+
+  const totalSolde = useMemo(() => {
+    if (stats?.soldeTotal !== undefined) {
+      return stats.soldeTotal
+    }
+    return calculateSoldeTotal(comptes)
+  }, [stats, comptes])
+
+  const mouvementsList = Array.isArray(mouvements) ? mouvements : []
+
+  const displayedMouvements = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+    return mouvementsList
+      .filter((mouvement) => {
+        if (!normalizedSearch) return true
+        const haystack = `${mouvement.libelle} ${mouvement.description ?? ""} ${mouvement.categorie ?? ""}`.toLowerCase()
+        return haystack.includes(normalizedSearch)
+      })
+      .sort((a, b) => new Date(b.dateMouvement).getTime() - new Date(a.dateMouvement).getTime())
+      .slice(0, 10)
+  }, [mouvementsList, searchTerm])
+
+  const compteAlerts = useMemo(() => {
+    return comptes.flatMap((compte) => {
+      const alerts: { niveau: "Critique" | "Attention"; message: string; valeur: number }[] = []
+      if (isSoldeNegatif(compte)) {
+        alerts.push({
+          niveau: "Critique",
+          message: `Le compte ${compte.nom} est en négatif`,
+          valeur: compte.soldeActuel,
+        })
+      } else if (isSoldeFaible(compte)) {
+        alerts.push({
+          niveau: "Attention",
+          message: `Le compte ${compte.nom} a un solde faible`,
+          valeur: compte.soldeActuel,
+        })
+      }
+      return alerts
+    })
+  }, [comptes])
+
+  const handleCreateAccount = useCallback(async (event: React.FormEvent) => {
+    event.preventDefault()
+
+    const soldeInitial = Number(compteForm.soldeInitial)
+    if (isNaN(soldeInitial) || soldeInitial < 0) {
+      toast({
+        title: "Solde invalide",
+        description: "Le solde initial doit être un nombre positif.",
+        variant: "destructive",
+      })
       return
     }
-  }, [user, router]
-  )
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("fr-FR", {
-      style: "currency",
-      currency: "EUR",
-    }).format(amount)
-  }
-
-  const cashFlowTrend = mockTreasuryData.monthlyIncome - mockTreasuryData.monthlyExpenses
-
-  const handleCreateTransaction = (transactionData: any) => {
-    // Refresh data logic would go here
-  }
-
-  const handleDeleteAccount = (accountId: number) => {
-    if (confirm("Êtes-vous sûr de vouloir supprimer ce compte ?")) {
-      setAccounts(accounts.filter((account) => account.id !== accountId))
+    const payload: CreateCompteRequest = {
+      nom: compteForm.nom.trim(),
+      typeCompte: compteForm.typeCompte,
+      banque: compteForm.banque.trim() || undefined,
+      numero: compteForm.numero.trim() || undefined,
+      soldeInitial,
     }
-  }
 
-  const handleDeleteAlert = (alertId: number) => {
-    setAlerts(alerts.filter((alert) => alert.id !== alertId))
-  }
+    try {
+      const response = await createCompte(payload)
+      if (response?.success) {
+        toast({
+          title: "Compte créé",
+          description: `Le compte ${payload.nom} a été créé avec succès.`,
+        })
+        setShowAddAccount(false)
+        setCompteForm(initialCompteForm)
+        refreshComptes()
+        refreshStats()
+      } else {
+        throw new Error(response?.message || "Erreur lors de la création")
+      }
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de créer le compte",
+        variant: "destructive",
+      })
+    }
+  }, [compteForm, createCompte, toast, refreshComptes, refreshStats])
+
+  const handleRefresh = useCallback(() => {
+    refreshComptes()
+    refreshMouvements()
+    refreshStats()
+  }, [refreshComptes, refreshMouvements, refreshStats])
+
+  const handleExportPDF = useCallback(async () => {
+    try {
+      await exporterRapportPDF({
+        dateDebut: reportRange.dateDebut,
+        dateFin: reportRange.dateFin,
+      })
+      toast({
+        title: "Export réussi",
+        description: "Le rapport PDF a été téléchargé avec succès.",
+      })
+    } catch (error) {
+      toast({
+        title: "Erreur d'export",
+        description: error instanceof Error ? error.message : "Impossible d'exporter le rapport",
+        variant: "destructive",
+      })
+    }
+  }, [reportRange, exporterRapportPDF, toast])
+
+  const handleExportExcel = useCallback(async () => {
+    try {
+      await exporterRapportExcel({
+        dateDebut: reportRange.dateDebut,
+        dateFin: reportRange.dateFin,
+      })
+      toast({
+        title: "Export réussi",
+        description: "Le rapport Excel a été téléchargé avec succès.",
+      })
+    } catch (error) {
+      toast({
+        title: "Erreur d'export",
+        description: error instanceof Error ? error.message : "Impossible d'exporter le rapport",
+        variant: "destructive",
+      })
+    }
+  }, [reportRange, exporterRapportExcel, toast])
 
   if (!user || !canManageTresorerie) {
     return null
@@ -95,272 +314,357 @@ export default function TreasuryPage() {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Trésorerie</h1>
-            <p className="text-gray-600">Suivi financier et gestion des flux de trésorerie</p>
+            <h1 className="text-3xl font-bold">Trésorerie</h1>
+            <p className="text-muted-foreground">Gérez vos comptes et mouvements financiers</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowAddTransaction(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Transaction
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loadingComptes || loadingMouvements}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${(loadingComptes || loadingMouvements) ? 'animate-spin' : ''}`} />
+              Actualiser
             </Button>
-            <Button>
-              <Download className="h-4 w-4 mr-2" />
-              Exporter
+            <Button size="sm" onClick={() => setShowAddTransaction(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nouvelle transaction
             </Button>
           </div>
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Solde Total</CardTitle>
-              <DollarSign className="h-4 w-4 text-gray-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-900">{formatCurrency(mockTreasuryData.totalBalance)}</div>
-              <p className="text-xs text-gray-500">Tous comptes confondus</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Recettes du mois</CardTitle>
-              <TrendingUp className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{formatCurrency(mockTreasuryData.monthlyIncome)}</div>
-              <p className="text-xs text-gray-500">+12% vs mois dernier</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Dépenses du mois</CardTitle>
-              <TrendingDown className="h-4 w-4 text-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{formatCurrency(mockTreasuryData.monthlyExpenses)}</div>
-              <p className="text-xs text-gray-500">-5% vs mois dernier</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Flux net</CardTitle>
-              <CreditCard className="h-4 w-4 text-gray-400" />
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${cashFlowTrend >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {formatCurrency(cashFlowTrend)}
-              </div>
-              <p className="text-xs text-gray-500">Ce mois-ci</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Alerts */}
-        {alerts.length > 0 && (
-          <Card className="border-orange-200 bg-orange-50">
-            <CardHeader>
-              <CardTitle className="text-orange-800 flex items-center">
-                <AlertTriangle className="h-5 w-5 mr-2" />
-                Alertes financières
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {alerts.map((alert) => (
-                  <div key={alert.id} className="flex justify-between items-center p-2 bg-white rounded border">
-                    <span className="text-sm text-gray-700">{alert.message}</span>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={alert.type === "warning" ? "destructive" : "default"}>
-                        {formatCurrency(alert.amount)}
-                      </Badge>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteAlert(alert.id)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1 h-auto"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
+        {/* Alertes */}
+        {compteAlerts.length > 0 && (
+          <Alert variant={compteAlerts.some((a) => a.niveau === "Critique") ? "destructive" : "default"}>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <div className="space-y-1">
+                {compteAlerts.map((alert, index) => (
+                  <div key={index}>
+                    <span className="font-semibold">{alert.niveau}:</span> {alert.message} ({formatCurrency(alert.valeur)})
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </AlertDescription>
+          </Alert>
         )}
 
-        {/* Charts and Analytics */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* KPIs */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Évolution de trésorerie</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Solde total</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <CashFlowChart />
+              <div className="text-2xl font-bold">{formatCurrency(totalSolde)}</div>
+              <p className="text-xs text-muted-foreground">{comptes.length} compte(s) actif(s)</p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Répartition des dépenses</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Entrées du mois</CardTitle>
+              <TrendingUp className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <ExpenseBreakdown />
+              <div className="text-2xl font-bold text-green-600">
+                {loadingStats ? "..." : formatCurrency(stats?.entreesMois || 0)}
+              </div>
+              <p className="text-xs text-muted-foreground">Depuis le début du mois</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Sorties du mois</CardTitle>
+              <TrendingDown className="h-4 w-4 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">
+                {loadingStats ? "..." : formatCurrency(stats?.sortiesMois || 0)}
+              </div>
+              <p className="text-xs text-muted-foreground">Depuis le début du mois</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Résultat net</CardTitle>
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${(stats?.beneficeMois || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {loadingStats ? "..." : formatCurrency(stats?.beneficeMois || 0)}
+              </div>
+              <p className="text-xs text-muted-foreground">Bénéfice du mois</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Bank Accounts */}
+        {/* Graphiques */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <CashFlowChart dateDebut={reportRange.dateDebut} dateFin={reportRange.dateFin} />
+          <ExpenseBreakdown dateDebut={reportRange.dateDebut} dateFin={reportRange.dateFin} />
+        </div>
+
+        {/* Transactions récentes et Rapports */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Mouvements récents</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Select value={selectedPeriod} onValueChange={(value: PeriodFilter) => setSelectedPeriod(value)}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="week">7 derniers jours</SelectItem>
+                      <SelectItem value="month">30 derniers jours</SelectItem>
+                      <SelectItem value="quarter">3 derniers mois</SelectItem>
+                      <SelectItem value="year">12 derniers mois</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher un mouvement..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Select
+                  value={selectedCompteId}
+                  onValueChange={(value) => setSelectedCompteId(value)}
+                >                  
+                <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Compte" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les comptes</SelectItem>
+                    {comptes.map((compte) => (
+                      <SelectItem
+                        key={compte.id}
+                        value={compte.id?.toString()}>
+                        {compte.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={selectedType} onValueChange={(value: "all" | TypeMouvement) => setSelectedType(value)}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les types</SelectItem>
+                    {typesMouvementList.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {typeMouvementLabels[type]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={selectedCategorie} onValueChange={setSelectedCategorie}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Catégorie" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Toutes les catégories</SelectItem>
+                    {categoriesMouvementList.map((categorie) => (
+                      <SelectItem key={categorie} value={categorie}>
+                        {categorie}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <RecentTransactions
+                mouvements={displayedMouvements}
+                searchTerm={searchTerm}
+                loading={loadingMouvements}
+                error={mouvementsError}
+                comptesMap={comptesMap}
+              />
+            </CardContent>
+          </Card>
+
+          <Card className="h-fit">
+            <CardHeader>
+              <CardTitle>Rapports</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Période de rapport</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Input
+                      type="date"
+                      value={reportRange.dateDebut}
+                      onChange={(e) => setReportRange((prev) => ({ ...prev, dateDebut: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Input
+                      type="date"
+                      value={reportRange.dateFin}
+                      onChange={(e) => setReportRange((prev) => ({ ...prev, dateFin: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleExportPDF}
+                  disabled={loadingRapport}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Exporter en PDF
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleExportExcel}
+                  disabled={loadingRapport}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Exporter en Excel
+                </Button>
+              </div>
+
+              {errorRapport && (
+                <Alert variant="destructive">
+                  <AlertDescription>{errorRapport}</AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Comptes bancaires */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Comptes bancaires</CardTitle>
-            <Dialog open={showAddAccount} onOpenChange={setShowAddAccount}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Ajouter un compte
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Ajouter un compte bancaire</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="accountName">Nom du compte</Label>
-                    <Input id="accountName" placeholder="Compte Principal" />
-                  </div>
-                  <div>
-                    <Label htmlFor="bankName">Banque</Label>
-                    <Input id="bankName" placeholder="BNP Paribas" />
-                  </div>
-                  <div>
-                    <Label htmlFor="accountType">Type de compte</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner le type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="courant">Compte courant</SelectItem>
-                        <SelectItem value="epargne">Compte épargne</SelectItem>
-                        <SelectItem value="professionnel">Compte professionnel</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="initialBalance">Solde initial</Label>
-                    <Input id="initialBalance" type="number" placeholder="0.00" />
-                  </div>
-                  <Button className="w-full">Ajouter le compte</Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <Button variant="outline" size="sm" onClick={() => setShowAddAccount(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Ajouter un compte
+            </Button>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {accounts.map((account) => (
-                <div key={account.id} className="flex justify-between items-center p-4 border rounded-lg">
+          <CardContent className="space-y-4">
+            {loadingComptes && (
+              <p className="text-sm text-muted-foreground">Chargement des comptes...</p>
+            )}
+            {comptes.length === 0 && !loadingComptes ? (
+              <div className="rounded border border-dashed p-6 text-center text-sm text-muted-foreground">
+                Aucun compte enregistré pour le moment.
+              </div>
+            ) : (
+              comptes.map((compte) => (
+                <div key={compte.id} className="flex flex-col justify-between gap-4 rounded border p-4 md:flex-row md:items-center">
                   <div>
-                    <h4 className="font-medium text-gray-900">{account.name}</h4>
-                    <p className="text-sm text-gray-500">{account.bank}</p>
-                    <Badge variant="outline" className="mt-1">
-                      {account.type === "courant" ? "Courant" : "Épargne"}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <div className="text-lg font-semibold text-gray-900">{formatCurrency(account.balance)}</div>
+                    <div className="flex items-center gap-3">
+                      <p className="text-lg font-semibold text-gray-900">{compte.nom}</p>
+                      <Badge variant={compte.actif ? "default" : "secondary"}>{compte.actif ? "Actif" : "Inactif"}</Badge>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDeleteAccount(account.id)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <p className="text-sm text-muted-foreground">{compte.banque || "Banque non renseignée"}</p>
+                    <div className="mt-2 flex flex-wrap gap-2 text-sm text-muted-foreground">
+                      <Badge variant="outline">{compte.typeCompte}</Badge>
+                      {compte.numero && <span>#{compte.numero}</span>}
+                      <span>Créé le {formatDate(compte.dateCreation)}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Solde actuel</p>
+                    <p className="text-2xl font-bold text-gray-900">{formatCurrency(compte.soldeActuel)}</p>
+                    <p className="text-xs text-muted-foreground">Solde initial: {formatCurrency(compte.soldeInitial)}</p>
                   </div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Recent Transactions */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Transactions récentes</CardTitle>
-            <div className="flex gap-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Rechercher..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-64"
-                />
-              </div>
-              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                <SelectTrigger className="w-32">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="week">7 jours</SelectItem>
-                  <SelectItem value="month">30 jours</SelectItem>
-                  <SelectItem value="quarter">3 mois</SelectItem>
-                  <SelectItem value="year">1 an</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <RecentTransactions searchTerm={searchTerm} period={selectedPeriod} />
-          </CardContent>
-        </Card>
-
-        {/* Cash Flow Forecast */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Prévisions de trésorerie</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center p-4 border rounded-lg">
-                <div className="text-sm text-gray-500">Mois prochain</div>
-                <div className="text-xl font-semibold text-green-600">
-                  {formatCurrency(mockTreasuryData.totalBalance + cashFlowTrend)}
-                </div>
-              </div>
-              <div className="text-center p-4 border rounded-lg">
-                <div className="text-sm text-gray-500">Dans 2 mois</div>
-                <div className="text-xl font-semibold text-green-600">
-                  {formatCurrency(mockTreasuryData.totalBalance + cashFlowTrend * 2)}
-                </div>
-              </div>
-              <div className="text-center p-4 border rounded-lg">
-                <div className="text-sm text-gray-500">Dans 3 mois</div>
-                <div className="text-xl font-semibold text-green-600">
-                  {formatCurrency(mockTreasuryData.totalBalance + cashFlowTrend * 3)}
-                </div>
-              </div>
-            </div>
+              ))
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Transaction Form Modal */}
+      {/* Modal Nouvelle transaction */}
       <TransactionFormModal
         isOpen={showAddTransaction}
         onClose={() => setShowAddTransaction(false)}
-        onSubmit={handleCreateTransaction}
+        onSuccess={() => {
+          refreshMouvements()
+          refreshComptes()
+          refreshStats()
+        }}
+        comptes={comptes}
+        loadingComptes={loadingComptes}
+        errorComptes={errorComptes}
       />
+
+      {/* Modal Nouveau compte */}
+      <Dialog open={showAddAccount} onOpenChange={setShowAddAccount}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ajouter un compte</DialogTitle>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={handleCreateAccount}>
+            <div className="space-y-2">
+              <Label>Nom du compte</Label>
+              <Input value={compteForm.nom} onChange={(event) => setCompteForm((prev) => ({ ...prev, nom: event.target.value }))} required />
+            </div>
+            <div className="space-y-2">
+              <Label>Banque</Label>
+              <Input value={compteForm.banque} onChange={(event) => setCompteForm((prev) => ({ ...prev, banque: event.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Numéro de compte</Label>
+              <Input value={compteForm.numero} onChange={(event) => setCompteForm((prev) => ({ ...prev, numero: event.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Type de compte</Label>
+              <Select
+                value={compteForm.typeCompte}
+                onValueChange={(value: TypeCompte) => setCompteForm((prev) => ({ ...prev, typeCompte: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Choisir un type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Courant">Courant</SelectItem>
+                  <SelectItem value="Epargne">Épargne</SelectItem>
+                  <SelectItem value="Caisse">Caisse</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Solde initial (XOF)</Label>
+              <Input
+                type="number"
+                min="0"
+                step="1"
+                value={compteForm.soldeInitial}
+                onChange={(event) => setCompteForm((prev) => ({ ...prev, soldeInitial: event.target.value }))}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setShowAddAccount(false)}>
+                Annuler
+              </Button>
+              <Button type="submit" disabled={loadingCompteActions}>
+                {loadingCompteActions && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
+                Créer le compte
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   )
 }

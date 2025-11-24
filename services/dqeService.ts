@@ -37,7 +37,7 @@ const apiClient = axios.create({
 // Intercepteur pour ajouter le token d'authentification
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem('safalu_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -54,7 +54,7 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Token expiré ou invalide
-      localStorage.removeItem('authToken');
+      localStorage.removeItem('safalu_token');
       window.location.href = '/';
     }
     return Promise.reject(error);

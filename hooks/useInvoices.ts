@@ -182,7 +182,7 @@ export function useInvoices(autoLoad: boolean = false): UseInvoicesResult {
     setLoading(true)
     setError(null)
     
-    try {
+    try { console.log('Debug UseService update:',data)
       await InvoiceService.updateInvoice(id, data)
       
       // Recharger la facture mise à jour

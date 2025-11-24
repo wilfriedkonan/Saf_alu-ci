@@ -55,6 +55,7 @@ export const getStoredToken = () => {
 export const setStoredToken = (token: string) => {
   if (typeof window === 'undefined') return;
   localStorage.setItem('safalu_token', token);
+  console.log('Token stocké:', localStorage.getItem('safalu_token'));
 };
 
 export const removeStoredToken = () => {

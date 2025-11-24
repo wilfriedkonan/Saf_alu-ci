@@ -95,7 +95,9 @@ export default function ProjectDetailPage() {
     if (total === 0) return 0
     return Math.round((actual / total) * 100)
   }
-
+  const totalDepenses = projet ? projet.etapes
+  ?.reduce((sum, etape) => sum + (etape.depense || 0), 0) : 0;
+  
   // États de chargement et permissions
   if (!user || !canManageProjects) {
     return null
@@ -185,8 +187,12 @@ export default function ProjectDetailPage() {
               <p className="text-xs text-muted-foreground">
                 Coût réel: {formatCurrency(projet.coutReel)} 
              </p>
-                Dépensé: {formatCurrency(projet.depenseGlobale)} (
-                {calculateBudgetPercentage(projet.depenseGlobale, projet.coutReel)}%)
+             <p className="text-xs text-muted-foreground">
+    Dépensé : {formatCurrency(totalDepenses??0)}
+    {" "}(
+      {calculateBudgetPercentage(totalDepenses??0, projet.coutReel)}%
+    )
+  </p>
               <p className="text-xs text-muted-foreground">
                 Marge: {formatCurrency(projet.budgetInitial-projet.coutReel)}
               </p>

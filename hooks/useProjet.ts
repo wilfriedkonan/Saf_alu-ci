@@ -22,6 +22,8 @@ export const useProjetsList = () => {
       setLoading(true);
       setError(null);
       const data = await ProjetService.getAllProjets();
+
+      
       setProjets(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors du chargement des projets');

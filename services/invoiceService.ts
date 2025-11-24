@@ -9,11 +9,9 @@ import type {
     CreateLigneFactureRequest,
     CreateEcheancierRequest,
     MarquerPayeRequest,
+    FactureStatut,
+    FactureType,
   } from "@/types/invoices"
-  
-  // Types pour les statuts et types de factures
-  type FactureStatut = "Brouillon" | "Envoyee" | "Payee" | "EnRetard" | "Annulee";
-  type FactureType = "Devis" | "SousTraitant" | "Avoir" | "Acompte";
   
   // DTOs pour l'API - Utilisation des types de types/invoices.ts
   interface UpdateFactureRequest {
@@ -25,6 +23,7 @@ import type {
     referenceClient?: string
     lignes?: CreateLigneFactureRequest[]
     echeanciers?: CreateEcheancierRequest[]
+    statut?: FactureStatut
   }
   
   interface FactureStats {
@@ -62,7 +61,7 @@ import type {
   // Intercepteur pour ajouter le token d'authentification
   apiClient.interceptors.request.use(
     (config) => {
-      const token = localStorage.getItem('authToken');
+      const token = localStorage.getItem('safalu_token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -79,7 +78,7 @@ import type {
     (error) => {
       if (error.response?.status === 401) {
         // Token expiré ou invalide
-        localStorage.removeItem('authToken');
+        localStorage.removeItem('safalu_token');
         window.location.href = '/';
       }
       return Promise.reject(error);
@@ -181,7 +180,7 @@ import type {
      * Met à jour une facture (uniquement si statut = brouillon)
      */
     static async updateInvoice(id: number, data: UpdateFactureRequest): Promise<ApiResponse<void>> {
-      try {
+      try {console.log('Debug Service update:',data) 
         const response: AxiosResponse<ApiResponse<void>> = await apiClient.put(`/factures/${id}`, data);
         return response.data;
       } catch (error) {

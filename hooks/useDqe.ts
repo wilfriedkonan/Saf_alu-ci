@@ -160,13 +160,15 @@ export const useDqe = () => {
     try {
       const response = await DQEService.validateDQE(id);
       toast.success(response.message || 'DQE validé avec succès');
-      
+      console.log('Validation oui?:', response)
       // Rafraîchir la liste
       await fetchDQE();
       
       return true;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la validation du DQE';
+      console.log('Validation erreur?:', errorMessage)
+
       setError(errorMessage);
       toast.error(errorMessage);
       return false;

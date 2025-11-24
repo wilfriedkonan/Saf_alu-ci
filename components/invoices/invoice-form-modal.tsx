@@ -17,7 +17,8 @@ import { CalendarIcon, Check, ChevronsUpDown, Loader2, Plus, Trash2, UserPlus } 
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 import { cn } from "@/lib/utils"
-import type { InvoiceType, LigneFacture, Echeancier, Facture } from "@/types/invoices"
+import type { InvoiceType, LigneFacture, Echeancier, Facture, InvoiceStatus } from "@/types/invoices"
+import { invoiceStatusLabels } from "@/types/invoices"
 
 import type { CreateFactureRequest } from "@/types/invoices"
 import { useClientActions, useClientsList } from "@/hooks/useClients"
@@ -26,10 +27,14 @@ import { Client } from "@/types/clients"
 import { ClientFormModal } from "@/components/clients/client-form-modal"
 import { toast } from "../ui/use-toast"
 
+type InvoiceFormPayload = CreateFactureRequest & {
+  statut?: InvoiceStatus
+}
+
 interface InvoiceFormModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (invoice: CreateFactureRequest) => void
+  onSubmit: (invoice: InvoiceFormPayload) => void
   facture?: Facture // Pour l'édition
   loading?: boolean
 }
@@ -61,6 +66,7 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit, facture, loading=f
   const [clientSearchOpen, setClientSearchOpen] = useState(false)
   const [isClientModalOpen, setIsClientModalOpen] = useState(false)
   const [dueDate, setDueDate] = useState<Date>()
+  const [invoiceStatus, setInvoiceStatus] = useState<InvoiceStatus>("Brouillon")
 
   //hook presonnalisé 
   const { clients, loading: clientLoading, error: clientError, refreshCliens } = useClientsList();
@@ -117,6 +123,7 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit, facture, loading=f
           })))
           
         }
+        setInvoiceStatus(facture.statut || facture.status || "Brouillon")
       } else {
         // Mode création - formulaire vide
         setFormData({
@@ -134,6 +141,7 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit, facture, loading=f
         })
         setItems([{  id: 1, factureId: 1, ordre: 1, designation: "", description: "", quantite: 1, unite: "unité", prixUnitaireHT: 0, totalHT: 0 }]),
         setPaymentSchedule([{id: 1, factureId: 1, ordre: 1, description: "Paiement unique", montantTTC: 0, dateEcheance: "", statut: "EnAttente"}])
+        setInvoiceStatus("Brouillon")
       }
     }
   }, [isOpen, isEdit, facture])
@@ -234,7 +242,7 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit, facture, loading=f
     e.preventDefault()
 
     // Format des données selon l'API
-    const invoiceData = {
+    const invoiceData: InvoiceFormPayload = {
       typeFacture: formData.type,
       clientId: formData.clientId || undefined,
       sousTraitantId: undefined,
@@ -259,9 +267,13 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit, facture, loading=f
         dateEcheance: payment.dateEcheance ? new Date(payment.dateEcheance).toISOString() : new Date().toISOString()
       }))
     }
+    if (isEdit) {
+      invoiceData.statut = invoiceStatus
+    }
 
     onSubmit(invoiceData)
-    onClose()
+console.log('submit:',invoiceData,' est en modification ?:',isEdit)
+   // onClose()
   }
 
   return (
@@ -328,6 +340,26 @@ export function InvoiceFormModal({ isOpen, onClose, onSubmit, facture, loading=f
                         </PopoverContent>
                       </Popover>
                     </div>
+                    {isEdit && (
+                      <div>
+                        <Label htmlFor="invoiceStatus">Statut</Label>
+                        <Select
+                          value={invoiceStatus}
+                          onValueChange={(value) => setInvoiceStatus(value as InvoiceStatus)}
+                        >
+                          <SelectTrigger id="invoiceStatus">
+                            <SelectValue placeholder="Choisir un statut" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(invoiceStatusLabels).map(([statusKey, label]) => (
+                              <SelectItem key={statusKey} value={statusKey as InvoiceStatus}>
+                                {label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
 
                   <div>

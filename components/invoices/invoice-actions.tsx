@@ -105,7 +105,7 @@ export function InvoiceActions({ invoice, onUpdate, onEdit }: InvoiceActionsProp
     }
   }
 
-  const canSend = invoice.status === "Brouillon"
+  const canSend = invoice.status === "Brouillon" 
   const canMarkPaid =
     invoice.status === "Envoyee" || invoice.status === "en_retard" || invoice.status === "payee"
   const canSendReminder =

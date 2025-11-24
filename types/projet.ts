@@ -1,5 +1,5 @@
 // ============================================
-// INTERFACES PRINCIPALES
+// INTERFACES PRINCIPALES - VERSION HIÉRARCHIQUE
 // ============================================
 
 export interface Project {
@@ -23,7 +23,7 @@ export interface Project {
   villeChantier?: string
   pourcentageAvancement: number
   chefProjetId?: number
-  soustaitantId? :number
+  soustaitantId?: number
   dateCreation: string
   dateModification: string
   utilisateurCreation: number
@@ -66,29 +66,59 @@ export interface ProjectStage {
   nom: string
   description?: string
   ordre: number
+  
+  // 🆕 HIÉRARCHIE
+  etapeParentId?: number | null
+  niveau: number // 1 = Lot, 2 = Item
+  typeEtape: "Lot" | "Item"
+  
+  // Dates
   dateDebut?: string
   dateFinPrevue?: string
   dateFinReelle?: string
+  
+  // Statut
   statut: StageStatus
   pourcentageAvancement: number
+  
+  // Budget
   budgetPrevu: number
   coutReel: number
-  depense : number
+  depense: number
+  
+  // 🆕 QUANTITÉS (pour Items)
+  unite?: string | null
+  quantitePrevue?: number | null
+  quantiteRealisee?: number | null
+  prixUnitairePrevu?: number | null
+  
+  // Responsable
   responsableId?: number
   typeResponsable: ResponsableType
   idSousTraitant?: number
-  // DQE lot linking properties
-  linkedDqeLotId?: number
-  linkedDqeLotCode?: string
-  linkedDqeLotName?: string
-  linkedDqeReference?: string
-
   
-  // Propriétés optionnelles pour l'UI (non dans le modèle C#)
+  // Traçabilité DQE complète
+  linkedDqeLotId?: number | null
+  linkedDqeLotCode?: string | null
+  linkedDqeLotName?: string | null
+  linkedDqeItemId?: number | null // 🆕
+  linkedDqeItemCode?: string | null // 🆕
+  linkedDqeChapterId?: number | null // 🆕
+  linkedDqeChapterCode?: string | null // 🆕
+  linkedDqeReference?: string | null
+  
+  // 🆕 Navigation hiérarchique
+  sousEtapes?: ProjectStage[]
+  
+  // Métadonnées
+  estActif?: boolean
+  dateCreation?: string
+  dateModification?: string
+  
+  // Propriétés optionnelles pour l'UI
   evaluation?: StageEvaluation
-  // ✅ CORRECTION: Type boolean au lieu de number
-  estActif?: boolean 
-
+  
+  // Navigation properties
   responsable?: {
     id: number
     prenom: string
@@ -101,7 +131,19 @@ export interface ProjectStage {
     telephone?: string
     noteMoyenne: number
   }
+}
 
+// 🆕 Statistiques des sous-étapes
+export interface StatistiquesSousEtapes {
+  nombreTotal: number
+  nombreNonCommencees: number
+  nombreEnCours: number
+  nombreTerminees: number
+  avancementMoyen: number
+  budgetTotal: number
+  coutTotal: number
+  ecartBudgetTotal: number
+  ecartBudgetPourcentage: number
 }
 
 export interface StageEvaluation {
@@ -124,9 +166,8 @@ export interface CreateProjetRequest {
   nom: string
   description?: string
   clientId: number
-  typeProjetId?: number  // Optionnel pour éviter erreur Foreign Key
+  typeProjetId?: number
   devisId?: number
-  // ✅ CORRECTION: Date peut être Date ou string (ISO format)
   dateDebut?: Date | string
   dateFinPrevue?: Date | string
   budgetInitial: number
@@ -135,7 +176,7 @@ export interface CreateProjetRequest {
   villeChantier?: string
   chefProjetId?: number
   etapes?: CreateEtapeProjetRequest[]
-  statut?:string
+  statut?: string
   
   // DQE conversion properties
   linkedDqeId?: number
@@ -149,17 +190,43 @@ export interface CreateEtapeProjetRequest {
   id?: number
   nom: string
   description?: string
+  ordre?: number
+  
+  // 🆕 Hiérarchie
+  etapeParentId?: number | null
+  niveau?: number // 1 = Lot, 2 = Item
+  typeEtape?: "Lot" | "Item"
+  
+  // Dates
   dateDebut?: Date | string
   dateFinPrevue?: Date | string
+  
+  // Budget
   budgetPrevu: number
-  coutReel?: number  // Ajouté car utilisé dans le formulaire
-  statut?: StageStatus  // Ajouté car utilisé dans le formulaire
-  idSousTraitant?: number 
-  // DQE lot linking properties
+  coutReel?: number
+  
+  // 🆕 Quantités (pour Items)
+  unite?: string
+  quantitePrevue?: number
+  prixUnitairePrevu?: number
+  
+  // Statut
+  statut?: StageStatus
+  
+  // Responsable
+  idSousTraitant?: number
+  typeResponsable?: ResponsableType
+  
+  // Traçabilité DQE
   linkedDqeLotId?: number
   linkedDqeLotCode?: string
   linkedDqeLotName?: string
+  linkedDqeItemId?: number // 🆕
+  linkedDqeItemCode?: string // 🆕
+  linkedDqeChapterId?: number // 🆕
+  linkedDqeChapterCode?: string // 🆕
   linkedDqeReference?: string
+  
   estActif?: boolean
 }
 
@@ -167,6 +234,22 @@ export interface UpdateAvancementRequest {
   pourcentageAvancement: number
   note?: number
   commentaire?: string
+}
+
+// 🆕 Request pour mettre à jour une sous-étape
+export interface UpdateSousEtapeRequest {
+  nom?: string
+  description?: string
+  statut?: StageStatus
+  pourcentageAvancement?: number
+  quantiteRealisee?: number
+  coutReel?: number
+  depense?: number
+  dateDebut?: Date | string
+  dateFinPrevue?: Date | string
+  dateFinReelle?: Date | string
+  responsableId?: number
+  idSousTraitant?: number
 }
 
 // ============================================
@@ -206,6 +289,10 @@ export type ResponsableType = "Interne" | "SousTraitant"
 export type DocumentType = "plan" | "photo" | "contrat" | "facture" | "autre"
 export type OfferStatus = "en_attente" | "acceptee" | "refusee" | "en_negociation"
 
+// 🆕 Type pour identifier le niveau hiérarchique
+export type NiveauEtape = 1 | 2 // 1 = Lot, 2 = Item
+export type TypeEtape = "Lot" | "Item"
+
 // ============================================
 // LABELS ET COULEURS
 // ============================================
@@ -240,6 +327,17 @@ export const stageStatusColors: Record<StageStatus, string> = {
   Suspendu: "bg-yellow-100 text-yellow-800",
 }
 
+// 🆕 Labels pour les types d'étapes
+export const typeEtapeLabels: Record<TypeEtape, string> = {
+  Lot: "Lot (Étape principale)",
+  Item: "Item (Sous-étape)",
+}
+
+export const typeEtapeIcons: Record<TypeEtape, string> = {
+  Lot: "📦",
+  Item: "✓",
+}
+
 // ============================================
 // FONCTIONS UTILITAIRES
 // ============================================
@@ -271,6 +369,66 @@ export const getProjectsByStatus = (statut: ProjectStatus): Project[] => {
 }
 
 /**
+ * 🆕 Filtre uniquement les étapes principales (Niveau 1 - Lots)
+ */
+export const getMainStages = (stages: ProjectStage[]): ProjectStage[] => {
+  return stages.filter(stage => stage.niveau === 1)
+}
+
+/**
+ * 🆕 Récupère les sous-étapes d'une étape principale
+ */
+export const getSubStages = (stages: ProjectStage[], parentId: number): ProjectStage[] => {
+  return stages
+    .filter(stage => stage.etapeParentId === parentId && stage.niveau === 2)
+    .sort((a, b) => a.ordre - b.ordre)
+}
+
+/**
+ * 🆕 Calcule les statistiques des sous-étapes d'une étape principale
+ */
+export const calculateSubStagesStats = (stages: ProjectStage[], parentId: number): StatistiquesSousEtapes | null => {
+  const subStages = getSubStages(stages, parentId)
+  
+  if (subStages.length === 0) return null
+
+  const total = subStages.length
+  const completed = subStages.filter(s => s.statut === "Termine").length
+  const inProgress = subStages.filter(s => s.statut === "EnCours").length
+  const notStarted = subStages.filter(s => s.statut === "NonCommence").length
+  const avgProgress = subStages.reduce((sum, s) => sum + s.pourcentageAvancement, 0) / total
+  const totalBudget = subStages.reduce((sum, s) => sum + s.budgetPrevu, 0)
+  const totalCost = subStages.reduce((sum, s) => sum + s.coutReel, 0)
+  const variance = totalBudget - totalCost
+
+  return {
+    nombreTotal: total,
+    nombreNonCommencees: notStarted,
+    nombreEnCours: inProgress,
+    nombreTerminees: completed,
+    avancementMoyen: Math.round(avgProgress),
+    budgetTotal: totalBudget,
+    coutTotal: totalCost,
+    ecartBudgetTotal: variance,
+    ecartBudgetPourcentage: totalBudget > 0 ? (variance / totalBudget) * 100 : 0
+  }
+}
+
+/**
+ * 🆕 Vérifie si une étape est une étape principale (Lot)
+ */
+export const isMainStage = (stage: ProjectStage): boolean => {
+  return stage.niveau === 1 && stage.typeEtape === "Lot"
+}
+
+/**
+ * 🆕 Vérifie si une étape est une sous-étape (Item)
+ */
+export const isSubStage = (stage: ProjectStage): boolean => {
+  return stage.niveau === 2 && stage.typeEtape === "Item"
+}
+
+/**
  * Met à jour le pourcentage d'avancement d'une étape
  */
 export const updateStageProgress = (
@@ -288,9 +446,14 @@ export const updateStageProgress = (
       } else if (pourcentageAvancement > 0) {
         stage.statut = "EnCours"
       }
-      // Update project overall progress
-      const totalProgress = project.etapes.reduce((sum, s) => sum + s.pourcentageAvancement, 0)
-      project.pourcentageAvancement = Math.round(totalProgress / project.etapes.length)
+      
+      // 🆕 Update project overall progress (uniquement depuis étapes principales)
+      const mainStages = getMainStages(project.etapes)
+      if (mainStages.length > 0) {
+        const totalProgress = mainStages.reduce((sum, s) => sum + s.pourcentageAvancement, 0)
+        project.pourcentageAvancement = Math.round(totalProgress / mainStages.length)
+      }
+      
       project.dateModification = new Date().toISOString()
       return true
     }
@@ -321,7 +484,7 @@ export const addStageEvaluation = (
 }
 
 // ============================================
-// ✅ NOUVELLES FONCTIONS UTILITAIRES POUR DATES
+// FONCTIONS UTILITAIRES POUR DATES
 // ============================================
 
 /**
@@ -339,4 +502,78 @@ export const formatDateForAPI = (date: Date | undefined): string | undefined => 
 export const parseDateFromAPI = (dateString: string | undefined): Date | undefined => {
   if (!dateString) return undefined
   return new Date(dateString)
+}
+
+// ============================================
+// 🆕 FONCTIONS UTILITAIRES POUR QUANTITÉS
+// ============================================
+
+/**
+ * Calcule l'écart de quantité (réalisée - prévue)
+ */
+export const calculateQuantityVariance = (stage: ProjectStage): number | null => {
+  if (!stage.quantiteRealisee || !stage.quantitePrevue) return null
+  return stage.quantiteRealisee - stage.quantitePrevue
+}
+
+/**
+ * Calcule le pourcentage d'écart de quantité
+ */
+export const calculateQuantityVariancePercentage = (stage: ProjectStage): number | null => {
+  if (!stage.quantiteRealisee || !stage.quantitePrevue || stage.quantitePrevue === 0) return null
+  const variance = stage.quantiteRealisee - stage.quantitePrevue
+  return (variance / stage.quantitePrevue) * 100
+}
+
+/**
+ * Calcule la quantité restante à réaliser
+ */
+export const calculateRemainingQuantity = (stage: ProjectStage): number | null => {
+  if (!stage.quantiteRealisee || !stage.quantitePrevue) return null
+  return Math.max(0, stage.quantitePrevue - stage.quantiteRealisee)
+}
+
+/**
+ * Formate une quantité avec son unité
+ */
+export const formatQuantity = (quantity: number | null | undefined, unit: string | null | undefined): string => {
+  if (!quantity || !unit) return "-"
+  return `${quantity.toLocaleString("fr-FR")} ${unit}`
+}
+
+// ============================================
+// 🆕 FONCTIONS UTILITAIRES POUR BUDGET
+// ============================================
+
+/**
+ * Calcule l'écart budgétaire (coût réel - budget prévu)
+ */
+export const calculateBudgetVariance = (stage: ProjectStage): number => {
+  return stage.coutReel - stage.budgetPrevu
+}
+
+/**
+ * Calcule le pourcentage d'écart budgétaire
+ */
+export const calculateBudgetVariancePercentage = (stage: ProjectStage): number => {
+  if (stage.budgetPrevu === 0) return 0
+  return ((stage.coutReel - stage.budgetPrevu) / stage.budgetPrevu) * 100
+}
+
+/**
+ * Vérifie si l'étape est en dépassement budgétaire
+ */
+export const isBudgetOverrun = (stage: ProjectStage): boolean => {
+  return stage.coutReel > stage.budgetPrevu
+}
+
+/**
+ * Formate un montant en devise locale (XOF)
+ */
+export const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: "XOF",
+    minimumFractionDigits: 0,
+  }).format(amount)
 }

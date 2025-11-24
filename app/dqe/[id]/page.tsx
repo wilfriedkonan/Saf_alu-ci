@@ -34,15 +34,21 @@ import {
   isDQEEditable,
   getConversionStatus,
 } from "@/types/dqe"
+import { toast } from "sonner"
+import DQEService from "@/services/dqeService"
+import axios from "axios"
+import { DQEFormModal } from "@/components/dqe/dqe-form-modal"
 
 export default function DQEDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
   const { id } = use(params)
   const dqeId = parseInt(id)
   const [showConvertModal, setShowConvertModal] = useState(false)
-
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editingDQE, setEditingDQE] = useState<DQE | null>(null)
+  
   // Hooks
-  const { fetchDQEById, validateDQE, loading } = useDqe()
+  const { fetchDQEById, validateDQE, fetchDQE,loading, error } = useDqe()
   const { exportExcel, exportPDF, loading: exportLoading } = useDqeExport()
 
   const [dqe, setDqe] = useState<DQE | null>(null)
@@ -112,16 +118,70 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
     setShowConvertModal(true)
   }
 
-  const handleEdit = () => {
-    router.push(`/dqe/${dqeId}/edit`)
+  const handleEdit = (dqe: DQE) => {
+    setEditingDQE(dqe)
+    setShowCreateModal(true)
   }
 
   const handleValidate = async () => {
     if (confirm("Êtes-vous sûr de vouloir valider ce DQE ?")) {
-      await validateDQE(dqeId)
-      // Recharger le DQE
-      const updatedDQE = await fetchDQEById(dqeId)
-      setDqe(updatedDQE)
+      try {
+        const response = await DQEService.validateDQE(dqeId)
+        toast.success(response.message || 'DQE validé avec succès')
+        // Recharger le DQE
+        const updatedDQE: DQE | null = await fetchDQEById(dqeId)
+        setDqe(updatedDQE)
+      } catch (err) {
+        // Afficher les erreurs de validation de l'API
+        let errorMessage = 'Erreur lors de la validation du DQE'
+        let errorDetails: string[] = []
+        
+        if (axios.isAxiosError(err) && err.response) {
+          const apiResponse = err.response.data
+          
+          // Récupérer le message principal
+          if (apiResponse?.message) {
+            errorMessage = apiResponse.message
+          } else if (typeof apiResponse === 'string') {
+            errorMessage = apiResponse
+          } else if (apiResponse?.title) {
+            errorMessage = apiResponse.title
+          }
+          
+          // Récupérer les erreurs de validation détaillées
+          if (apiResponse?.errors && Array.isArray(apiResponse.errors)) {
+            // Format: { errors: [{ field, message, code }] }
+            errorDetails = apiResponse.errors.map((errItem: any) => 
+              errItem.field ? `${errItem.field}: ${errItem.message || errItem}` : (errItem.message || errItem)
+            )
+          } else if (apiResponse?.validationErrors && typeof apiResponse.validationErrors === 'object') {
+            // Format: { validationErrors: { field: [messages] } }
+            errorDetails = Object.entries(apiResponse.validationErrors).flatMap(([field, messages]) => 
+              Array.isArray(messages) 
+                ? messages.map((msg: string) => `${field}: ${msg}`)
+                : [`${field}: ${messages}`]
+            )
+          } else if (apiResponse?.error) {
+            errorDetails = [typeof apiResponse.error === 'string' ? apiResponse.error : JSON.stringify(apiResponse.error)]
+          }
+        } else if (err instanceof Error) {
+          // L'erreur est déjà formatée par handleError du service
+          errorMessage = err.message
+        }
+        
+        // Afficher le message d'erreur avec les détails
+        let messageToShow = errorMessage || 'Une erreur est survenue lors de la validation'
+        
+        if (errorDetails.length > 0) {
+          // Plusieurs erreurs de validation - combiner tout en un message lisible
+          messageToShow = `${messageToShow}\n\n${errorDetails.map(d => `• ${d}`).join('\n')}`
+        }
+        
+        // Afficher le toast
+        toast.error(messageToShow, {
+          duration: 10000,
+        })
+      }
     }
   }
 
@@ -246,7 +306,7 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
                     Convertir en projet
                   </Button>
                   {isDQEEditable(dqe) && (
-                    <Button size="sm" variant="outline" onClick={handleEdit}>
+                    <Button size="sm" variant="outline" onClick={()=>handleEdit(dqe)}>
                       <Edit className="h-4 w-4 mr-2" />
                       Éditer
                     </Button>
@@ -484,7 +544,7 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
             </Button>
           )}
           {isDQEEditable(dqe) && (
-            <Button onClick={handleEdit} variant="outline">
+            <Button onClick={()=>handleEdit(dqe)} variant="outline">
               <Edit className="h-4 w-4 mr-2" />
               Éditer
             </Button>
@@ -501,6 +561,21 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
           onConvert={handleProjectConversion}
         />
       )}
+       {/* Modal de création/édition */}
+       <DQEFormModal
+        open={showCreateModal}
+        onOpenChange={(open) => {
+          setShowCreateModal(open)
+          if (!open) setEditingDQE(null)
+        }}
+        editData={editingDQE}
+        onSubmit={async (dqeData) => {
+          // La soumission sera gérée par le modal lui-même
+          setShowCreateModal(false)
+          setEditingDQE(null)
+          await fetchDQE()
+        }}
+      />
     </DashboardLayout>
   )
 }
