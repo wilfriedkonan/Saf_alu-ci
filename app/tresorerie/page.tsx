@@ -349,53 +349,106 @@ export default function TreasuryPage() {
 
         {/* KPIs */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Solde total</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+          {/* Solde Total Card with gradient */}
+          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-blue-100">Solde total</CardTitle>
+                <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
+                  <DollarSign className="h-5 w-5 text-white" />
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalSolde)}</div>
-              <p className="text-xs text-muted-foreground">{comptes.length} compte(s) actif(s)</p>
+              <div className="text-3xl font-bold mb-1">{formatCurrency(totalSolde)}</div>
+              <p className="text-sm text-blue-100">{comptes.length} compte(s) actif(s)</p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Entrées du mois</CardTitle>
-              <TrendingUp className="h-4 w-4 text-green-600" />
+          {/* Entrées Card with monthly and yearly data */}
+          <Card className="hover:shadow-md transition-shadow">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Entrées du mois</CardTitle>
+                <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                  <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-2">
                 {loadingStats ? "..." : formatCurrency(stats?.entreesMois || 0)}
               </div>
-              <p className="text-xs text-muted-foreground">Depuis le début du mois</p>
+              <p className="text-xs text-muted-foreground mb-3">Depuis le début du mois</p>
+
+              <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                <div className="text-lg font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                  {loadingStats ? "..." : formatCurrency(stats?.entreesAnnee || 0)}
+                </div>
+                <p className="text-xs text-muted-foreground">Depuis le début de l'année</p>
+              </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Sorties du mois</CardTitle>
-              <TrendingDown className="h-4 w-4 text-red-600" />
+          {/* Sorties Card with monthly and yearly data */}
+          <Card className="hover:shadow-md transition-shadow">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Sorties du mois</CardTitle>
+                <div className="h-10 w-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                  <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-600">
+              <div className="text-2xl font-bold text-red-600 dark:text-red-400 mb-2">
                 {loadingStats ? "..." : formatCurrency(stats?.sortiesMois || 0)}
               </div>
-              <p className="text-xs text-muted-foreground">Depuis le début du mois</p>
+              <p className="text-xs text-muted-foreground mb-3">Depuis le début du mois</p>
+
+              <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                <div className="text-lg font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                  {loadingStats ? "..." : formatCurrency(stats?.sortiesAnnee || 0)}
+                </div>
+                <p className="text-xs text-muted-foreground">Depuis le début de l'année</p>
+              </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Résultat net</CardTitle>
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
+          {/* Résultat Net Card with monthly and yearly data */}
+          <Card className="hover:shadow-md transition-shadow">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Résultat net</CardTitle>
+                <div className="h-10 w-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                  <CreditCard className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${(stats?.beneficeMois || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <div
+                className={`text-2xl font-bold mb-2 ${
+                  (stats?.beneficeMois || 0) >= 0
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-red-600 dark:text-red-400"
+                }`}
+              >
                 {loadingStats ? "..." : formatCurrency(stats?.beneficeMois || 0)}
               </div>
-              <p className="text-xs text-muted-foreground">Bénéfice du mois</p>
+              <p className="text-xs text-muted-foreground mb-3">Bénéfice du mois</p>
+
+              <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                <div
+                  className={`text-lg font-semibold mb-1 ${
+                    (stats?.beneficeAnnee || 0) >= 0
+                      ? "text-gray-600 dark:text-gray-300"
+                      : "text-red-600 dark:text-red-400"
+                  }`}
+                >
+                  {loadingStats ? "..." : formatCurrency(stats?.beneficeAnnee || 0)}
+                </div>
+                <p className="text-xs text-muted-foreground">Bénéfice de l'année</p>
+              </div>
             </CardContent>
           </Card>
         </div>

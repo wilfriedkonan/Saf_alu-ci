@@ -341,7 +341,7 @@ export default function ProjectsPage() {
                         <div>
                           <div className="font-medium">{formatCurrency(project.budgetInitial)}</div>
                           <div className="text-sm text-muted-foreground">
-                            Dépensé: {formatCurrency(project.coutReel)}
+                            Dépensé: {formatCurrency(project.depenseGlobale)}
                           </div>
                         </div>
                       </TableCell>

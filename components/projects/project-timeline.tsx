@@ -82,7 +82,7 @@ export function ProjectTimeline({ projet, onUpdate }: ProjectTimelineProps) {
 
   const getNiveauProgress = (niveau: ProjectStage["niveau"]) => {
     if (niveau === undefined || niveau === null) return 0
-    const niveauStages = sortedStages.filter((stage) => stage.niveau === niveau)
+    const niveauStages = sortedStages.filter((stage) => stage.niveau === niveau && !stage.linkedDqeLotName )
     if (niveauStages.length === 0) return 0
     const total = niveauStages.reduce((sum, stage) => sum + (stage.pourcentageAvancement || 0), 0)
     return total / niveauStages.length
@@ -112,7 +112,7 @@ export function ProjectTimeline({ projet, onUpdate }: ProjectTimelineProps) {
               <Button
                 variant="outline"
                 className="mt-4"
-                onClick={() => toast.info("Fonctionnalité d'ajout d'étape à venir")}
+                onClick={() => toast.info("Pour la fonctionnalité d'ajout rendez vous en modification")}
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Créer la première étape
@@ -171,8 +171,8 @@ export function ProjectTimeline({ projet, onUpdate }: ProjectTimelineProps) {
                           {linkedOrder !== null && <div className="flex items-center gap-4">
                             {stage.typeResponsable && (
                               <span>
-                                Type: {stage.typeResponsable === "Interne" ? "👨‍💼 Interne" : "🏢 Sous-traitant"}
-                                te
+                                Type: {stage.typeResponsable === "Interne" ? "👨‍💼 Interne " : "🏢 Sous-traitant"}
+                                
                               </span>
                             )}
                             <div>

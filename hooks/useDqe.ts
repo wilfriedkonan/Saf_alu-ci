@@ -78,7 +78,7 @@ export const useDqe = () => {
   /**
    * Crée un nouveau DQE
    */
-  const createDQE = useCallback(async (dqeData: CreateDQERequest): Promise<number | null> => {
+  const createDQE = useCallback(async (dqeData: CreateDQERequest): Promise<{ success: boolean; id?: number }> => {
     setLoading(true);
     setError(null);
     
@@ -89,12 +89,12 @@ export const useDqe = () => {
       // Rafraîchir la liste
       await fetchDQE();
       
-      return response.data?.id || null;
+      return { success: true, id: response.data?.id };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la création du DQE';
       setError(errorMessage);
       toast.error(errorMessage);
-      return null;
+      return { success: false };
     } finally {
       setLoading(false);
     }
@@ -273,6 +273,26 @@ export const useDqeConversion = () => {
     }
   }, []);
 
+  const linkToExistingProject = useCallback(async (
+    dqeId: number,
+    projetId: number
+  ): Promise<boolean> => {
+    setLoading(true);
+    setError(null);
+  
+    try {
+      const response = await DQEService.linkToExistingProject(dqeId, projetId);
+      toast.success(response.message || 'DQE lié au projet avec succès');
+      return true;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la liaison du DQE au projet';
+      setError(errorMessage);
+      toast.error(errorMessage);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
   /**
    * Réinitialise la prévisualisation
    */
@@ -288,6 +308,7 @@ export const useDqeConversion = () => {
     checkCanConvert,
     generatePreview,
     convertToProject,
+    linkToExistingProject, 
     resetPreview,
   };
 };

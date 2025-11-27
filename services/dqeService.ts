@@ -22,6 +22,7 @@ import {
   ConversionSuccessResponse,
   DQESearchParams,
   DQEStatut,
+  APIResponse,
 } from '@/types/dqe';
 
 // Configuration axios
@@ -228,7 +229,17 @@ export class DQEService {
       throw this.handleError(error);
     }
   }
-
+  static async linkToExistingProject(dqeId: number, projetId: number): Promise<APIResponse<any>> {
+    try {
+      const response = await apiClient.post<APIResponse<any>>(
+        `/DQE/${dqeId}/link-to-project/${projetId}`
+      );
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+  
   // ========================================
   // FILTRES SPÉCIALISÉS
   // ========================================

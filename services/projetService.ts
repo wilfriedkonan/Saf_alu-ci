@@ -330,7 +330,17 @@ export class ProjetService {
       throw this.handleError(error);
     }
   }
-
+  static async getAvailableProjectsForLinking(): Promise<Project[]> {
+    try {
+      console.log("Récupération des projets disponibles pour liaison DQE");
+      const response: AxiosResponse<Project[]> = await apiClient.get('/Projets/available-for-linking');
+      console.log('Projets disponibles:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la récupération des projets disponibles:', error);
+      throw this.handleError(error);
+    }
+  }
   /**
    * Récupère tous les types de projets
    */
@@ -439,5 +449,6 @@ export const useProjetService = () => {
     getStatistiquesProjets: ProjetService.getStatistiquesProjets,
     getTypesProjets: ProjetService.getTypesProjets,
     exporterProjetPDF: ProjetService.exporterProjetPDF,
+    getAvailableProjectsForLinking: ProjetService.getAvailableProjectsForLinking, // ✅ AJOUTER ICI
   };
 };

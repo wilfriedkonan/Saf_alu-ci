@@ -10,6 +10,7 @@ import {
   ProjectStatus,
   TypeProjet
 } from '@/types/projet';
+import { toast } from 'sonner';
 
 // Hook pour gérer la liste des projets
 export const useProjetsList = () => {
@@ -506,6 +507,74 @@ export const useTypesProjets = () => {
     refreshTypes
   };
 };
+
+/**
+ * Hook pour la gestion des projets disponibles pour liaison DQE
+ */
+export const useProjetForDqeLinking = () => {
+  const [projets, setProjets] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Récupère les projets disponibles pour être liés à un DQE
+   */
+  const getAvailableProjects = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const data = await ProjetService.getAvailableProjectsForLinking();
+      setProjets(data);
+      return data;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la récupération des projets';
+      setError(errorMessage);
+      toast.error(errorMessage);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Récupère un projet spécifique par ID
+   */
+  const getProjetById = useCallback(async (id: number): Promise<Project | null> => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const data = await ProjetService.getProjetById(id);
+      return data;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la récupération du projet';
+      setError(errorMessage);
+      toast.error(errorMessage);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Rafraîchit la liste des projets disponibles
+   */
+  const refresh = useCallback(async () => {
+    await getAvailableProjects();
+  }, [getAvailableProjects]);
+
+  return {
+    projets,
+    loading,
+    error,
+    getAvailableProjects,
+    getProjetById,
+    refresh,
+  };
+};
+
+export default useProjetForDqeLinking;
 
 // Hook pour les statistiques des projets
 export const useProjetStatistiques = () => {

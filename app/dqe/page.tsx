@@ -414,11 +414,11 @@ export default function DQEListPage() {
           if (!open) setEditingDQE(null)
         }}
         editData={editingDQE}
-        onSubmit={async (dqeData) => {
-          // La soumission sera gérée par le modal lui-même
+        onSubmit={async () => {
+          const params = statusFilter === "all" ? undefined : { statut: statusFilter }
+          await fetchDQE(params)
           setShowCreateModal(false)
           setEditingDQE(null)
-          await fetchDQE()
         }}
       />
     </DashboardLayout>

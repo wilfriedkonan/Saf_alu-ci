@@ -30,7 +30,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useProjetEtapes, useProjetsList } from "@/hooks/useProjet"
 import { useSousTraitantList } from "@/hooks/useSoustraitant"
 import { ScrollArea } from "@/components/ui/scroll-area"
-
+import { toast } from "sonner"
 // ============================================
 // INTERFACES POUR LES ENTITÉS LIÉES
 // ============================================
@@ -140,12 +140,12 @@ function SearchSelect<T>({
   const filteredData = useMemo(() => {
     if (!Array.isArray(data)) return []
     if (!searchQuery.trim()) return data
-    
+
     const query = searchQuery.toLowerCase().trim()
-    
+
     return data.filter((item: T) => {
       const itemAny = item as any
-      
+
       // Liste de tous les champs à rechercher
       const fieldsToSearch = [
         displayField(item),
@@ -163,9 +163,9 @@ function SearchSelect<T>({
         itemAny?.nomClient,
         itemAny?.specialite,
       ]
-      
+
       // Vérifier si au moins un champ contient la requête
-      return fieldsToSearch.some(field => 
+      return fieldsToSearch.some(field =>
         field && typeof field === 'string' && field.toLowerCase().includes(query)
       )
     })
@@ -229,7 +229,7 @@ function SearchSelect<T>({
                 autoFocus
               />
             </div>
-            
+
             {/* Liste des résultats */}
             <ScrollArea className="h-[250px]">
               {loading ? (
@@ -259,11 +259,11 @@ function SearchSelect<T>({
                           isSelected && "bg-accent"
                         )}
                       >
-                        <Check 
+                        <Check
                           className={cn(
                             "h-4 w-4 shrink-0",
                             isSelected ? "opacity-100" : "opacity-0"
-                          )} 
+                          )}
                         />
                         <div className="flex flex-col flex-1 min-w-0">
                           <span className="font-medium truncate">
@@ -281,7 +281,7 @@ function SearchSelect<T>({
                 </div>
               )}
             </ScrollArea>
-            
+
             {/* Compteur de résultats */}
             {!loading && !error && filteredData.length > 0 && (
               <div className="p-2 border-t text-xs text-muted-foreground text-center">
@@ -313,7 +313,7 @@ function useFactures() {
       const response = await fetch("/api/Factures/non-payees")
       if (!response.ok) throw new Error("Erreur lors du chargement des factures")
       const data = await response.json()
-      
+
       const rawFactures = Array.isArray(data) ? data : data.factures || []
       const mappedFactures = rawFactures.map((f: any) => ({
         id: f.id || f.factureId,
@@ -321,7 +321,7 @@ function useFactures() {
         client: f.client || f.nomClient || f.detailDebiteur?.nom || '',
         montantTotal: f.montantTotal || f.montant || 0,
       }))
-      
+
       setFactures(mappedFactures)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inconnue")
@@ -349,8 +349,8 @@ export function TransactionFormModal({
   loadingComptes: loadingComptesFromProps,
   errorComptes: errorComptesFromProps,
 }: TransactionFormModalProps) {
-  const { toast } = useToast()
-  const tresorerieHook = useTresorerie()
+/*   const { toast } = useToast()
+ */  const tresorerieHook = useTresorerie()
 
   // Charger les comptes
   const rawComptes = useMemo(() => {
@@ -433,33 +433,28 @@ export function TransactionFormModal({
     event.preventDefault()
 
     if (!formState.compteId) {
-      toast({
-        title: "Compte requis",
-        description: "Veuillez sélectionner un compte source.",
-        variant: "destructive",
-      })
+      toast.info('Veuillez sélectionner un compte source.')
       return
     }
 
     if (isVirement && (!formState.compteDestinationId || formState.compteDestinationId === formState.compteId)) {
-      toast({
-        title: "Virement invalide",
-        description: "Sélectionnez un compte de destination différent du compte source.",
-        variant: "destructive",
-      })
+      toast.info('Sélectionnez un compte de destination différent du compte source.')
       return
     }
 
     const montant = Number(formState.montant)
     if (!montant || montant <= 0) {
-      toast({
-        title: "Montant invalide",
-        description: "Le montant doit être supérieur à zéro.",
-        variant: "destructive",
-      })
+      toast.info('Le montant doit être supérieur à zéro.')
       return
     }
-
+    if (isSortie && !formState.etapeProjetId) {
+      toast.info('En sortie de caisse la sélection d une est obligatoire .')
+      return
+    }
+    if ( !formState.libelle){
+      toast.info('Veillez entrer un libelle avant.')
+       return
+     }
     const payload: CreateMouvementRequest = {
       compteId: Number(formState.compteId),
       typeMouvement: formState.typeMouvement,
@@ -503,10 +498,7 @@ export function TransactionFormModal({
         throw new Error(response.message || "Échec de la création du mouvement")
       }
 
-      toast({
-        title: "Mouvement enregistré",
-        description: `Le mouvement "${payload.libelle}" a été créé avec succès.`,
-      })
+      toast.info(`Le mouvement "${payload.libelle}" a été créé avec succès.`)
 
       onClose()
       resetForm()
@@ -515,11 +507,7 @@ export function TransactionFormModal({
       }
     } catch (error) {
       console.error("Erreur lors de la création du mouvement:", error)
-      toast({
-        title: "Erreur",
-        description: error instanceof Error ? error.message : "Impossible d'enregistrer le mouvement",
-        variant: "destructive",
-      })
+      toast.info(error instanceof Error ? error.message : "Impossible d'enregistrer le mouvement")
     }
   }
 
@@ -529,8 +517,8 @@ export function TransactionFormModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-        <div className="space-y-0">
+      <DialogContent className="w-[98vw] max-w-[98vw] h-[95vh] max-h-[95vh] lg:max-w-[60vw] xl:max-w-[65vw] 2xl:max-w-[50vw] p-0">
+        <div className="space-y-0 overflow-y-auto" >
           <DialogHeader className="px-6 pt-6">
             <div className="flex items-center justify-between">
               <DialogTitle>Nouvelle transaction</DialogTitle>
@@ -763,7 +751,7 @@ export function TransactionFormModal({
                       value={formState.projetId}
                       onValueChange={(value) => handleChange("projetId", value)}
                       displayField={(projet) => `${projet.numero || projet.codeProjet || ''} - ${projet.nom || projet.nomProjet || ''}`}
-                      secondaryField={(projet) => `Client: ${projet.client || projet.nomClient || ''}`}
+                      secondaryField={(projet) => `Client: ${projet.client?.nom || projet.nomClient || ''}`}
                       getKey={(projet) => (projet.id || projet.projetId || '').toString()}
                     />
 

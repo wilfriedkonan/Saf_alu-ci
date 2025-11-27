@@ -2,43 +2,24 @@
 
 import { ArrowUpRight, ArrowDownRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { formatCurrency, formatDate, typeMouvementColors } from "@/types/tresorerie"
-
-interface Compte {
-  compteId: number
-  nom: string
-}
-
-interface MouvementAPI {
-  id: number
-  typeMouvement: string
-  categorie?: string | null
-  libelle: string
-  description?: string | null
-  montant: number
-  dateMouvement: string
-  dateSaisie: string
-  modePaiement?: string | null
-  reference?: string | null
-  compte: Compte
-  compteDestination?: Compte | null
-  couleur?: string
-}
+import { formatCurrency, formatDate, typeMouvementColors, MouvementFinancier, Compte } from "@/types/tresorerie"
 
 interface RecentTransactionsProps {
-  mouvements: MouvementAPI[]
+  mouvements: MouvementFinancier[]
   searchTerm?: string
-  selectedCompteId?: number | string  // ✅ Ajout du filtre de compte
+  selectedCompteId?: number | string
   loading?: boolean
   error?: string | null
+  comptesMap?: Map<number, Compte>
 }
 
 export function RecentTransactions({ 
   mouvements, 
   searchTerm = "", 
-  selectedCompteId,  // ✅ Nouveau prop
+  selectedCompteId,
   loading = false,
   error = null,
+  comptesMap,
 }: RecentTransactionsProps) {
   
   if (loading) {
@@ -65,7 +46,6 @@ export function RecentTransactions({
     )
   }
 
-  // ✅ FILTRAGE CORRIGÉ
   const filteredTransactions = mouvements.filter((mouvement) => {
     // Filtre par terme de recherche
     if (searchTerm) {
@@ -78,7 +58,7 @@ export function RecentTransactions({
       if (!matchesSearch) return false
     }
 
-    // ✅ Filtre par compte (CORRIGÉ)
+    // Filtre par compte
     if (selectedCompteId && selectedCompteId !== "all") {
       const compteIdNumber = typeof selectedCompteId === 'string' 
         ? parseInt(selectedCompteId) 
@@ -86,8 +66,10 @@ export function RecentTransactions({
       
       // Vérifier le compte source OU le compte destination (pour les virements)
       const matchesCompte = 
-        mouvement.compte?.compteId === compteIdNumber ||
-        mouvement.compteDestination?.compteId === compteIdNumber
+        mouvement.compteId === compteIdNumber ||
+        mouvement.compte?.id === compteIdNumber ||
+        mouvement.compteDestinationId === compteIdNumber ||
+        mouvement.compteDestination?.id === compteIdNumber
       
       if (!matchesCompte) return false
     }
@@ -112,7 +94,13 @@ export function RecentTransactions({
         const isEntree = transaction.typeMouvement === "Entree"
         const isVirement = transaction.typeMouvement === "Virement"
         
-        const compteName = transaction.compte?.nom || `Compte #${transaction.compte?.compteId || 'N/A'}`
+        // Récupérer le compte depuis le mouvement ou depuis la map
+        const compte = transaction.compte || (comptesMap && comptesMap.get(transaction.compteId))
+        const compteName = compte?.nom || `Compte #${transaction.compteId || 'N/A'}`
+        
+        // Récupérer le compte destination si c'est un virement
+        const compteDestination = transaction.compteDestination || 
+          (transaction.compteDestinationId && comptesMap && comptesMap.get(transaction.compteDestinationId))
 
         return (
           <div key={transaction.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors">
@@ -148,10 +136,10 @@ export function RecentTransactions({
                   
                   <p className="text-xs text-muted-foreground">{compteName}</p>
                   
-                  {transaction.compteDestination && (
+                  {compteDestination && (
                     <>
                       <span className="text-xs text-blue-500">→</span>
-                      <p className="text-xs text-muted-foreground">{transaction.compteDestination.nom}</p>
+                      <p className="text-xs text-muted-foreground">{compteDestination.nom}</p>
                     </>
                   )}
                   

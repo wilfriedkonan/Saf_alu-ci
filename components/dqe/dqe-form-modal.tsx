@@ -26,7 +26,7 @@ import {
 interface DQEFormModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSubmit: (dqe: Partial<DQE>) => void
+  onSubmit: (dqe: Partial<DQE>) => Promise<void> | void
   editData?: DQE | null
 }
 
@@ -129,15 +129,14 @@ export function DQEFormModal({ open, onOpenChange, onSubmit, editData }: DQEForm
         console.log('Debug update dqe start data: ',dqeData)
         const success = await updateDQE(editData.id, dqeData as UpdateDQERequest)
         if (success) {
-        
-          onSubmit(formData)
+          await onSubmit(formData)
           onOpenChange(false)
         }
       } else {
         // ✅ Appel de createDQE
-        const newId = await createDQE(dqeData as CreateDQERequest)
-        if (newId) {
-          onSubmit(formData)
+        const result = await createDQE(dqeData as CreateDQERequest)
+        if (result.success) {
+          await onSubmit(formData)
           onOpenChange(false)
         }
       }

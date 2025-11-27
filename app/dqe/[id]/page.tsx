@@ -562,18 +562,18 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
         />
       )}
        {/* Modal de création/édition */}
-       <DQEFormModal
+      <DQEFormModal
         open={showCreateModal}
         onOpenChange={(open) => {
           setShowCreateModal(open)
           if (!open) setEditingDQE(null)
         }}
         editData={editingDQE}
-        onSubmit={async (dqeData) => {
-          // La soumission sera gérée par le modal lui-même
+        onSubmit={async () => {
+          const updated = await fetchDQEById(dqeId)
+          setDqe(updated)
           setShowCreateModal(false)
           setEditingDQE(null)
-          await fetchDQE()
         }}
       />
     </DashboardLayout>

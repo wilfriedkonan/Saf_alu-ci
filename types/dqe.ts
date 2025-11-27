@@ -423,6 +423,102 @@ export interface DQE {
     projetId: number;
     redirectUrl: string;
   }
+  export interface APIResponse<T = any> {
+    /**
+     * Indique si la requête a réussi
+     */
+    success?: boolean;
+  
+    /**
+     * Message de succès ou d'erreur
+     */
+    message?: string;
+  
+    /**
+     * Données retournées par l'API
+     */
+    data?: T;
+  
+    /**
+     * Code d'erreur (optionnel)
+     */
+    errorCode?: string;
+  
+    /**
+     * Détails additionnels (optionnel)
+     */
+    errors?: string[];
+  
+    /**
+     * Métadonnées de pagination (optionnel)
+     */
+    pagination?: {
+      page: number;
+      pageSize: number;
+      totalItems: number;
+      totalPages: number;
+    };
+  
+    /**
+     * ID du projet (pour les conversions DQE)
+     */
+    projetId?: number;
+  
+    /**
+     * URL de redirection (pour les conversions DQE)
+     */
+    redirectUrl?: string;
+  }
+  
+  /**
+   * Réponse API standard pour les opérations CRUD
+   */
+  export interface CRUDResponse {
+    success: boolean;
+    message: string;
+    id?: number;
+  }
+  
+  /**
+   * Réponse API pour les erreurs
+   */
+  export interface ErrorResponse {
+    success: false;
+    message: string;
+    errorCode?: string;
+    errors?: string[];
+    statusCode?: number;
+  }
+  
+  /**
+   * Réponse API avec pagination
+   */
+  export interface PaginatedResponse<T> {
+    success: boolean;
+    data: T[];
+    pagination: {
+      page: number;
+      pageSize: number;
+      totalItems: number;
+      totalPages: number;
+      hasNextPage: boolean;
+      hasPreviousPage: boolean;
+    };
+  }
+  
+  /**
+   * Type guard pour vérifier si une réponse est une erreur
+   */
+  export function isErrorResponse(response: any): response is ErrorResponse {
+    return response && response.success === false;
+  }
+  
+  /**
+   * Type guard pour vérifier si une réponse a des données
+   */
+  export function hasData<T>(response: APIResponse<T>): response is Required<Pick<APIResponse<T>, 'data'>> & APIResponse<T> {
+    return response && response.data !== undefined && response.data !== null;
+  }
   
   // ========================================
   // ENUMS ET CONSTANTES

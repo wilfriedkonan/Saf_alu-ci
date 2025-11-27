@@ -163,7 +163,7 @@ export interface Compte {
   // ============================================
   
   export type TypeCompte = "Courant" | "Epargne" | "Caisse"
-  export type TypeMouvement = "Entree" | "Sortie" | "Virement"
+  export type TypeMouvement = "Entree" | "Sortie" /* | "Virement" */
   export type NiveauAlerte = "Info" | "Attention" | "Critique"
   
   // ============================================
@@ -188,7 +188,7 @@ export interface Compte {
     Virement: "Virement" as const,
   }
   
-  export const typesMouvementList: TypeMouvement[] = ["Entree", "Sortie", "Virement"]
+  export const typesMouvementList: TypeMouvement[] = ["Entree", "Sortie"/* , "Virement" */]
   
   // ============================================
   // CONSTANTES - Catégories de Mouvements
@@ -239,14 +239,14 @@ export interface Compte {
   export const typeMouvementLabels: Record<TypeMouvement, string> = {
     Entree: "Entrée",
     Sortie: "Sortie",
-    Virement: "Virement",
+   /*  Virement: "Virement", */
   }
   
   export const typeMouvementColors: Record<TypeMouvement, string> = {
     Entree: "bg-green-100 text-green-800",
     Sortie: "bg-red-100 text-red-800",
-    Virement: "bg-blue-100 text-blue-800",
-  }
+/*     Virement: "bg-blue-100 text-blue-800",
+ */  }
   
   export const niveauAlerteColors: Record<NiveauAlerte, string> = {
     Info: "bg-blue-100 text-blue-800",
