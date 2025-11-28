@@ -38,6 +38,10 @@ import { toast } from "sonner"
 import DQEService from "@/services/dqeService"
 import axios from "axios"
 import { DQEFormModal } from "@/components/dqe/dqe-form-modal"
+import { DetailDebourseSecViewer } from "@/components/dqe/detail-debourse-sec-viewer"
+import { DebourseStatisticsCard } from "@/components/dqe/debourse-statistics-card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { DollarSign } from "lucide-react"
 
 export default function DQEDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
@@ -46,11 +50,15 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
   const [showConvertModal, setShowConvertModal] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingDQE, setEditingDQE] = useState<DQE | null>(null)
-  
-  // Hooks
-  const { fetchDQEById, validateDQE, fetchDQE,loading, error } = useDqe()
-  const { exportExcel, exportPDF, loading: exportLoading } = useDqeExport()
+  const [activeTab, setActiveTab] = useState("structure")
 
+  // Hooks
+  const { fetchDQEById, validateDQE, fetchDQE, loading, error } = useDqe()
+  const { exportExcel, exportPDF, loading: exportLoading } = useDqeExport()
+  const reloadDQE = async () => {
+    const data = await fetchDQEById(dqeId)
+    setDqe(data)
+  }
   const [dqe, setDqe] = useState<DQE | null>(null)
   const [loadingDQE, setLoadingDQE] = useState(true)
 
@@ -97,7 +105,7 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
 
   const tva = dqe.totalRevenueHT * (dqe.tauxTVA / 100)
   const totalTTC = dqe.totalRevenueHT + tva
-  
+
   // Calcul du total des déboursés secs pour tous les lots
   const totalDeboursseSec = dqe.lots?.reduce((lotTotal: number, lot: any) => {
     const chapterTotal = lot.chapters?.reduce((chapterSum: number, chapter: any) => {
@@ -108,10 +116,10 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
     }, 0) || 0;
     return lotTotal + chapterTotal;
   }, 0) || 0
-  
+
   // Calcul de la marge bénéficiaire globale
   const margeBeneficiaire = dqe.totalRevenueHT - totalDeboursseSec
-  
+
   const conversionStatus = getConversionStatus(dqe)
 
   const handleConvertToProject = () => {
@@ -135,10 +143,10 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
         // Afficher les erreurs de validation de l'API
         let errorMessage = 'Erreur lors de la validation du DQE'
         let errorDetails: string[] = []
-        
+
         if (axios.isAxiosError(err) && err.response) {
           const apiResponse = err.response.data
-          
+
           // Récupérer le message principal
           if (apiResponse?.message) {
             errorMessage = apiResponse.message
@@ -147,17 +155,17 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
           } else if (apiResponse?.title) {
             errorMessage = apiResponse.title
           }
-          
+
           // Récupérer les erreurs de validation détaillées
           if (apiResponse?.errors && Array.isArray(apiResponse.errors)) {
             // Format: { errors: [{ field, message, code }] }
-            errorDetails = apiResponse.errors.map((errItem: any) => 
+            errorDetails = apiResponse.errors.map((errItem: any) =>
               errItem.field ? `${errItem.field}: ${errItem.message || errItem}` : (errItem.message || errItem)
             )
           } else if (apiResponse?.validationErrors && typeof apiResponse.validationErrors === 'object') {
             // Format: { validationErrors: { field: [messages] } }
-            errorDetails = Object.entries(apiResponse.validationErrors).flatMap(([field, messages]) => 
-              Array.isArray(messages) 
+            errorDetails = Object.entries(apiResponse.validationErrors).flatMap(([field, messages]) =>
+              Array.isArray(messages)
                 ? messages.map((msg: string) => `${field}: ${msg}`)
                 : [`${field}: ${messages}`]
             )
@@ -168,15 +176,15 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
           // L'erreur est déjà formatée par handleError du service
           errorMessage = err.message
         }
-        
+
         // Afficher le message d'erreur avec les détails
         let messageToShow = errorMessage || 'Une erreur est survenue lors de la validation'
-        
+
         if (errorDetails.length > 0) {
           // Plusieurs erreurs de validation - combiner tout en un message lisible
           messageToShow = `${messageToShow}\n\n${errorDetails.map(d => `• ${d}`).join('\n')}`
         }
-        
+
         // Afficher le toast
         toast.error(messageToShow, {
           duration: 10000,
@@ -306,7 +314,7 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
                     Convertir en projet
                   </Button>
                   {isDQEEditable(dqe) && (
-                    <Button size="sm" variant="outline" onClick={()=>handleEdit(dqe)}>
+                    <Button size="sm" variant="outline" onClick={() => handleEdit(dqe)}>
                       <Edit className="h-4 w-4 mr-2" />
                       Éditer
                     </Button>
@@ -379,104 +387,137 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
           </CardContent>
         </Card>
 
-        {/* Structure DQE */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Structure du DQE</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {dqe.lots && dqe.lots.length > 0 ? (
-              <Accordion type="multiple" className="w-full">
-                {dqe.lots.map((lot: any) => (
-                  <AccordionItem key={lot.id} value={lot.id.toString()}>
-                    <AccordionTrigger className="hover:no-underline">
-                      <div className="flex items-center justify-between w-full pr-4">
-                        <div className="flex items-center gap-3">
-                          <span className="font-bold text-lg">{lot.code}</span>
-                          <Separator orientation="vertical" className="h-6" />
-                          <span className="font-semibold">{lot.nom}</span>
-                        </div>
-                        <div className="flex flex-col items-end text-sm">
-                          <span className="font-medium text-primary">
-                            {formatCurrency(lot.totalRevenueHT)}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            Déboursés secs: {formatCurrency(
-                              lot.chapters?.reduce((chapterTotal: number, chapter: any) => {
-                                const itemsTotal = chapter.items?.reduce((itemTotal: number, item: any) => {
-                                  return itemTotal + (item.deboursseSec || 0);
-                                }, 0) || 0;
-                                return chapterTotal + itemsTotal;
-                              }, 0) || 0
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="pl-4 space-y-4">
-                        {lot.chapters?.map((chapter: any) => (
-                          <div key={chapter.id} className="border-l-2 border-muted pl-4 space-y-3">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-muted-foreground">
-                                  {chapter.code}
-                                </span>
-                                <span className="font-medium">{chapter.nom}</span>
-                              </div>
-                              <span className="text-sm font-medium">
-                                {formatCurrency(chapter.totalRevenueHT)}
+
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="structure">Structure DQE</TabsTrigger>
+            <TabsTrigger value="debourses">
+              <DollarSign className="h-4 w-4 mr-2" />
+              Déboursés Secs
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="structure">
+            {/* Structure DQE */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Structure du DQE</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {dqe.lots && dqe.lots.length > 0 ? (
+                  <Accordion type="multiple" className="w-full">
+                    {dqe.lots.map((lot: any) => (
+                      <AccordionItem key={lot.id} value={lot.id.toString()}>
+                        <AccordionTrigger className="hover:no-underline">
+                          <div className="flex items-center justify-between w-full pr-4">
+                            <div className="flex items-center gap-3">
+                              <span className="font-bold text-lg">{lot.code}</span>
+                              <Separator orientation="vertical" className="h-6" />
+                              <span className="font-semibold">{lot.nom}</span>
+                            </div>
+                            <div className="flex flex-col items-end text-sm">
+                              <span className="font-medium text-primary">
+                                {formatCurrency(lot.totalRevenueHT)}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                Déboursés secs: {formatCurrency(
+                                  lot.chapters?.reduce((chapterTotal: number, chapter: any) => {
+                                    const itemsTotal = chapter.items?.reduce((itemTotal: number, item: any) => {
+                                      return itemTotal + (item.deboursseSec || 0);
+                                    }, 0) || 0;
+                                    return chapterTotal + itemsTotal;
+                                  }, 0) || 0
+                                )}
                               </span>
                             </div>
-
-                            <div className="space-y-2">
-                              {chapter.items?.map((item: any) => (
-                                <div key={item.id} className="bg-muted/50 rounded-lg p-3 space-y-2">
-                                  <div className="flex items-start justify-between gap-4">
-                                    <div className="flex-1">
-                                      <p className="font-medium text-sm">
-                                        {item.code} - {item.designation}
-                                      </p>
-                                    </div>
-                                    <p className="font-semibold text-sm whitespace-nowrap">
-                                      {formatCurrency(item.totalRevenueHT)}
-                                    </p>
-                                    
-                                  </div>
-                                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                    <span className="font-medium">{item.unite}</span>
-                                    <Separator orientation="vertical" className="h-3" />
-                                    <span>{item.quantite.toLocaleString("fr-FR")}</span>
-                                    <span>×</span>
-                                    <span>{formatCurrency(item.prixUnitaireHT)}</span>
-                                    <span>→</span>
-                                    <span className="font-medium">
-                                      {formatCurrency(item.totalRevenueHT)}
-                                    </span>
-                                    <span>déboursé sec:</span>
-                                    <span>{formatCurrency(item.deboursseSec)}</span>
-                                    <span>Marge brute:</span>
-                                    <span className={item.deboursseSec > 0 ? "text-green-600" : "text-red-600"}>
-                                      {item.deboursseSec > 0 ? formatCurrency(item.totalRevenueHT - item.deboursseSec ) : "Veuillez renseigner le débourssé sec"}
-                                    </span>                                  </div>
-                                </div>
-                              ))}
-                            </div>
                           </div>
-                        ))}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            ) : (
-              <p className="text-center text-muted-foreground py-8">
-                Aucun lot défini
-              </p>
-            )}
-          </CardContent>
-        </Card>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <div className="pl-4 space-y-4">
+                            {lot.chapters?.map((chapter: any) => (
+                              <div key={chapter.id} className="border-l-2 border-muted pl-4 space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-muted-foreground">
+                                      {chapter.code}
+                                    </span>
+                                    <span className="font-medium">{chapter.nom}</span>
+                                  </div>
+                                  <span className="text-sm font-medium">
+                                    {formatCurrency(chapter.totalRevenueHT)}
+                                  </span>
+                                </div>
 
+                                <div className="space-y-2">
+                                  {chapter.items?.map((item: any) => (
+                                    <div key={item.id} className="bg-muted/50 rounded-lg p-3 space-y-2">
+                                      <div className="flex items-start justify-between gap-4">
+                                        <div className="flex-1">
+                                          <p className="font-medium text-sm">
+                                            {item.code} - {item.designation}
+                                          </p>
+                                        </div>
+                                        <p className="font-semibold text-sm whitespace-nowrap">
+                                          {formatCurrency(item.totalRevenueHT)}
+                                        </p>
+
+                                      </div>
+                                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                        <span className="font-medium">{item.unite}</span>
+                                        <Separator orientation="vertical" className="h-3" />
+                                        <span>{item.quantite.toLocaleString("fr-FR")}</span>
+                                        <span>×</span>
+                                        <span>{formatCurrency(item.prixUnitaireHT)}</span>
+                                        <span>→</span>
+                                        <span className="font-medium">
+                                          {formatCurrency(item.totalRevenueHT)}
+                                        </span>
+                                        <span>déboursé sec:</span>
+                                        <span>{formatCurrency(item.deboursseSec)}</span>
+                                        <span>Marge brute:</span>
+                                        <span className={item.deboursseSec > 0 ? "text-green-600" : "text-red-600"}>
+                                          {item.deboursseSec > 0 ? formatCurrency(item.totalRevenueHT - item.deboursseSec) : "Veuillez renseigner le débourssé sec"}
+                                        </span>                                  </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">
+                    Aucun lot défini
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="debourses" className="space-y-6">
+            {/* Statistiques globales */}
+            <DebourseStatisticsCard dqeId={dqeId} />
+
+            {/* Détails par item */}
+            {dqe.lots?.map(lot => (
+              lot.chapters?.map(chapter => (
+                chapter.items?.map(item => (
+                  <DetailDebourseSecViewer
+                    itemId={item.id}
+                    itemCode={item.code}
+                    itemDesignation={item.designation}
+                    totalRevenueHT={item.totalRevenueHT}
+                    deboursseSec={item.deboursseSec}
+                    onDebourseChange={reloadDQE}
+                  />
+                ))
+              ))
+            ))}
+          </TabsContent>
+        </Tabs>
         {/* Récapitulatif Financier */}
         <Card className="border-primary/20 bg-primary/5">
           <CardHeader>
@@ -544,7 +585,7 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
             </Button>
           )}
           {isDQEEditable(dqe) && (
-            <Button onClick={()=>handleEdit(dqe)} variant="outline">
+            <Button onClick={() => handleEdit(dqe)} variant="outline">
               <Edit className="h-4 w-4 mr-2" />
               Éditer
             </Button>
@@ -561,7 +602,7 @@ export default function DQEDetailPage({ params }: { params: Promise<{ id: string
           onConvert={handleProjectConversion}
         />
       )}
-       {/* Modal de création/édition */}
+      {/* Modal de création/édition */}
       <DQEFormModal
         open={showCreateModal}
         onOpenChange={(open) => {

@@ -528,7 +528,49 @@ export class DQEService {
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
   }
+// ========================================
+// EXPORT - MÉTHODES AMÉLIORÉES
+// ========================================
 
+/**
+ * Prévisualise un DQE en HTML dans une nouvelle fenêtre
+ */
+static previewDqe(id: number): void {
+  const token = localStorage.getItem('safalu_token');
+  const url = `${API_BASE_URL}/DQE/${id}/preview`;
+  
+  const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+  
+  if (!newWindow) {
+    throw new Error('Impossible d\'ouvrir la prévisualisation. Vérifiez les paramètres de votre navigateur.');
+  }
+}
+
+/**
+ * Export rapide Excel avec téléchargement automatique
+ */
+static async quickExportToExcel(id: number, reference?: string): Promise<void> {
+  try {
+    const { blob, filename } = await this.exportExcel(id);
+    const finalFilename = filename || `DQE_${reference || id}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    this.downloadFile(blob, finalFilename);
+  } catch (error) {
+    throw this.handleError(error);
+  }
+}
+
+/**
+ * Export rapide PDF avec téléchargement automatique
+ */
+static async quickExportToPdf(id: number, reference?: string): Promise<void> {
+  try {
+    const { blob, filename } = await this.exportPDF(id);
+    const finalFilename = filename || `DQE_${reference || id}_${new Date().toISOString().split('T')[0]}.pdf`;
+    this.downloadFile(blob, finalFilename);
+  } catch (error) {
+    throw this.handleError(error);
+  }
+}
   // ========================================
   // DUPLICATION
   // ========================================

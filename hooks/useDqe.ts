@@ -478,17 +478,18 @@ export const useDqeStats = () => {
 export const useDqeExport = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
-  /**
-   * Exporte un DQE en Excel
-   */
-  const exportExcel = useCallback(async (id: number): Promise<boolean> => {
+  const exportExcel = useCallback(async (id: number, reference?: string): Promise<boolean> => {
     setLoading(true);
+    setIsExportingExcel(true);
     setError(null);
     
     try {
       const { blob, filename } = await DQEService.exportExcel(id);
-      DQEService.downloadFile(blob, filename || `DQE-${id}.xlsx`);
+      const finalFilename = filename || `DQE_${reference || id}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      DQEService.downloadFile(blob, finalFilename);
       toast.success('Export Excel réussi');
       return true;
     } catch (err) {
@@ -498,19 +499,19 @@ export const useDqeExport = () => {
       return false;
     } finally {
       setLoading(false);
+      setIsExportingExcel(false);
     }
   }, []);
 
-  /**
-   * Exporte un DQE en PDF
-   */
-  const exportPDF = useCallback(async (id: number): Promise<boolean> => {
+  const exportPDF = useCallback(async (id: number, reference?: string): Promise<boolean> => {
     setLoading(true);
+    setIsExportingPdf(true);
     setError(null);
     
     try {
       const { blob, filename } = await DQEService.exportPDF(id);
-      DQEService.downloadFile(blob, filename || `DQE-${id}.pdf`);
+      const finalFilename = filename || `DQE_${reference || id}_${new Date().toISOString().split('T')[0]}.pdf`;
+      DQEService.downloadFile(blob, finalFilename);
       toast.success('Export PDF réussi');
       return true;
     } catch (err) {
@@ -520,14 +521,42 @@ export const useDqeExport = () => {
       return false;
     } finally {
       setLoading(false);
+      setIsExportingPdf(false);
     }
   }, []);
+
+  const previewDqe = useCallback((id: number) => {
+    try {
+      DQEService.previewDqe(id);
+      toast.success('Prévisualisation ouverte dans un nouvel onglet');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la prévisualisation';
+      setError(errorMessage);
+      toast.error(errorMessage);
+    }
+  }, []);
+
+  const quickExport = useCallback(async (
+    id: number, 
+    format: 'excel' | 'pdf',
+    reference?: string
+  ): Promise<boolean> => {
+    if (format === 'excel') {
+      return await exportExcel(id, reference);
+    } else {
+      return await exportPDF(id, reference);
+    }
+  }, [exportExcel, exportPDF]);
 
   return {
     loading,
     error,
+    isExportingExcel,
+    isExportingPdf,
     exportExcel,
     exportPDF,
+    previewDqe,
+    quickExport,
   };
 };
 
