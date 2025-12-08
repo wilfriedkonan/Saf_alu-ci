@@ -36,10 +36,10 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
       
       // Token expiré, rediriger vers login
-      if (typeof window !== 'undefined') {
+      /* if (typeof window !== 'undefined') {
         removeStoredToken();
-        window.location.href = '/login';
-      }
+        window.location.href = '/';
+      } */
     }
     
     return Promise.reject(error);
@@ -48,30 +48,30 @@ apiClient.interceptors.response.use(
 
 // Gestion du stockage du token (avec support SSR)
 export const getStoredToken = () => {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('safalu_token');
+/*   if (typeof window === 'undefined') return null;
+ */  return localStorage.getItem('safalu_token');
 };
 
 export const setStoredToken = (token: string) => {
-  if (typeof window === 'undefined') return;
+ // if (typeof window === 'undefined') return;
   localStorage.setItem('safalu_token', token);
   console.log('Token stocké:', localStorage.getItem('safalu_token'));
 };
 
 export const removeStoredToken = () => {
-  if (typeof window === 'undefined') return;
+ // if (typeof window === 'undefined') return;
   localStorage.removeItem('safalu_token');
   localStorage.removeItem('safalu_user');
 };
 
 export const getStoredUser = () => {
-  if (typeof window === 'undefined') return null;
+  //if (typeof window === 'undefined') return null;
   const user = localStorage.getItem('safalu_user');
   return user ? JSON.parse(user) : null;
 };
 
 export const setStoredUser = (user: unknown) => {
-  if (typeof window === 'undefined') return;
+ // if (typeof window === 'undefined') return;
   localStorage.setItem('safalu_user', JSON.stringify(user));
 };
 
@@ -130,13 +130,13 @@ class AuthService {
     }
   }
 
-  // Déconnexion
-  logout() {
+   // Déconnexion
+   logout() {
     removeStoredToken();
     if (typeof window !== 'undefined') {
-      window.location.href = '/login';
+      window.location.href = '/';
     }
-  }
+  } 
 
   // Vérifier si l'utilisateur est connecté
   isAuthenticated() {

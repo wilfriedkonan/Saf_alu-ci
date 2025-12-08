@@ -2,6 +2,8 @@
 // INTERFACES PRINCIPALES - VERSION HIÉRARCHIQUE
 // ============================================
 
+import { MouvementFinancier } from "./tresorerie"
+
 export interface Project {
   id: number
   numero: string
@@ -58,6 +60,7 @@ export interface Project {
     prenom: string
   }
   etapes?: ProjectStage[]
+  depenseProjet?: MouvementFinancier[]
 }
 
 export interface ProjectStage {
@@ -131,6 +134,7 @@ export interface ProjectStage {
     telephone?: string
     noteMoyenne: number
   }
+  depenseProjet?: MouvementFinancier[]
 }
 
 // 🆕 Statistiques des sous-étapes
@@ -566,7 +570,20 @@ export const calculateBudgetVariancePercentage = (stage: ProjectStage): number =
 export const isBudgetOverrun = (stage: ProjectStage): boolean => {
   return stage.coutReel > stage.budgetPrevu
 }
+ /**
+   * Unités de Mesure
+   */
+ export type UniteMesure = 'm³' | 'ml' | 'm²' | 'ens' | 'forf' | 'u'|'kg';
 
+ export const UNITE_LABELS: Record<UniteMesure, string> = {
+  'm³': 'Mètre cube',
+  'ml': 'Mètre linéaire',
+  'm²': 'Mètre carré',
+  'ens': 'Ensemble',
+  'forf': 'Forfait',
+  'u': 'Unité',
+  'kg': 'Kilogramme',
+};
 /**
  * Formate un montant en devise locale (XOF)
  */

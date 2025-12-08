@@ -12,7 +12,7 @@ import { Progress } from "@/components/ui/progress"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { 
+import {
   Calendar,
   Euro,
   User,
@@ -27,7 +27,12 @@ import {
   Play,
   Pause,
   RotateCcw,
-  Ban
+  Ban,
+  DollarSignIcon,
+  Coins,
+  Wallet,
+  PiggyBank,
+  Banknote
 } from "lucide-react"
 import type { Project, ProjectStage } from "@/types/projet"
 import { useProjetEtapes } from "@/hooks/useProjet"
@@ -46,18 +51,18 @@ interface StageProgressModalProps {
 export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate }: StageProgressModalProps) {
   const { user } = useAuth()
   const { updateEtape, loading } = useProjetEtapes(projet.id)
-  
+
   // ✅ CORRECTION: Utiliser le hook avec l'ID du sous-traitant si disponible
   const sousTraitantId = stage?.idSousTraitant || stage?.sousTraitant?.id
-  const { 
-    createEvaluation, 
+  const {
+    createEvaluation,
     evaluations,
     noteMoyenne,
     totalEvaluations,
     loading: evaluationLoading,
     refreshEvaluations
   } = useSousTraitantEvaluations(sousTraitantId)
-  
+
   const [progression, setProgression] = useState(0)
   const [note, setNote] = useState(0)
   const [commentaire, setCommentaire] = useState("")
@@ -71,6 +76,10 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
     professionnalisme: 0,
     proprete: 0
   })
+
+  const totalDepenseEtape = stage?.depenseProjet
+    ?.filter((mvt) => mvt.typeMouvement === "Sortie")
+    ?.reduce((sum, mvt) => sum + mvt.montant, 0) ?? 0;
 
   // ✅ CORRECTION: Charger les données de l'étape et réinitialiser l'évaluation
   useEffect(() => {
@@ -209,7 +218,7 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
 
   const getAvailableActions = () => {
     const actions = []
-    
+
     switch (currentStatut) {
       case "Planification":
       case "NonCommence":
@@ -226,7 +235,7 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
           statut: "Annule"
         })
         break
-      
+
       case "EnCours":
         actions.push({
           label: "Terminer",
@@ -247,7 +256,7 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
           statut: "Annule"
         })
         break
-      
+
       case "Suspendu":
         actions.push({
           label: "Reprendre",
@@ -262,13 +271,13 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
           statut: "Annule"
         })
         break
-      
+
       case "Termine":
       case "Annule":
         // Aucune action disponible pour les étapes terminées ou annulées
         break
     }
-    
+
     return actions
   }
 
@@ -305,7 +314,7 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
       }
 
       await updateEtape(stage.id, updateData)
-      
+
       toast.success("Étape mise à jour avec succès")
       // ✅ Appeler onUpdate() seulement après une modification réussie
       onUpdate()
@@ -379,7 +388,7 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
               </p>
             </div>
           </DialogTitle>
-          
+
           {/* Boutons de gestion de statut */}
           {getAvailableActions().length > 0 && (
             <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t">
@@ -401,11 +410,11 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
               })}
             </div>
           )}
-          
+
           {(currentStatut === "Termine" || currentStatut === "Annule") && (
             <div className="mt-4 pt-4 border-t">
               <p className="text-sm text-muted-foreground">
-                {currentStatut === "Termine" 
+                {currentStatut === "Termine"
                   ? "✅ Cette étape est terminée. Aucune modification n'est possible."
                   : "❌ Cette étape est annulée. Aucune modification n'est possible."}
               </p>
@@ -414,11 +423,12 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
         </DialogHeader>
 
         <Tabs defaultValue="progress" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="progress">Progression</TabsTrigger>
             <TabsTrigger value="details">Détails</TabsTrigger>
             <TabsTrigger value="evaluation">Évaluation</TabsTrigger>
             <TabsTrigger value="history">Historique</TabsTrigger>
+            <TabsTrigger value="depenses"> Dépenses</TabsTrigger>
           </TabsList>
 
           <TabsContent value="progress" className="space-y-4">
@@ -428,15 +438,15 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
                   ⚠️ La progression ne peut être modifiée que lorsque l'étape est "En cours"
                 </p>
                 <p className="text-xs text-amber-700 mt-1">
-                  {currentStatut === "Planification" || currentStatut === "NonCommence" 
+                  {currentStatut === "Planification" || currentStatut === "NonCommence"
                     ? "Veuillez d'abord démarrer l'étape."
                     : currentStatut === "Suspendu"
-                    ? "Veuillez d'abord reprendre l'étape."
-                    : "Cette étape ne peut plus être modifiée."}
+                      ? "Veuillez d'abord reprendre l'étape."
+                      : "Cette étape ne peut plus être modifiée."}
                 </p>
               </div>
             )}
-            
+
             <Card>
               <CardContent className="pt-6 space-y-6">
                 {/* Progression actuelle */}
@@ -534,12 +544,12 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
                       Date de début
                     </Label>
                     <p className="text-sm font-medium">
-                      {stage.dateDebut 
+                      {stage.dateDebut
                         ? new Date(stage.dateDebut).toLocaleDateString("fr-FR", {
-                            day: "numeric",
-                            month: "long",
-                            year: "numeric"
-                          })
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric"
+                        })
                         : "Non définie"}
                     </p>
                   </div>
@@ -549,12 +559,12 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
                       Date de fin prévue
                     </Label>
                     <p className="text-sm font-medium">
-                      {stage.dateFinPrevue 
+                      {stage.dateFinPrevue
                         ? new Date(stage.dateFinPrevue).toLocaleDateString("fr-FR", {
-                            day: "numeric",
-                            month: "long",
-                            year: "numeric"
-                          })
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric"
+                        })
                         : "Non définie"}
                     </p>
                   </div>
@@ -581,19 +591,18 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <Label className="text-sm flex items-center gap-2">
-                      <Euro className="h-4 w-4" />
+                      <Wallet className="h-4 w-4" />
                       Budget prévu
                     </Label>
                     <p className="text-sm font-medium">{formatCurrency(stage.budgetPrevu)}</p>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-sm flex items-center gap-2">
-                      <Euro className="h-4 w-4" />
+                      <Coins className="h-4 w-4" />
                       Coût réel
                     </Label>
-                    <p className={`text-sm font-medium ${
-                      stage.coutReel > stage.budgetPrevu ? "text-red-600" : "text-green-600"
-                    }`}>
+                    <p className={`text-sm font-medium ${stage.coutReel > stage.budgetPrevu ? "text-red-600" : "text-green-600"
+                      }`}>
                       {formatCurrency(stage.coutReel)}
                     </p>
                   </div>
@@ -602,12 +611,11 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
                 {/* Budget restant */}
                 <div className="space-y-1">
                   <Label className="text-sm flex items-center gap-2">
-                    <Euro className="h-4 w-4" />
+                    <Banknote className="h-4 w-4" />
                     Budget restant
                   </Label>
-                  <p className={`text-sm font-medium ${
-                    (stage.budgetPrevu - stage.coutReel) < 0 ? "text-red-600" : "text-green-600"
-                  }`}>
+                  <p className={`text-sm font-medium ${(stage.budgetPrevu - stage.coutReel) < 0 ? "text-red-600" : "text-green-600"
+                    }`}>
                     {formatCurrency(stage.budgetPrevu - stage.coutReel)}
                   </p>
                 </div>
@@ -623,7 +631,7 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
                       {stage.typeResponsable === "Interne" ? "👨‍💼 Interne" : "🏢 Sous-traitant"}
                     </Badge>
                     <div className="flex flex-col">
-                      {stage.sousTraitant? stage.sousTraitant.nom : ""}
+                      {stage.sousTraitant ? stage.sousTraitant.nom : ""}
                     </div>
                   </div>
                 </div>
@@ -658,7 +666,7 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
                   <div className="text-center py-8 text-muted-foreground">
                     <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
                     <p className="text-sm">
-                      {stage.typeResponsable === "Interne" 
+                      {stage.typeResponsable === "Interne"
                         ? "Cette étape est gérée en interne. L'évaluation n'est disponible que pour les sous-traitants."
                         : "Aucun sous-traitant n'est assigné à cette étape."}
                     </p>
@@ -746,7 +754,7 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
                     </div>
 
                     {/* Bouton de sauvegarde */}
-                    <Button 
+                    <Button
                       onClick={handleSaveEvaluation}
                       disabled={evaluationLoading || note === 0}
                       className="w-full"
@@ -771,8 +779,8 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
                           let criteresParsed: Record<string, number> | null = null
                           if (evaluation.criteres) {
                             try {
-                              criteresParsed = typeof evaluation.criteres === 'string' 
-                                ? JSON.parse(evaluation.criteres) 
+                              criteresParsed = typeof evaluation.criteres === 'string'
+                                ? JSON.parse(evaluation.criteres)
                                 : evaluation.criteres
                             } catch (e) {
                               console.error("Erreur parsing criteres:", e)
@@ -780,7 +788,7 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
                           }
 
                           return (
-                            <div 
+                            <div
                               key={evaluation.id || index}
                               className="bg-muted rounded-lg p-4 space-y-2 border"
                             >
@@ -790,9 +798,8 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
                                     {[...Array(5)].map((_, i) => (
                                       <span
                                         key={i}
-                                        className={`text-lg ${
-                                          i < evaluation.note ? "text-yellow-400" : "text-gray-300"
-                                        }`}
+                                        className={`text-lg ${i < evaluation.note ? "text-yellow-400" : "text-gray-300"
+                                          }`}
                                       >
                                         ★
                                       </span>
@@ -863,7 +870,7 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
                     <History className="h-5 w-5" />
                     Historique des modifications
                   </Label>
-                  
+
                   <div className="space-y-3">
                     {/* Historique de progression */}
                     <div className="flex items-start space-x-3 text-sm">
@@ -916,6 +923,122 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
               </CardContent>
             </Card>
           </TabsContent>
+          <TabsContent value="depenses" className="space-y-4">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-6">
+
+                  {/* Titre */}
+                  <Label className="text-base font-medium flex items-center gap-2">
+                    <History className="h-5 w-5" />
+                    Historique des dépenses
+                  </Label>
+
+                  {/* 🔥 LISTE DES MOUVEMENTS FINANCIERS 🔥 */}
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-sm">Mouvements financiers</h3>
+
+                    {/* Si aucun mouvement */}
+                    {(!stage?.depenseProjet || stage.depenseProjet.length === 0) && (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Aucun mouvement enregistré pour le moment
+                      </p>
+                    )}
+
+                    {/* Liste */}
+                    <div className="space-y-3">
+                      {stage?.depenseProjet?.map((mvt) => (
+                        <div
+                          key={mvt.id}
+                          className="flex items-start justify-between border rounded-lg p-3 bg-muted/30"
+                        >
+                          <div className="flex items-start space-x-3">
+
+                            <div
+                              className={`h-2 w-2 rounded-full mt-2 flex-shrink-0 ${mvt.typeMouvement === "Sortie" ? "bg-red-500" : "bg-green-500"
+                                }`}
+                            />
+
+                            <div>
+                              <p className="font-medium">{mvt.libelle}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(mvt.dateMouvement).toLocaleDateString("fr-FR")}
+                              </p>
+                            </div>
+                          </div>
+
+                          <p
+                            className={`font-semibold ${mvt.typeMouvement === "Sortie" ? "text-red-600" : "text-green-700"
+                              }`}
+                          >
+                            {mvt.typeMouvement === "Sortie" ? "-" : "+"}
+                            {mvt.montant.toLocaleString("fr-FR")} F
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 🔷 TOTAL DÉPENSE ÉTAPE */}
+                  <div className="border rounded-lg p-4 bg-muted/50">
+                    <p className="text-sm font-medium flex items-center gap-2">
+                      Total dépense étape :
+                      <span className="text-red-600 font-bold">
+                        {totalDepenseEtape.toLocaleString("fr-FR")} F
+                      </span>
+                    </p>
+                  </div>
+
+                  {/* 🔷 Progression & Infos */}
+                  <div className="space-y-3">
+                    <div className="flex items-start space-x-3 text-sm">
+                      <div className="h-2 w-2 rounded-full bg-blue-500 mt-2 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium">
+                          Progression actuelle: {stage.pourcentageAvancement}%
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Statut: {getStatusLabel(stage.statut)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* évaluations */}
+                    {evaluations.length > 0 && (
+                      <div className="flex items-start space-x-3 text-sm">
+                        <div className="h-2 w-2 rounded-full bg-yellow-500 mt-2 flex-shrink-0" />
+                        <div>
+                          <p className="font-medium">
+                            {evaluations.length} évaluation{evaluations.length > 1 ? "s" : ""} enregistrée{evaluations.length > 1 ? "s" : ""}
+                            {noteMoyenne > 0 && ` (Moyenne: ${noteMoyenne.toFixed(1)}/5)`}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Dernière évaluation le{" "}
+                            {new Date(evaluations[0].dateEvaluation).toLocaleDateString("fr-FR")}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* étape finie */}
+                    {stage.dateFinReelle && (
+                      <div className="flex items-start space-x-3 text-sm">
+                        <div className="h-2 w-2 rounded-full bg-green-500 mt-2 flex-shrink-0" />
+                        <div>
+                          <p className="font-medium">Étape terminée</p>
+                          <p className="text-xs text-muted-foreground">
+                            Le {new Date(stage.dateFinReelle).toLocaleDateString("fr-FR")}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+
         </Tabs>
 
         <DialogFooter>
@@ -923,8 +1046,8 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
             Annuler
           </Button>
           {(currentStatut !== "Termine" && currentStatut !== "Annule") && (
-            <Button 
-              onClick={handleSave} 
+            <Button
+              onClick={handleSave}
               disabled={loading || (!canEditProgress() && progression !== stage.pourcentageAvancement)}
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

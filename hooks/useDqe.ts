@@ -273,13 +273,17 @@ export const useDqeConversion = () => {
     }
   }, []);
 
+  /**
+   * Lie un DQE à un projet existant
+   * Les items du DQE seront ajoutés sous les items existants du projet
+   */
   const linkToExistingProject = useCallback(async (
     dqeId: number,
     projetId: number
   ): Promise<boolean> => {
     setLoading(true);
     setError(null);
-  
+
     try {
       const response = await DQEService.linkToExistingProject(dqeId, projetId);
       toast.success(response.message || 'DQE lié au projet avec succès');
@@ -308,7 +312,7 @@ export const useDqeConversion = () => {
     checkCanConvert,
     generatePreview,
     convertToProject,
-    linkToExistingProject, 
+    linkToExistingProject,
     resetPreview,
   };
 };
@@ -478,18 +482,17 @@ export const useDqeStats = () => {
 export const useDqeExport = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isExportingExcel, setIsExportingExcel] = useState(false);
-  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
-  const exportExcel = useCallback(async (id: number, reference?: string): Promise<boolean> => {
+  /**
+   * Exporte un DQE en Excel
+   */
+  const exportExcel = useCallback(async (id: number): Promise<boolean> => {
     setLoading(true);
-    setIsExportingExcel(true);
     setError(null);
     
     try {
       const { blob, filename } = await DQEService.exportExcel(id);
-      const finalFilename = filename || `DQE_${reference || id}_${new Date().toISOString().split('T')[0]}.xlsx`;
-      DQEService.downloadFile(blob, finalFilename);
+      DQEService.downloadFile(blob, filename || `DQE-${id}.xlsx`);
       toast.success('Export Excel réussi');
       return true;
     } catch (err) {
@@ -499,19 +502,19 @@ export const useDqeExport = () => {
       return false;
     } finally {
       setLoading(false);
-      setIsExportingExcel(false);
     }
   }, []);
 
-  const exportPDF = useCallback(async (id: number, reference?: string): Promise<boolean> => {
+  /**
+   * Exporte un DQE en PDF
+   */
+  const exportPDF = useCallback(async (id: number): Promise<boolean> => {
     setLoading(true);
-    setIsExportingPdf(true);
     setError(null);
     
     try {
       const { blob, filename } = await DQEService.exportPDF(id);
-      const finalFilename = filename || `DQE_${reference || id}_${new Date().toISOString().split('T')[0]}.pdf`;
-      DQEService.downloadFile(blob, finalFilename);
+      DQEService.downloadFile(blob, filename || `DQE-${id}.pdf`);
       toast.success('Export PDF réussi');
       return true;
     } catch (err) {
@@ -521,42 +524,14 @@ export const useDqeExport = () => {
       return false;
     } finally {
       setLoading(false);
-      setIsExportingPdf(false);
     }
   }, []);
-
-  const previewDqe = useCallback((id: number) => {
-    try {
-      DQEService.previewDqe(id);
-      toast.success('Prévisualisation ouverte dans un nouvel onglet');
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la prévisualisation';
-      setError(errorMessage);
-      toast.error(errorMessage);
-    }
-  }, []);
-
-  const quickExport = useCallback(async (
-    id: number, 
-    format: 'excel' | 'pdf',
-    reference?: string
-  ): Promise<boolean> => {
-    if (format === 'excel') {
-      return await exportExcel(id, reference);
-    } else {
-      return await exportPDF(id, reference);
-    }
-  }, [exportExcel, exportPDF]);
 
   return {
     loading,
     error,
-    isExportingExcel,
-    isExportingPdf,
     exportExcel,
     exportPDF,
-    previewDqe,
-    quickExport,
   };
 };
 

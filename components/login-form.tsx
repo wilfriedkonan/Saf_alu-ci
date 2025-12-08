@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Building2 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
+import Link from "next/link"
 
 export function LoginForm() {
   const [email, setEmail] = useState("")
@@ -109,9 +110,11 @@ export function LoginForm() {
             </Button>
 
             <div className="text-center">
-              <Button variant="link" className="text-sm">
-                Mot de passe oublié ?
-              </Button>
+              <Link href="/auth/forgot-password">
+                <Button variant="link" className="text-sm">
+                  Mot de passe oublié ?
+                </Button>
+              </Link>
             </div>
           </form>
         </CardContent>

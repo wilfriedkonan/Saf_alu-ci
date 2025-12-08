@@ -4,18 +4,19 @@ import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { 
-  ArrowLeft, 
-  Building2, 
-  Calendar, 
-  Euro, 
-  Users, 
-  FileText, 
-  Upload, 
+import {
+  ArrowLeft,
+  Building2,
+  Calendar,
+  Euro,
+  Users,
+  FileText,
+  Upload,
   Loader2,
   MapPin,
   User,
@@ -40,29 +41,18 @@ export default function ProjectDetailPage() {
   const { canManageProjects } = usePermissions()
   const router = useRouter()
   const params = useParams()
-  
+
   const projectId = params.id ? parseInt(params.id as string) : null
   const { projet, loading, error, refreshProjet } = useProjet(projectId)
-  
+
   const [showEditModal, setShowEditModal] = useState(false)
   // ✅ État pour préserver l'onglet actif lors du refresh
   const [activeTab, setActiveTab] = useState("overview")
 
-  // Vérification des permissions
-  useEffect(() => {
-    if (!user || !canManageProjects) {
-      router.push("/dashboard")
-      return
-    }
-  }, [user, router, canManageProjects])
+  const totalDepenseProjet = projet?.depenseProjet
+    ?.filter((mvt) => mvt.typeMouvement === "Sortie")
+    ?.reduce((sum, mvt) => sum + mvt.montant, 0) ?? 0;
 
-  // Gestion des erreurs
-  useEffect(() => {
-    if (error) {
-      toast.error(error)
-      router.push("/projets")
-    }
-  }, [error, router])
 
   // Redirection si projet non trouvé
   useEffect(() => {
@@ -96,8 +86,8 @@ export default function ProjectDetailPage() {
     return Math.round((actual / total) * 100)
   }
   const totalDepenses = projet ? projet.etapes
-  ?.reduce((sum, etape) => sum + (etape.depense || 0), 0) : 0;
-  
+    ?.reduce((sum, etape) => sum + (etape.depense || 0), 0) : 0;
+
   // États de chargement et permissions
   if (!user || !canManageProjects) {
     return null
@@ -134,8 +124,8 @@ export default function ProjectDetailPage() {
             <p className="text-muted-foreground">{projet.numero}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => setShowEditModal(true)}
             >
@@ -146,11 +136,11 @@ export default function ProjectDetailPage() {
               {projectStatusLabels[projet.statut]}
             </Badge>
             {projet.typeProjet && (
-              <Badge 
-                variant="outline" 
-                style={{ 
+              <Badge
+                variant="outline"
+                style={{
                   borderColor: projet.typeProjet.couleur,
-                  color: projet.typeProjet.couleur 
+                  color: projet.typeProjet.couleur
                 }}
               >
                 {projet.typeProjet.nom}
@@ -161,7 +151,7 @@ export default function ProjectDetailPage() {
 
         {/* DQE Link Banner */}
         {projet.isFromDqeConversion && (
-          <ProjectDQELinkBanner 
+          <ProjectDQELinkBanner
             project={{
               linkedDqeId: projet.linkedDqeId?.toString() || null,
               linkedDqeReference: projet.linkedDqeReference || "",
@@ -169,9 +159,9 @@ export default function ProjectDetailPage() {
               linkedDqeBudgetHT: projet.linkedDqeBudgetHT || 0,
               clientName: projet.client?.nom || "",
               convertedAt: projet.dqeConvertedAt || "",
-              convertedByName: projet.dqeConvertedBy ? 
+              convertedByName: projet.dqeConvertedBy ?
                 `${projet.dqeConvertedBy.prenom} ${projet.dqeConvertedBy.nom}` : "",
-            }} 
+            }}
           />
         )}
 
@@ -185,16 +175,16 @@ export default function ProjectDetailPage() {
             <CardContent>
               <div className="text-2xl font-bold">{formatCurrency(projet.budgetInitial)}</div>
               <p className="text-xs text-muted-foreground">
-                Coût réel: {formatCurrency(projet.coutReel)} 
-             </p>
-             <p className="text-xs text-muted-foreground">
-    Dépensé : {formatCurrency(totalDepenses??0)}
-    {" "}(
-      {calculateBudgetPercentage(totalDepenses??0, projet.coutReel)}%
-    )
-  </p>
+                Coût réel: {formatCurrency(projet.coutReel)}
+              </p>
               <p className="text-xs text-muted-foreground">
-                Marge: {formatCurrency(projet.budgetInitial-projet.coutReel)}
+                Dépensé : {formatCurrency(totalDepenses ?? 0)}
+                {" "}(
+                {calculateBudgetPercentage(totalDepenses ?? 0, projet.coutReel)}%
+                )
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Marge: {formatCurrency(projet.budgetInitial - projet.coutReel)}
               </p>
               {projet.budgetRevise !== projet.budgetInitial && (
                 <p className="text-xs text-amber-600 mt-1">
@@ -240,11 +230,11 @@ export default function ProjectDetailPage() {
                 {calculateDuration(projet.dateDebut, projet.dateFinPrevue)} j
               </div>
               <p className="text-xs text-muted-foreground">
-                {projet.dateDebut 
-                  ? new Date(projet.dateDebut).toLocaleDateString("fr-FR") 
-                  : "Non défini"} - {projet.dateFinPrevue 
-                  ? new Date(projet.dateFinPrevue).toLocaleDateString("fr-FR") 
-                  : "Non défini"}
+                {projet.dateDebut
+                  ? new Date(projet.dateDebut).toLocaleDateString("fr-FR")
+                  : "Non défini"} - {projet.dateFinPrevue
+                    ? new Date(projet.dateFinPrevue).toLocaleDateString("fr-FR")
+                    : "Non défini"}
               </p>
             </CardContent>
           </Card>
@@ -259,6 +249,7 @@ export default function ProjectDetailPage() {
             <TabsTrigger value="location">Localisation</TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="offers">Offres</TabsTrigger>
+            <TabsTrigger value="depenses">Dépenses</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
@@ -307,7 +298,7 @@ export default function ProjectDetailPage() {
                   <p className="text-muted-foreground">
                     {projet.description || "Aucune description disponible"}
                   </p>
-                  
+
                   {/* Informations supplémentaires */}
                   <div className="mt-4 space-y-2">
                     <div className="flex items-center justify-between text-sm">
@@ -352,9 +343,8 @@ export default function ProjectDetailPage() {
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t">
                     <span className="text-muted-foreground">Budget restant</span>
-                    <span className={`font-medium ${
-                      (projet.budgetRevise - projet.coutReel) < 0 ? 'text-red-600' : 'text-green-600'
-                    }`}>
+                    <span className={`font-medium ${(projet.budgetRevise - projet.coutReel) < 0 ? 'text-red-600' : 'text-green-600'
+                      }`}>
                       {formatCurrency(projet.budgetRevise - projet.coutReel)}
                     </span>
                   </div>
@@ -399,8 +389,8 @@ export default function ProjectDetailPage() {
                       {projet.etapes
                         .filter(etape => etape.idSousTraitant)
                         .map((etape) => (
-                          <div 
-                            key={etape.id} 
+                          <div
+                            key={etape.id}
                             className="flex items-center justify-between p-2 bg-muted rounded-lg"
                           >
                             <span className="text-sm">{etape.nom}</span>
@@ -408,10 +398,10 @@ export default function ProjectDetailPage() {
                               <div className="items-center justify-between text-xs">
                                 {etape.typeResponsable === "Interne" ? "Interne" : etape?.sousTraitant?.nom}
                                 <div className="flex flex-col">
-                                {etape.typeResponsable === "Interne" ? "Interne" : etape?.sousTraitant?.telephone}
+                                  {etape.typeResponsable === "Interne" ? "Interne" : etape?.sousTraitant?.telephone}
                                 </div>
-                                </div>
-                              
+                              </div>
+
                             </Badge>
                           </div>
                         ))}
@@ -488,6 +478,72 @@ export default function ProjectDetailPage() {
 
           <TabsContent value="offers">
             <SubcontractorOffersTable projet={projet} onUpdate={handleRefresh} />
+          </TabsContent>
+          <TabsContent value="depenses" className="space-y-4">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-6">
+                  {/* Titre */}
+                  <Label className="text-base font-medium flex items-center gap-2">
+                    Historique des dépenses du projet
+                  </Label>
+
+                  {/* 🔥 LISTE DES MOUVEMENTS FINANCIERS 🔥 */}
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-sm">Mouvements financiers</h3>
+
+                    {/* Si aucun mouvement */}
+                    {(!projet?.depenseProjet || projet.depenseProjet.length === 0) && (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Aucun mouvement enregistré pour le moment
+                      </p>
+                    )}
+
+                    {/* Liste */}
+                    <div className="space-y-3">
+                      {projet?.depenseProjet?.map((mvt) => (
+                        <div
+                          key={mvt.id}
+                          className="flex items-start justify-between border rounded-lg p-3 bg-muted/30"
+                        >
+                          <div className="flex items-start space-x-3">
+                            {/* Pastille */}
+                            <div
+                              className={`h-2 w-2 rounded-full mt-2 flex-shrink-0 ${mvt.typeMouvement === "Sortie" ? "bg-red-500" : "bg-green-500"
+                                }`}
+                            />
+
+                            <div>
+                              <p className="font-medium">{mvt.libelle}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(mvt.dateMouvement).toLocaleDateString("fr-FR")}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Montant */}
+                          <p
+                            className={`font-semibold ${mvt.typeMouvement === "Sortie" ? "text-red-600" : "text-green-700"
+                              }`}
+                          >
+                            {mvt.typeMouvement === "Sortie" ? "-" : "+"}
+                            {mvt.montant.toLocaleString("fr-FR")} F
+                          </p>
+                        </div>
+                      ))}
+                          <div className="border rounded-lg p-4 bg-muted/50">
+                    <p className="text-sm font-medium flex items-center gap-2">
+                      Total dépense projet :
+                      <span className="text-red-600 font-bold">
+                        {totalDepenseProjet.toLocaleString("fr-FR")} F
+                      </span>
+                    </p>
+                  </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>

@@ -4,20 +4,20 @@
 import React, { useState, useEffect } from 'react'
 import { 
   TacheProjet, 
-  CreateTacheProjetRequest,
-  UpdateTacheProjetRequest,
+  CreateEtapeProjetRequest,
+  UNITE_LABELS,
   UniteMesure,
-  TacheStatus,
+  StageStatus,
   ResponsableType,
-  uniteLabels,
-  tacheStatusLabels
+ 
+  stageStatusLabels
 } from '@/types/projet'
 import { X } from 'lucide-react'
 
 interface TacheFormModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (data: CreateTacheProjetRequest | UpdateTacheProjetRequest) => Promise<void>
+  onSubmit: (data: CreateEtapeProjetRequest | Partial<CreateEtapeProjetRequest>) => Promise<void>
   tache?: TacheProjet // Si fourni, mode édition
   etapeId: number
   mode: 'create' | 'edit'
@@ -45,7 +45,7 @@ export default function TacheFormModal({
     quantiteRealisee: 0,
     prixUnitairePrevu: 0,
     prixUnitaireReel: 0,
-    statut: 'NonCommence' as TacheStatus,
+    statut: 'NonCommence' as StageStatus,
     pourcentageAvancement: 0,
     dateDebut: '',
     dateFinPrevue: '',
@@ -135,7 +135,7 @@ export default function TacheFormModal({
         
         await onSubmit(createData)
       } else {
-        const updateData: UpdateTacheProjetRequest = {
+        const updateData: Partial<CreateEtapeProjetRequest> = {
           nom: formData.nom,
           description: formData.description || undefined,
           unite: formData.unite,
@@ -290,9 +290,9 @@ export default function TacheFormModal({
                       required
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
-                      {Object.entries(uniteLabels).map(([value, label]) => (
+                      {Object.entries(UNITE_LABELS ).map(([value, label]) => (
                         <option key={value} value={value}>
-                          {label} ({value})
+                          {label as string} ({value})
                         </option>
                       ))}
                     </select>
@@ -403,7 +403,7 @@ export default function TacheFormModal({
                         required
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       >
-                        {Object.entries(tacheStatusLabels).map(([value, label]) => (
+                        {Object.entries(stageStatusLabels).map(([value, label]) => (
                           <option key={value} value={value}>
                             {label}
                           </option>

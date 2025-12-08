@@ -331,7 +331,7 @@ export default function ProjectsPage() {
                         <div>
                           <div className="font-medium">{project.client?.nom || "N/A"}</div>
                           <div className="text-sm text-muted-foreground">
-                            {project.villeChantier || project.client?.adresse || "N/A"}
+                          {project.client?.telephone || "N/A"}
                           </div>
                         </div>
                       </TableCell>

@@ -77,7 +77,7 @@ export function SubcontractorOffersTable({ projet, onUpdate }: SubcontractorOffe
       ? projet.etapes?.filter((etape) => etape?.id?.toString() === selectedStage)
       : projet.etapes?.filter((etape) => etape.typeResponsable === "SousTraitant")
 
-  return (
+   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -101,7 +101,7 @@ export function SubcontractorOffersTable({ projet, onUpdate }: SubcontractorOffe
                 <SelectContent>
                   <SelectItem value="all">Toutes les étapes</SelectItem>
                   {projet.etapes?.map((etape) => (
-                    <SelectItem key={etape?.id} value={etape?.id?.toString()}>
+                    <SelectItem key={etape.id} value={etape.id?.toString() || ""}>
                       {etape.nom}
                     </SelectItem>
                   ))}
