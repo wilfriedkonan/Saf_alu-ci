@@ -24,7 +24,7 @@ interface InviteFormData {
   roleId: number
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5264/api'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL /* || 'http://localhost:5264/api' */
 
 export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalProps) {
   const [loading, setLoading] = useState(false)

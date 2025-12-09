@@ -11,7 +11,7 @@ import { Loader2, CheckCircle2, XCircle, Eye, EyeOff, Lock } from "lucide-react"
 import { toast } from "sonner"
 import axios from "axios"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5264/api'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL /* || 'http://localhost:5264/api' */
 
 export default function ResetPasswordPage() {
   const router = useRouter()
