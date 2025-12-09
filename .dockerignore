@@ -1,0 +1,54 @@
+# Node modules
+node_modules
+npm-debug.log
+yarn-debug.log*
+yarn-error.log*
+
+# Logs
+logs
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# Environment files (ne jamais envoyer dans l'image)
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Output Next.js
+.next
+out
+
+# Typescript build
+dist
+build
+
+# System files
+.DS_Store
+*.swp
+
+# Git
+.git
+.gitignore
+.gitlab*
+.github/
+
+# Docker
+docker-compose.yml
+Dockerfile
+
+# Testing
+coverage
+jest-cache
+jest-coverage
+
+# Local editor configs
+.vscode
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
