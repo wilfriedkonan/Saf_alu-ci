@@ -2,7 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
-import { Analytics } from "@vercel/analytics/next"
+//import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/contexts/AuthContext" 
 import { Suspense } from "react"
@@ -31,7 +31,7 @@ export default function RootLayout({
           </ThemeProvider>
         </Suspense>
         <Toaster />
-        <Analytics />
+      {/*   <Analytics /> */}
       </body>
     </html>
   )
