@@ -12,7 +12,7 @@ import { toast } from "sonner"
 import axios from "axios"
 import Link from "next/link"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ; // || 'http://localhost:5264/api' ;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://167.86.107.54/api' ;
 
 export default function ForgotPasswordPage() {
   const router = useRouter()
