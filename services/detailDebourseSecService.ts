@@ -12,7 +12,7 @@ import {
 } from '@/types/dqe-debourse-sec';
 
 // Configuration axios
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL /* || 'http://localhost:5264/api' */;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ; // || 'http://localhost:5264/api' ;;
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
