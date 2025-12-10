@@ -18,7 +18,7 @@ import type {
 // CONFIGURATION
 // =============================================
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ; // || 'http://localhost:5264/api' ;;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://167.86.107.54/api' ;
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
