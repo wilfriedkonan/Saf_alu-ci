@@ -1,7 +1,7 @@
 // lib/api.js - Configuration Axios centralisée
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://167.86.107.54/api' ;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5264/api';
 
 // Instance Axios principale
 const apiClient = axios.create({
@@ -36,10 +36,10 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
       
       // Token expiré, rediriger vers login
-       if (typeof window !== 'undefined') {
+      /* if (typeof window !== 'undefined') {
         removeStoredToken();
         window.location.href = '/';
-      } 
+      } */
     }
     
     return Promise.reject(error);

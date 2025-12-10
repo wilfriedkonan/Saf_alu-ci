@@ -11,7 +11,7 @@ import { Loader2, CheckCircle2, XCircle, Eye, EyeOff, Shield } from "lucide-reac
 import { toast } from "sonner"
 import axios from "axios"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://167.86.107.54/api' ;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ; // || 'http://localhost:5264/api' ;
 const INDEX_URL = process.env.NEXT_INDEX 
 
 export default function CompleteRegistrationPage() {
