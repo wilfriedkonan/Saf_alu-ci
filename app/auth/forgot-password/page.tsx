@@ -11,8 +11,9 @@ import { Loader2, Mail, ArrowLeft, CheckCircle2 } from "lucide-react"
 import { toast } from "sonner"
 import axios from "axios"
 import Link from "next/link"
+import { API_BASE_URL} from '@/lib/api-config';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://167.86.107.54/api' ;
+
 
 export default function ForgotPasswordPage() {
   const router = useRouter()

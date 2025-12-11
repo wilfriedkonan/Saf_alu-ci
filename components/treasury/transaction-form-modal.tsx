@@ -31,6 +31,9 @@ import { useProjetEtapes, useProjetsList } from "@/hooks/useProjet"
 import { useSousTraitantList } from "@/hooks/useSoustraitant"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { toast } from "sonner"
+import { API_BASE_URL } from "@/lib/api-config"
+import { useInvoice } from "@/hooks/useInvoices"
+import { InvoiceService } from "@/services/invoiceService"
 // ============================================
 // INTERFACES POUR LES ENTITÉS LIÉES
 // ============================================
@@ -46,7 +49,9 @@ interface Facture {
   id: number
   numeroFacture: string
   client: string
-  montantTotal: number
+  montant: number,
+  montantRestant: number
+  
 }
 
 interface SousTraitant {
@@ -310,16 +315,17 @@ function useFactures() {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch("/api/Factures/non-payees")
-      if (!response.ok) throw new Error("Erreur lors du chargement des factures")
-      const data = await response.json()
+      const response = await InvoiceService.getOverdueInvoices()
+      if (!response) throw new Error("Erreur lors du chargement des factures")
+      const data = response
 
-      const rawFactures = Array.isArray(data) ? data : data.factures || []
+      const rawFactures = Array.isArray(data) ? data : data || []
       const mappedFactures = rawFactures.map((f: any) => ({
         id: f.id || f.factureId,
         numeroFacture: f.numeroFacture || f.numero || '',
-        client: f.client || f.nomClient || f.detailDebiteur?.nom || '',
-        montantTotal: f.montantTotal || f.montant || 0,
+        client: f.debiteur || f.nomClient || f.detailDebiteur?.nom || '',
+        montant: f.montantRestant || f.montant || 0,
+        montantRestant: f.montantRestant
       }))
 
       setFactures(mappedFactures)
@@ -412,7 +418,7 @@ export function TransactionFormModal({
     }
   }, [comptes, formState.compteId])
 
-  const isVirement = formState.typeMouvement === "Virement"
+  /* const isVirement = formState.typeMouvement === "Virement" */
   const isEntree = formState.typeMouvement === "Entree"
   const isSortie = formState.typeMouvement === "Sortie"
 
@@ -437,10 +443,10 @@ export function TransactionFormModal({
       return
     }
 
-    if (isVirement && (!formState.compteDestinationId || formState.compteDestinationId === formState.compteId)) {
+  /*   if (isVirement && (!formState.compteDestinationId || formState.compteDestinationId === formState.compteId)) {
       toast.info('Sélectionnez un compte de destination différent du compte source.')
       return
-    }
+    } */
 
     const montant = Number(formState.montant)
     if (!montant || montant <= 0) {
@@ -467,9 +473,9 @@ export function TransactionFormModal({
       reference: formState.reference || undefined,
     }
 
-    if (isVirement) {
+    /* if (isVirement) {
       payload.compteDestinationId = Number(formState.compteDestinationId)
-    }
+    } */
 
     // En cas d'entrée avec facture
     if (isEntree && formState.factureId) {
@@ -635,7 +641,7 @@ export function TransactionFormModal({
                         </p>
                       )}
                     </div>
-                    {isVirement && (
+                  {/*   {isVirement && (
                       <div>
                         <Label>Compte destination</Label>
                         <Select
@@ -665,7 +671,7 @@ export function TransactionFormModal({
                           </SelectContent>
                         </Select>
                       </div>
-                    )}
+                    )} */}
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -783,7 +789,7 @@ export function TransactionFormModal({
                         value={formState.factureId}
                         onValueChange={(value) => handleChange("factureId", value)}
                         displayField={(facture) => `${facture.numeroFacture} - ${facture.client}`}
-                        secondaryField={(facture) => `Montant: ${facture.montantTotal?.toLocaleString() || 0} XOF`}
+                        secondaryField={(facture) => `Montant restant: ${facture.montant || 0} XOF`}
                         getKey={(facture) => facture.id.toString()}
                       />
                     )}

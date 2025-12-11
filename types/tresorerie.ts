@@ -2,6 +2,10 @@
 // INTERFACES PRINCIPALES - TRÉSORERIE
 // ============================================
 
+import { Facture } from "./invoices"
+import { Project } from "./projet"
+import Utilisateurs, { Utilisateur } from "./Utilisateurs"
+
 export interface Compte {
     id: number
     nom: string
@@ -45,8 +49,14 @@ export interface Compte {
     // Navigation properties (optionnelles)
     compte?: Compte
     compteDestination?: Compte
+    facture? : Facture
+    projet?:Project
+    utilisateurSaisieProp: Utilisateurs
   }
-  
+  interface Utilisateurs {
+    
+    nom: string;
+    prenom: string; }
   // ============================================
   // DTOs POUR CRÉATION ET MODIFICATION
   // ============================================

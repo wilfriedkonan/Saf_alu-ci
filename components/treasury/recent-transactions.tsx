@@ -1,8 +1,11 @@
 "use client"
 
-import { ArrowUpRight, ArrowDownRight } from "lucide-react"
+import { useState } from "react"
+import { ArrowUpRight, ArrowDownRight, Eye } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { formatCurrency, formatDate, typeMouvementColors, MouvementFinancier, Compte } from "@/types/tresorerie"
+import { TransactionDetailDialog } from "./transaction-detail-dialog"
 
 interface RecentTransactionsProps {
   mouvements: MouvementFinancier[]
@@ -21,6 +24,19 @@ export function RecentTransactions({
   error = null,
   comptesMap,
 }: RecentTransactionsProps) {
+  const [selectedTransactionId, setSelectedTransactionId] = useState<number | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+
+  const handleViewDetails = (transactionId: number) => {
+    setSelectedTransactionId(transactionId)
+    setDialogOpen(true)
+  }
+
+  const handleCloseDialog = () => {
+    setDialogOpen(false)
+    // Attendre la fermeture de l'animation avant de reset l'ID
+    setTimeout(() => setSelectedTransactionId(null), 300)
+  }
   
   if (loading) {
     return (
@@ -89,86 +105,113 @@ export function RecentTransactions({
   }
 
   return (
-    <div className="space-y-4">
-      {transactions.map((transaction) => {
-        const isEntree = transaction.typeMouvement === "Entree"
-        const isVirement = transaction.typeMouvement === "Virement"
-        
-        // Récupérer le compte depuis le mouvement ou depuis la map
-        const compte = transaction.compte || (comptesMap && comptesMap.get(transaction.compteId))
-        const compteName = compte?.nom || `Compte #${transaction.compteId || 'N/A'}`
-        
-        // Récupérer le compte destination si c'est un virement
-        const compteDestination = transaction.compteDestination || 
-          (transaction.compteDestinationId && comptesMap && comptesMap.get(transaction.compteDestinationId))
+    <>
+      <div className="space-y-4">
+        {transactions.map((transaction) => {
+          const isEntree = transaction.typeMouvement === "Entree"
+/*           const isVirement = transaction.typeMouvement === "Virement"
+ */          
+          // Récupérer le compte depuis le mouvement ou depuis la map
+          const compte = transaction.compte || (comptesMap && comptesMap.get(transaction.compteId))
+          const compteName = compte?.nom || `Compte #${transaction.compteId || 'N/A'}`
+          
+          // Récupérer le compte destination si c'est un virement
+          const compteDestination = transaction.compteDestination || 
+            (transaction.compteDestinationId && comptesMap && comptesMap.get(transaction.compteDestinationId))
 
-        return (
-          <div key={transaction.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors">
-            <div className="flex items-center space-x-3">
-              {/* Icône */}
-              <div className={`p-2 rounded-full ${
-                isEntree ? "bg-green-100" : isVirement ? "bg-blue-100" : "bg-red-100"
-              }`}>
-                {isEntree ? (
-                  <ArrowUpRight className="h-4 w-4 text-green-600" />
-                ) : (
-                  <ArrowDownRight className={`h-4 w-4 ${isVirement ? "text-blue-600" : "text-red-600"}`} />
-                )}
-              </div>
+          return (
+            <div 
+              key={transaction.id} 
+              className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors group"
+            >
+              <div className="flex items-center space-x-3 flex-1">
+                {/* Icône */}
+                <div className={`p-2 rounded-full ${
+                  isEntree ? "bg-green-100" : "bg-red-100" /* isVirement ? "bg-blue-100" : "bg-red-100" */
+                }`}>
+                  {isEntree ? (
+                    <ArrowUpRight className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <ArrowDownRight className={`h-4 w-4 ${/* isVirement ? "text-blue-600" : */ "text-red-600"}`} />
+                  )}
+                </div>
 
-              {/* Informations */}
-              <div>
-                <p className="font-medium text-sm">{transaction.libelle}</p>
-                
-                {transaction.description && (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {transaction.description}
-                  </p>
-                )}
-                
-                <div className="flex items-center space-x-2 mt-1 flex-wrap">
-                  {transaction.categorie && (
-                    <>
-                      <p className="text-xs text-muted-foreground">{transaction.categorie}</p>
-                      <span className="text-xs text-muted-foreground">•</span>
-                    </>
+                {/* Informations */}
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate">{transaction.libelle}</p>
+                  
+                  {transaction.description && (
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                      {transaction.description}
+                    </p>
                   )}
                   
-                  <p className="text-xs text-muted-foreground">{compteName}</p>
-                  
-                  {compteDestination && (
-                    <>
-                      <span className="text-xs text-blue-500">→</span>
-                      <p className="text-xs text-muted-foreground">{compteDestination.nom}</p>
-                    </>
-                  )}
-                  
-                  <span className="text-xs text-muted-foreground">•</span>
-                  <p className="text-xs text-muted-foreground">
-                    {formatDate(transaction.dateMouvement)}
-                  </p>
+                  <div className="flex items-center space-x-2 mt-1 flex-wrap">
+                    {transaction.categorie && (
+                      <>
+                        <p className="text-xs text-muted-foreground">{transaction.categorie}</p>
+                        <span className="text-xs text-muted-foreground">•</span>
+                      </>
+                    )}
+                    
+                    <p className="text-xs text-muted-foreground truncate">{compteName}</p>
+                    
+                    {compteDestination && (
+                      <>
+                        <span className="text-xs text-blue-500">→</span>
+                        <p className="text-xs text-muted-foreground truncate">{compteDestination.nom}</p>
+                      </>
+                    )}
+                    
+                    <span className="text-xs text-muted-foreground">•</span>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDate(transaction.dateMouvement)}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Montant et badge */}
-            <div className="text-right space-y-1">
-              <p className={`font-semibold ${
-                isEntree ? "text-green-600" : isVirement ? "text-blue-600" : "text-red-600"
-              }`}>
-                {isEntree ? "+" : isVirement ? "→" : "-"}
-                {formatCurrency(transaction.montant)}
-              </p>
-              <Badge 
-                variant="outline" 
-                className={`text-xs ${typeMouvementColors[transaction.typeMouvement as keyof typeof typeMouvementColors] || ''}`}
-              >
-                {transaction.typeMouvement}
-              </Badge>
+              {/* Montant, badge et bouton détails */}
+              <div className="flex items-center gap-3 ml-3">
+                <div className="text-right space-y-1">
+                  <p className={`font-semibold ${
+                    isEntree ? "text-green-600" : "text-red-600" /* isVirement ? "text-blue-600" : "text-red-600" */
+                  }`}>
+                    {isEntree ? "+" : "-" /* isVirement ? "→" : "-" */}
+                    {formatCurrency(transaction.montant)}
+                  </p>
+                  <Badge 
+                    variant="outline" 
+                    className={`text-xs ${typeMouvementColors[transaction.typeMouvement as keyof typeof typeMouvementColors] || ''}`}
+                  >
+                    {transaction.typeMouvement}
+                  </Badge>
+                </div>
+
+                {/* Bouton œil - visible au survol */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => handleViewDetails(transaction.id)}
+                  title="Voir les détails"
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-          </div>
-        )
-      })}
-    </div>
+          )
+        })}
+      </div>
+
+      {/* Dialog de détails */}
+      {selectedTransactionId && (
+        <TransactionDetailDialog
+          transactionId={selectedTransactionId}
+          open={dialogOpen}
+          onOpenChange={handleCloseDialog}
+        />
+      )}
+    </>
   )
 }

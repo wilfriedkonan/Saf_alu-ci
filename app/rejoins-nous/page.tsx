@@ -10,9 +10,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, CheckCircle2, XCircle, Eye, EyeOff, Shield } from "lucide-react"
 import { toast } from "sonner"
 import axios from "axios"
+import { API_BASE_URL} from '@/lib/api-config';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://167.86.107.54/api' ;
-const INDEX_URL = process.env.NEXT_INDEX 
+
 
 export default function CompleteRegistrationPage() {
   const router = useRouter()

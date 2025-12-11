@@ -1,30 +1,7 @@
 // lib/api.js - Configuration Axios centralisée
-import axios from 'axios';
+import { apiClient } from './api-config';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://167.86.107.54/api';
 
-// Instance Axios principale
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Intercepteur de requête pour ajouter le token automatiquement
-apiClient.interceptors.request.use(
-  (config) => {
-    const token = getStoredToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
 
 // Intercepteur de réponse pour gérer l'expiration du token
 apiClient.interceptors.response.use(

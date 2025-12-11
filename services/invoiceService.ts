@@ -11,7 +11,8 @@ import type {
     MarquerPayeRequest,
     FactureStatut,
     FactureType,
-  } from "@/types/invoices"
+  } from "@/types/invoices";
+  import { apiClient } from '@/lib/api-config';
   
   // DTOs pour l'API - Utilisation des types de types/invoices.ts
   interface UpdateFactureRequest {
@@ -48,42 +49,7 @@ import type {
     errors?: string[];
   }
   
-  // Configuration axios
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://167.86.107.54/api';
-
-  const apiClient = axios.create({
-    baseURL: API_BASE_URL,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  // Intercepteur pour ajouter le token d'authentification
-  apiClient.interceptors.request.use(
-    (config) => {
-      const token = localStorage.getItem('safalu_token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      return config;
-    },
-    (error) => {
-      return Promise.reject(error);
-    }
-  );
-
-  // Intercepteur pour gérer les erreurs de réponse
-  apiClient.interceptors.response.use(
-    (response) => response,
-    (error) => {
-      if (error.response?.status === 401) {
-        // Token expiré ou invalide
-        localStorage.removeItem('safalu_token');
-        window.location.href = '/';
-      }
-      return Promise.reject(error);
-    }
-  );
+ 
   
   export class InvoiceService {
   
@@ -248,7 +214,7 @@ import type {
      */
     static async getOverdueInvoices(): Promise<Facture[]> {
       try {
-        const response: AxiosResponse<Facture[]> = await apiClient.get('/factures/impayes');
+        const response: AxiosResponse<Facture[]> = await apiClient.get('/Factures/impayes');
         return response.data;
       } catch (error) {
         console.error('Erreur lors de la récupération des factures impayées:', error);

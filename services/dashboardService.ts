@@ -13,51 +13,7 @@ import type {
   DashboardKPIs,
   ProjetActif,
 } from '@/types/dashboard';
-
-// =============================================
-// CONFIGURATION
-// =============================================
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://167.86.107.54/api' ;
-
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// =============================================
-// INTERCEPTEURS
-// =============================================
-
-// Ajouter le token JWT
-apiClient.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('safalu_token');
-    console.log('🔑 Token récupéré:', token ? 'Existe ✅' : 'Manquant ❌');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-      console.log('📤 Header Authorization:', config.headers.Authorization);
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Gérer les erreurs de réponse
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('safalu_token');
-      window.location.href = '/';
-    }
-    return Promise.reject(error);
-  }
-);
+import apiClient from '@/lib/auth';
 
 // =============================================
 // SERVICE DASHBOARD

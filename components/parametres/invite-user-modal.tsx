@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, Mail, UserPlus } from "lucide-react"
 import { toast } from "sonner"
 import axios from "axios"
+import { API_BASE_URL} from '@/lib/api-config';
+
 
 interface InviteUserModalProps {
   isOpen: boolean
@@ -24,7 +26,6 @@ interface InviteFormData {
   roleId: number
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://167.86.107.54/api' ;
 
 export function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalProps) {
   const [loading, setLoading] = useState(false)
