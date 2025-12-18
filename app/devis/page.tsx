@@ -1,7 +1,7 @@
 // pages/devis/page.tsx
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, Search, FileText, Euro, Clock, CheckCircle, Loader2, AlertCircle } from "lucide-react"
+import { Plus, Search, FileText, Euro, Clock, CheckCircle, Loader2, AlertCircle, RefreshCw } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
 import { 
@@ -22,7 +22,7 @@ import {
 } from "@/types/devis"
 import { useDevisList, useDevisStatistiques, useDevisActions } from "@/hooks/useDevis"
 import { QuoteActions } from "@/components/quotes/quote-actions"
-import { QuoteFormModal } from "@/components/quotes/quote-form-modal"
+import { QuoteFormModalV2 } from "@/components/quotes/quote-form-modal"
 import { useAuth, usePermissions } from "@/contexts/AuthContext"
 import { toast } from "@/hooks/use-toast"
 import { useDevisService } from "@/services/devisService"
@@ -46,11 +46,10 @@ export default function DevisPage() {
 
   // Vérification des permissions
   useEffect(() => {
-    if (!user || !canAccessQuotes) {
+    if (user && !canAccessQuotes) {
       router.push("/dashboard")
       return
     }
-    console.log('stat verification:',stats)
 
   }, [user, canAccessQuotes, router])
 
@@ -78,7 +77,12 @@ export default function DevisPage() {
 
   // État devis en édition
   const [editingDevis, setEditingDevis] = useState<Devis | null>(null)
-
+  const handleRefresh = useCallback(() => {
+    refreshDevis()
+    refreshStats()
+  
+  }, [refreshDevis, refreshStats])
+  
   // Gestionnaire création/modification
   const handleSubmitDevis = async (newDevisData: any) => {
     try {
@@ -179,17 +183,24 @@ export default function DevisPage() {
             <h1 className="text-3xl font-bold tracking-tight">Gestion des Devis</h1>
             <p className="text-muted-foreground">Créez, gérez et suivez vos devis clients</p>
           </div>
-          <Button 
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={devisLoading }>
+              <RefreshCw className={`mr-2 h-4 w-4 ${(devisLoading ) ? 'animate-spin' : ''}`} />
+              Actualiser
+            </Button>
+            <Button 
             onClick={() => { setEditingDevis(null); setShowDevisForm(true) }}
-            disabled={actionLoading}
+            disabled={devisLoading}
           >
-            {actionLoading ? (
+            {devisLoading ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <Plus className="mr-2 h-4 w-4" />
             )}
             Nouveau devis
           </Button>
+          </div>
+         
         </div>
 
         {/* Affichage des erreurs */}
@@ -394,7 +405,7 @@ export default function DevisPage() {
       </div>
 
       {/* Modal de création de devis */}
-      <QuoteFormModal 
+      <QuoteFormModalV2 
         open={showDevisForm} 
         onOpenChange={(open) => { if (!open) setEditingDevis(null); setShowDevisForm(open) }} 
         onSubmit={handleSubmitDevis}

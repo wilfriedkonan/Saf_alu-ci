@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, Search, Receipt, Euro, AlertTriangle, TrendingUp, Trash2, Loader2 } from "lucide-react"
+import { Plus, Search, Receipt, Euro, AlertTriangle, TrendingUp, Trash2, Loader2, RefreshCw } from "lucide-react"
 import { useInvoices, useInvoiceStats, useListFacture } from "@/hooks/useInvoices"
 import type { Facture, InvoiceStatus, InvoiceType, CreateFactureRequest } from "@/types/invoices"
 import { invoiceStatusLabels, invoiceStatusColors, invoiceTypeLabels } from "@/types/invoices"
@@ -43,20 +43,18 @@ export default function InvoicesPage() {
   // État devis en édition
   const [editingFacture, setEditingFacture] = useState<Facture | null>(null)
 
-  useEffect(() => {
-    console.log('Statue selectionne:', typeFilter)
-  }, [typeFilter])
+  
   // Vérifier les permissions
   useEffect(() => {
-    if (!user || !canAccessFinances) {
-      router.push("/dashboard")
+    if (user && !canManageFinances) {
+      router.replace("/dashboard")
       return
     }
     // Charger les données au montage
     /*  getAll()
      getOverdue() */
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, canAccessFinances, router])
+  }, [user, canManageFinances, router])
 
   // Appliquer les filtres
 
@@ -71,7 +69,6 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     let filtered = facture
-    console.log('Data Facture:', facture)
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase()
       filtered = filtered.filter(
@@ -90,7 +87,6 @@ export default function InvoicesPage() {
     }
 
     setFilteredFacture(filtered)
-    console.log('valeur de filtered:', filtered)
   }, [facture, searchTerm, statusFilter, typeFilter])
 
   // Auto-dismiss des erreurs
@@ -112,7 +108,11 @@ export default function InvoicesPage() {
     setEditingFacture(null)
 
   }
-
+  const handleRefresh = useCallback(() => {
+    refreshFacture()
+    refresh()
+  
+  }, [refreshFacture, refresh])
   // Gestion de la suppression
   const handleDeleteInvoice = async (id: number, number: string) => {
     if (confirm(`Êtes-vous sûr de vouloir supprimer la facture ${number} ?`)) {
@@ -148,7 +148,7 @@ export default function InvoicesPage() {
   }
 
   // Protection de la route
-  if (!user || !canAccessFinances) {
+  if (!user || !canManageFinances) {
     return null
   }
 
@@ -162,12 +162,19 @@ export default function InvoicesPage() {
             <h1 className="text-3xl font-bold tracking-tight">Gestion des Factures</h1>
             <p className="text-muted-foreground">Créez, gérez et suivez vos factures clients</p>
           </div>
-          <Button onClick={() => setIsInvoiceFormOpen(true)} disabled={loading}>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={FactureLoading }>
+              <RefreshCw className={`mr-2 h-4 w-4 ${(FactureLoading ) ? 'animate-spin' : ''}`} />
+              Actualiser
+            </Button>
+         
+
+          <Button onClick={() => setIsInvoiceFormOpen(true)} disabled={FactureLoading}>
             <Plus className="mr-2 h-4 w-4" />
             Nouvelle facture
           </Button>
         </div>
-
+        </div>
         {/* Alertes factures en retard */}
         {overdueInvoices.length > 0 && (
           <Card className="border-red-200 bg-red-50">
@@ -341,7 +348,6 @@ export default function InvoicesPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredFacture.map((invoice) => {
-                    console.log("Détail débiteur :", invoice.detailDebiteur)
                     return (
                       <TableRow key={invoice.id}>
                         <TableCell className="font-medium">{invoice.numero}</TableCell>

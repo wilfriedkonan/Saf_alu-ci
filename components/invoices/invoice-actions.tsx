@@ -107,9 +107,9 @@ export function InvoiceActions({ invoice, onUpdate, onEdit }: InvoiceActionsProp
 
   const canSend = invoice.status === "Brouillon" 
   const canMarkPaid =
-    invoice.status === "Envoyee" || invoice.status === "en_retard" || invoice.status === "payee"
+    invoice.status === "Envoyee" || invoice.status === "EnRetard" || invoice.status === "payee"
   const canSendReminder =
-    invoice.status === "Envoyee" || invoice.status === "en_retard" || invoice.status === "payee"
+    invoice.status === "Envoyee" || invoice.status === "EnRetard" || invoice.status === "payee"
   const canCancel = invoice.status !== "payee" && invoice.status !== "Annulee"
   const canEdit = ["Brouillon", "Refuse"].includes(invoice.statut)
   return (
@@ -150,7 +150,7 @@ export function InvoiceActions({ invoice, onUpdate, onEdit }: InvoiceActionsProp
             </DropdownMenuItem>
           )}
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleExportPDF} disabled={loading}>
+          {/* <DropdownMenuItem onClick={handleExportPDF} disabled={loading}>
             <FileDown className="mr-2 h-4 w-4" />
             Export PDF
           </DropdownMenuItem>
@@ -158,7 +158,7 @@ export function InvoiceActions({ invoice, onUpdate, onEdit }: InvoiceActionsProp
             <FileDown className="mr-2 h-4 w-4" />
             Export Excel
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
+          <DropdownMenuSeparator /> */}
           {canCancel && (
             <DropdownMenuItem onClick={() => setShowCancelDialog(true)} className="text-red-600" disabled={loading}>
               <X className="mr-2 h-4 w-4" />

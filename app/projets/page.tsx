@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Button } from "@/components/ui/button"
@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { Plus, Search, AlertTriangle, Hammer, Euro, Eye, Trash2, Loader2 } from "lucide-react"
+import { Plus, Search, AlertTriangle, Hammer, Euro, Eye, Trash2, Loader2, RefreshCw } from "lucide-react"
 import { ProjectFormModal } from "@/components/projects/project-form-modal"
 import {
   type Project,
@@ -35,7 +35,7 @@ export default function ProjectsPage() {
     deleteProjet,
     clearError
   } = useProjetActions()
-  const { stats, loading: loadingStats } = useProjetStatistiques()
+  const { stats, loading: loadingStats,refreshStats } = useProjetStatistiques()
 
   // États locaux
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([])
@@ -45,7 +45,7 @@ export default function ProjectsPage() {
 
   // Vérification des permissions
   useEffect(() => {
-    if (!user || !canManageProjects) {
+    if (user &&!canManageProjects) {
       router.push("/dashboard")
       return
     }
@@ -100,6 +100,10 @@ export default function ProjectsPage() {
       return endDate < today && (p.statut === "EnCours" || p.statut === "Planification")
     })
   }
+  const handleRefresh = useCallback(() => {
+    refreshProjets()
+    refreshStats
+  }, [refreshProjets,refreshStats])
 
   const handleCreateProject = async () => {
     try {
@@ -152,10 +156,16 @@ export default function ProjectsPage() {
             <h1 className="text-3xl font-bold tracking-tight">Gestion des Projets</h1>
             <p className="text-muted-foreground">Suivez et gérez vos projets de construction</p>
           </div>
+          <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loadingProjets }>
+              <RefreshCw className={`mr-2 h-4 w-4 ${(loadingProjets ) ? 'animate-spin' : ''}`} />
+              Actualiser
+            </Button>
           <Button onClick={() => setShowProjectForm(true)} disabled={actionLoading}>
             <Plus className="mr-2 h-4 w-4" />
             Nouveau projet
           </Button>
+          </div>
         </div>
 
         {/* Overdue Projects Alert */}

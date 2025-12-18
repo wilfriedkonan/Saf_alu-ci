@@ -195,7 +195,7 @@ export default function TreasuryPage() {
         return haystack.includes(normalizedSearch)
       })
       .sort((a, b) => new Date(b.dateMouvement).getTime() - new Date(a.dateMouvement).getTime())
-      .slice(0, 10)
+      .slice()
   }, [mouvementsList, searchTerm])
 
   const compteAlerts = useMemo(() => {

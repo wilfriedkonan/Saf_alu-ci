@@ -1,11 +1,18 @@
 "use client"
 
-import { useState } from "react"
-import { ArrowUpRight, ArrowDownRight, Eye } from "lucide-react"
+import { useState, useMemo } from "react"
+import { ArrowUpRight, ArrowDownRight, Eye, ChevronLeft, ChevronRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { formatCurrency, formatDate, typeMouvementColors, MouvementFinancier, Compte } from "@/types/tresorerie"
 import { TransactionDetailDialog } from "./transaction-detail-dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 interface RecentTransactionsProps {
   mouvements: MouvementFinancier[]
@@ -26,6 +33,10 @@ export function RecentTransactions({
 }: RecentTransactionsProps) {
   const [selectedTransactionId, setSelectedTransactionId] = useState<number | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  
+  // États de pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
 
   const handleViewDetails = (transactionId: number) => {
     setSelectedTransactionId(transactionId)
@@ -37,7 +48,77 @@ export function RecentTransactions({
     // Attendre la fermeture de l'animation avant de reset l'ID
     setTimeout(() => setSelectedTransactionId(null), 300)
   }
-  
+
+  // Filtrage des transactions
+  const filteredTransactions = useMemo(() => {
+    if (!Array.isArray(mouvements)) return []
+
+    return mouvements.filter((mouvement) => {
+      // Filtre par terme de recherche
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase()
+        const matchesSearch = 
+          mouvement.libelle.toLowerCase().includes(searchLower) ||
+          (mouvement.description && mouvement.description.toLowerCase().includes(searchLower)) ||
+          (mouvement.categorie && mouvement.categorie.toLowerCase().includes(searchLower))
+        
+        if (!matchesSearch) return false
+      }
+
+      // Filtre par compte
+      if (selectedCompteId && selectedCompteId !== "all") {
+        const compteIdNumber = typeof selectedCompteId === 'string' 
+          ? parseInt(selectedCompteId) 
+          : selectedCompteId
+        
+        // Vérifier le compte source OU le compte destination (pour les virements)
+        const matchesCompte = 
+          mouvement.compteId === compteIdNumber ||
+          mouvement.compte?.id === compteIdNumber ||
+          mouvement.compteDestinationId === compteIdNumber ||
+          mouvement.compteDestination?.id === compteIdNumber
+        
+        if (!matchesCompte) return false
+      }
+
+      return true
+    })
+  }, [mouvements, searchTerm, selectedCompteId])
+
+  // Calcul de la pagination
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const currentTransactions = filteredTransactions.slice(startIndex, endIndex)
+
+  // Réinitialiser la page quand les filtres changent
+  useMemo(() => {
+    setCurrentPage(1)
+  }, [searchTerm, selectedCompteId, itemsPerPage])
+
+  // Fonctions de navigation
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)))
+  }
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1)
+    }
+  }
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1)
+    }
+  }
+
+  const handleItemsPerPageChange = (value: string) => {
+    setItemsPerPage(parseInt(value))
+    setCurrentPage(1)
+  }
+
+  // États de chargement et d'erreur
   if (loading) {
     return (
       <div className="text-center py-8 text-gray-500">
@@ -62,41 +143,7 @@ export function RecentTransactions({
     )
   }
 
-  const filteredTransactions = mouvements.filter((mouvement) => {
-    // Filtre par terme de recherche
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase()
-      const matchesSearch = 
-        mouvement.libelle.toLowerCase().includes(searchLower) ||
-        (mouvement.description && mouvement.description.toLowerCase().includes(searchLower)) ||
-        (mouvement.categorie && mouvement.categorie.toLowerCase().includes(searchLower))
-      
-      if (!matchesSearch) return false
-    }
-
-    // Filtre par compte
-    if (selectedCompteId && selectedCompteId !== "all") {
-      const compteIdNumber = typeof selectedCompteId === 'string' 
-        ? parseInt(selectedCompteId) 
-        : selectedCompteId
-      
-      // Vérifier le compte source OU le compte destination (pour les virements)
-      const matchesCompte = 
-        mouvement.compteId === compteIdNumber ||
-        mouvement.compte?.id === compteIdNumber ||
-        mouvement.compteDestinationId === compteIdNumber ||
-        mouvement.compteDestination?.id === compteIdNumber
-      
-      if (!matchesCompte) return false
-    }
-
-    return true
-  })
-
-  // Limiter à 10 transactions
-  const transactions = filteredTransactions.slice(0, 10)
-
-  if (transactions.length === 0) {
+  if (filteredTransactions.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
         Aucune transaction trouvée pour les critères sélectionnés
@@ -105,12 +152,12 @@ export function RecentTransactions({
   }
 
   return (
-    <>
+    <div className="space-y-4">
+      {/* Liste des transactions */}
       <div className="space-y-4">
-        {transactions.map((transaction) => {
+        {currentTransactions.map((transaction) => {
           const isEntree = transaction.typeMouvement === "Entree"
-/*           const isVirement = transaction.typeMouvement === "Virement"
- */          
+          
           // Récupérer le compte depuis le mouvement ou depuis la map
           const compte = transaction.compte || (comptesMap && comptesMap.get(transaction.compteId))
           const compteName = compte?.nom || `Compte #${transaction.compteId || 'N/A'}`
@@ -127,12 +174,12 @@ export function RecentTransactions({
               <div className="flex items-center space-x-3 flex-1">
                 {/* Icône */}
                 <div className={`p-2 rounded-full ${
-                  isEntree ? "bg-green-100" : "bg-red-100" /* isVirement ? "bg-blue-100" : "bg-red-100" */
+                  isEntree ? "bg-green-100" : "bg-red-100"
                 }`}>
                   {isEntree ? (
                     <ArrowUpRight className="h-4 w-4 text-green-600" />
                   ) : (
-                    <ArrowDownRight className={`h-4 w-4 ${/* isVirement ? "text-blue-600" : */ "text-red-600"}`} />
+                    <ArrowDownRight className="h-4 w-4 text-red-600" />
                   )}
                 </div>
 
@@ -175,9 +222,9 @@ export function RecentTransactions({
               <div className="flex items-center gap-3 ml-3">
                 <div className="text-right space-y-1">
                   <p className={`font-semibold ${
-                    isEntree ? "text-green-600" : "text-red-600" /* isVirement ? "text-blue-600" : "text-red-600" */
+                    isEntree ? "text-green-600" : "text-red-600"
                   }`}>
-                    {isEntree ? "+" : "-" /* isVirement ? "→" : "-" */}
+                    {isEntree ? "+" : "-"}
                     {formatCurrency(transaction.montant)}
                   </p>
                   <Badge 
@@ -204,6 +251,92 @@ export function RecentTransactions({
         })}
       </div>
 
+      {/* Contrôles de pagination */}
+      <div className="flex items-center justify-between border-t pt-4">
+        {/* Informations et sélecteur d'éléments par page */}
+        <div className="flex items-center gap-4">
+          <div className="text-sm text-muted-foreground">
+            Affichage de <span className="font-medium">{startIndex + 1}</span> à{" "}
+            <span className="font-medium">{Math.min(endIndex, filteredTransactions.length)}</span> sur{" "}
+            <span className="font-medium">{filteredTransactions.length}</span> transaction{filteredTransactions.length > 1 ? 's' : ''}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Par page:</span>
+            <Select 
+              value={itemsPerPage.toString()} 
+              onValueChange={handleItemsPerPageChange}
+            >
+              <SelectTrigger className="w-20 h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="5">5</SelectItem>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="20">20</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Boutons de navigation */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={goToPreviousPage}
+            disabled={currentPage === 1}
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Précédent
+          </Button>
+
+          {/* Numéros de pages */}
+          <div className="flex items-center gap-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter((page) => {
+                // Afficher les 3 premières pages, les 3 dernières, et les pages autour de la page actuelle
+                if (totalPages <= 7) return true
+                if (page <= 2 || page > totalPages - 2) return true
+                if (Math.abs(page - currentPage) <= 1) return true
+                return false
+              })
+              .map((page, index, array) => {
+                // Ajouter des ellipses entre les groupes de pages
+                const showEllipsisBefore = index > 0 && page - array[index - 1] > 1
+
+                return (
+                  <div key={page} className="flex items-center">
+                    {showEllipsisBefore && (
+                      <span className="px-2 text-muted-foreground">...</span>
+                    )}
+                    <Button
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      className="w-9 h-9 p-0"
+                      onClick={() => goToPage(page)}
+                    >
+                      {page}
+                    </Button>
+                  </div>
+                )
+              })}
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={goToNextPage}
+            disabled={currentPage === totalPages}
+          >
+            Suivant
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+      </div>
+
       {/* Dialog de détails */}
       {selectedTransactionId && (
         <TransactionDetailDialog
@@ -212,6 +345,6 @@ export function RecentTransactions({
           onOpenChange={handleCloseDialog}
         />
       )}
-    </>
+    </div>
   )
 }

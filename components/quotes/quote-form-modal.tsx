@@ -1,8 +1,8 @@
-// components/devis/devis-form-modal.tsx
+// components/devis/quote-form-modal-v2.tsx
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -10,31 +10,47 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Trash2, Calculator, Loader2 } from "lucide-react"
-import { CreateDevisRequest, CreateLigneDevisRequest, Devis } from "@/types/devis"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Plus, Trash2, Calculator, Loader2, GripVertical, Folder, FileText } from "lucide-react"
+import { 
+  CreateDevisRequest, 
+  CreateDevisSectionRequest, 
+  CreateLigneDevisRequest,
+  Devis,
+  DevisCompletResponse,
+  UnitesDisponibles,
+  TypesElements,
+  QualitesMateriel,
+  TypesVitrage,
+  calculateSectionTotal
+} from "@/types/devis"
 import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "@/hooks/use-toast"
 import { useClientsList } from "@/hooks/useClients"
+import { Badge } from "@/components/ui/badge"
 
 interface QuoteFormModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSubmit: (devis: CreateDevisRequest) => Promise<void>
-  devis?: Devis // Pour l'édition
+  devis?: Devis | DevisCompletResponse // CHANGÉ: Accepter les deux types
   loading?: boolean
 }
 
-interface LigneFormData {
-  designation: string
-  description?: string
-  quantite: number
-  unite: string
-  prixUnitaireHT: number
+interface SectionFormData extends Omit<CreateDevisSectionRequest, 'lignes'> {
+  tempId: string;
+  lignes: LigneFormData[];
 }
 
-export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = false }: QuoteFormModalProps) {
+interface LigneFormData extends CreateLigneDevisRequest {
+  tempId: string;
+}
+
+export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading = false }: QuoteFormModalProps) {
   const { user } = useAuth()
   const isEdit = !!devis
+
+  const [currentTab, setCurrentTab] = useState("general")
 
   const [formData, setFormData] = useState({
     clientId: 0,
@@ -43,20 +59,57 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
     dateValidite: "",
     conditions: "",
     notes: "",
+    chantier: "",
+    contact: "",
+    qualiteMateriel: "",
+    typeVitrage: "",
   })
   
-  const [lignes, setLignes] = useState<LigneFormData[]>([
-    { designation: "", description: "", quantite: 1, unite: "U", prixUnitaireHT: 0 },
-  ])
- 
-  const {clients,loading: clientLoading, error: clientError, refreshCliens}=useClientsList()
-
-  // Fonction pour obtenir le client sélectionné
-  const getSelectedClient = () => {
-    if (formData.clientId > 0 && clients) {
-      return clients.find(client => client.id === formData.clientId)
+  const [sections, setSections] = useState<SectionFormData[]>([
+    {
+      tempId: crypto.randomUUID(),
+      nom: "Section 1",
+      ordre: 1,
+      description: "",
+      lignes: [
+        {
+          tempId: crypto.randomUUID(),
+          typeElement: "",
+          designation: "",
+          description: "",
+          longueur: undefined,
+          hauteur: undefined,
+          quantite: 1,
+          unite: "U",
+          prixUnitaireHT: 0
+        }
+      ]
     }
-    return null
+  ])
+
+  const [activeSectionId, setActiveSectionId] = useState<string>(sections[0]?.tempId)
+
+  const { clients, loading: clientLoading } = useClientsList()
+
+  // Fonction helper pour normaliser les sections
+  const normalizeSections = (inputSections: any[]): SectionFormData[] => {
+    return inputSections.map(section => ({
+      tempId: crypto.randomUUID(),
+      nom: section.nom,
+      ordre: section.ordre,
+      description: section.description || "",
+      lignes: (section.lignes || []).map((ligne: any) => ({
+        tempId: crypto.randomUUID(),
+        typeElement: ligne.typeElement || "",
+        designation: ligne.designation,
+        description: ligne.description || "",
+        longueur: ligne.longueur,
+        hauteur: ligne.hauteur,
+        quantite: ligne.quantite,
+        unite: ligne.unite,
+        prixUnitaireHT: ligne.prixUnitaireHT
+      }))
+    }))
   }
 
   // Réinitialiser le formulaire quand la modal s'ouvre
@@ -71,21 +124,59 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
           dateValidite: devis.dateValidite ? devis.dateValidite.split('T')[0] : "",
           conditions: devis.conditions || "",
           notes: devis.notes || "",
+          chantier: devis.chantier || "",
+          contact: devis.contact || "",
+          qualiteMateriel: devis.qualiteMateriel || "",
+          typeVitrage: devis.typeVitrage || "",
         })
 
-        if (devis.lignes && devis.lignes.length > 0) {
-          setLignes(devis.lignes.map(ligne => ({
-            designation: ligne.designation,
-            description: ligne.description || "",
-            quantite: ligne.quantite,
-            unite: ligne.unite,
-            prixUnitaireHT: ligne.prixUnitaireHT,
-          })))
+        if (devis.sections && devis.sections.length > 0) {
+          const loadedSections = normalizeSections(devis.sections)
+          setSections(loadedSections)
+          setActiveSectionId(loadedSections[0]?.tempId)
         } else {
-          setLignes([{ designation: "", description: "", quantite: 1, unite: "U", prixUnitaireHT: 0 }])
+          // Pas de sections, créer une par défaut
+          const defaultSection: SectionFormData = {
+            tempId: crypto.randomUUID(),
+            nom: "Section 1",
+            ordre: 1,
+            description: "",
+            lignes: [{
+              tempId: crypto.randomUUID(),
+              typeElement: "",
+              designation: "",
+              description: "",
+              longueur: undefined,
+              hauteur: undefined,
+              quantite: 1,
+              unite: "U",
+              prixUnitaireHT: 0
+            }]
+          }
+          setSections([defaultSection])
+          setActiveSectionId(defaultSection.tempId)
         }
       } else {
         // Mode création - formulaire vide
+        const initialSection: SectionFormData = {
+          tempId: crypto.randomUUID(),
+          nom: "Section 1",
+          ordre: 1,
+          description: "",
+          lignes: [{
+            tempId: crypto.randomUUID(),
+            typeElement: "",
+            designation: "",
+            description: "",
+            longueur: undefined,
+            hauteur: undefined,
+            quantite: 1,
+            unite: "U",
+            prixUnitaireHT: 0
+          }]
+        }
+        setSections([initialSection])
+        setActiveSectionId(initialSection.tempId)
         setFormData({
           clientId: 0,
           titre: "",
@@ -93,51 +184,128 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
           dateValidite: "",
           conditions: "",
           notes: "",
+          chantier: "",
+          contact: "",
+          qualiteMateriel: "",
+          typeVitrage: "",
         })
-        setLignes([{ designation: "", description: "", quantite: 1, unite: "U", prixUnitaireHT: 0 }])
       }
+      setCurrentTab("general")
     }
   }, [open, isEdit, devis])
 
+  // Gestion du formulaire général
   const handleInputChange = (field: keyof typeof formData, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
-  const handleLigneChange = (index: number, field: keyof LigneFormData, value: string | number) => {
-    setLignes(prev => prev.map((ligne, i) => 
-      i === index ? { ...ligne, [field]: value } : ligne
-    ))
+  // Gestion des sections
+  const addSection = () => {
+    const newSection: SectionFormData = {
+      tempId: crypto.randomUUID(),
+      nom: `Section ${sections.length + 1}`,
+      ordre: sections.length + 1,
+      description: "",
+      lignes: [{
+        tempId: crypto.randomUUID(),
+        typeElement: "",
+        designation: "",
+        description: "",
+        longueur: undefined,
+        hauteur: undefined,
+        quantite: 1,
+        unite: "U",
+        prixUnitaireHT: 0
+      }]
+    }
+    setSections(prev => [...prev, newSection])
+    setActiveSectionId(newSection.tempId)
+    setCurrentTab("lignes")
   }
 
-  const addLigne = () => {
-    setLignes(prev => [...prev, { 
-      designation: "", 
-      description: "", 
-      quantite: 1, 
-      unite: "U", 
-      prixUnitaireHT: 0 
-    }])
-  }
-
-  const removeLigne = (index: number) => {
-    if (lignes.length > 1) {
-      setLignes(prev => prev.filter((_, i) => i !== index))
+  const removeSection = (tempId: string) => {
+    if (sections.length > 1) {
+      const filtered = sections.filter(s => s.tempId !== tempId)
+      setSections(filtered)
+      if (activeSectionId === tempId) {
+        setActiveSectionId(filtered[0]?.tempId)
+      }
     }
   }
 
+  const updateSection = (tempId: string, field: keyof Omit<SectionFormData, 'tempId' | 'lignes'>, value: any) => {
+    setSections(prev => prev.map(s => 
+      s.tempId === tempId ? { ...s, [field]: value } : s
+    ))
+  }
+
+  // Gestion des lignes
+  const addLigne = (sectionTempId: string) => {
+    setSections(prev => prev.map(section => {
+      if (section.tempId === sectionTempId) {
+        return {
+          ...section,
+          lignes: [...section.lignes, {
+            tempId: crypto.randomUUID(),
+            typeElement: "",
+            designation: "",
+            description: "",
+            longueur: undefined,
+            hauteur: undefined,
+            quantite: 1,
+            unite: "U",
+            prixUnitaireHT: 0
+          }]
+        }
+      }
+      return section
+    }))
+  }
+
+  const removeLigne = (sectionTempId: string, ligneTempId: string) => {
+    setSections(prev => prev.map(section => {
+      if (section.tempId === sectionTempId && section.lignes.length > 1) {
+        return {
+          ...section,
+          lignes: section.lignes.filter(l => l.tempId !== ligneTempId)
+        }
+      }
+      return section
+    }))
+  }
+
+  const updateLigne = (sectionTempId: string, ligneTempId: string, field: keyof Omit<LigneFormData, 'tempId'>, value: any) => {
+    setSections(prev => prev.map(section => {
+      if (section.tempId === sectionTempId) {
+        return {
+          ...section,
+          lignes: section.lignes.map(ligne => 
+            ligne.tempId === ligneTempId ? { ...ligne, [field]: value } : ligne
+          )
+        }
+      }
+      return section
+    }))
+  }
+
+  // Calcul des totaux
   const calculateTotals = () => {
-    const montantHT = lignes.reduce((sum, ligne) => {
-      return sum + (ligne.quantite * ligne.prixUnitaireHT)
-    }, 0)
+    let montantHT = 0
+    sections.forEach(section => {
+      section.lignes.forEach(ligne => {
+        montantHT += (ligne.quantite || 0) * (ligne.prixUnitaireHT || 0)
+      })
+    })
     
-    const tauxTVA = 18 // 18% par défaut
+    const tauxTVA = 18
     const montantTVA = montantHT * (tauxTVA / 100)
     const montantTTC = montantHT + montantTVA
 
     return { montantHT, tauxTVA, montantTVA, montantTTC }
   }
 
-  const validateForm = () => {
+  // Validation et soumission
+  const validateForm = (): string[] => {
     const errors: string[] = []
 
     if (!formData.titre.trim()) {
@@ -154,20 +322,30 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
       }
     }
 
-    if (lignes.length === 0) {
-      errors.push('Au moins une ligne est requise')
+    if (sections.length === 0) {
+      errors.push('Au moins une section est requise')
     }
 
-    lignes.forEach((ligne, index) => {
-      if (!ligne.designation.trim()) {
-        errors.push(`Ligne ${index + 1}: La désignation est requise`)
+    sections.forEach((section, sIndex) => {
+      if (!section.nom.trim()) {
+        errors.push(`Section ${sIndex + 1}: Le nom est requis`)
       }
-      if (ligne.quantite <= 0) {
-        errors.push(`Ligne ${index + 1}: La quantité doit être supérieure à 0`)
+
+      if (section.lignes.length === 0) {
+        errors.push(`Section ${sIndex + 1}: Au moins une ligne est requise`)
       }
-      if (ligne.prixUnitaireHT < 0) {
-        errors.push(`Ligne ${index + 1}: Le prix unitaire ne peut pas être négatif`)
-      }
+
+      section.lignes.forEach((ligne, lIndex) => {
+        if (!ligne.designation.trim() && !ligne.typeElement?.trim()) {
+          errors.push(`Section "${section.nom}" - Ligne ${lIndex + 1}: La désignation ou le type d'élément est requis`)
+        }
+        if ((ligne.quantite || 0) <= 0) {
+          errors.push(`Section "${section.nom}" - Ligne ${lIndex + 1}: La quantité doit être supérieure à 0`)
+        }
+        if ((ligne.prixUnitaireHT || 0) < 0) {
+          errors.push(`Section "${section.nom}" - Ligne ${lIndex + 1}: Le prix unitaire ne peut pas être négatif`)
+        }
+      })
     })
 
     return errors
@@ -189,7 +367,7 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
     if (errors.length > 0) {
       toast({
         title: "Erreurs de validation",
-        description: errors.join(', '),
+        description: errors.slice(0, 3).join(', ') + (errors.length > 3 ? '...' : ''),
         variant: "destructive",
       })
       return
@@ -202,24 +380,29 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
       dateValidite: formData.dateValidite || undefined,
       conditions: formData.conditions.trim() || undefined,
       notes: formData.notes.trim() || undefined,
-      lignes: lignes.map(ligne => ({
-        designation: ligne.designation.trim(),
-        description: ligne.description?.trim() || undefined,
-        quantite: ligne.quantite,
-        unite: ligne.unite,
-        prixUnitaireHT: ligne.prixUnitaireHT,
-      })),
+      chantier: formData.chantier.trim() || undefined,
+      contact: formData.contact.trim() || undefined,
+      qualiteMateriel: formData.qualiteMateriel || undefined,
+      typeVitrage: formData.typeVitrage || undefined,
+      sections: sections.map(section => ({
+        nom: section.nom.trim(),
+        ordre: section.ordre,
+        description: section.description?.trim() || undefined,
+        lignes: section.lignes.map(ligne => ({
+          typeElement: ligne.typeElement?.trim() || undefined,
+          designation: ligne.designation.trim() || ligne.typeElement?.trim() || "",
+          description: ligne.description?.trim() || undefined,
+          longueur: ligne.longueur || undefined,
+          hauteur: ligne.hauteur || undefined,
+          quantite: ligne.quantite || 1,
+          unite: ligne.unite,
+          prixUnitaireHT: ligne.prixUnitaireHT || 0
+        }))
+      }))
     }
 
-    try { 
-      await onSubmit(devisData)
-      // Le parent gère la fermeture de la modal et les messages de succès
-    } catch (error) {
-      // L'erreur est gérée par le parent ou le hook
-    }
+    await onSubmit(devisData)
   }
-
-  const { montantHT, tauxTVA, montantTVA, montantTTC } = calculateTotals()
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("fr-FR", {
@@ -229,386 +412,535 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
     }).format(amount)
   }
 
+  const totals = calculateTotals()
+  const activeSection = sections.find(s => s.tempId === activeSectionId)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[98vw] max-w-[98vw] lg:max-w-[96vw] xl:max-w-[94vw] h-[98vh] flex flex-col p-0">
-        <DialogHeader className="px-4 sm:px-6 py-4 border-b flex-shrink-0">
-          <DialogTitle className="text-lg sm:text-xl">
-            {isEdit ? `Modifier le devis ${devis?.numero}` : "Nouveau devis"}
+ <DialogContent className="w-[98vw] max-w-[98vw] h-[95vh] max-h-[95vh] lg:max-w-[90vw] xl:max-w-[85vw] 2xl:max-w-[80vw] p-0">        <DialogHeader>
+ <DialogHeader className="px-6 py-4 border-b">
+          <DialogTitle className="text-xl font-semibold">
+
+            {isEdit ? "Modifier le devis" : "Nouveau devis"}
           </DialogTitle>
-          <DialogDescription className="text-sm sm:text-base">
-            {isEdit ? "Modifiez les informations du devis" : "Créez un nouveau devis en remplissant les informations ci-dessous"}
+          </DialogHeader>
+          <DialogDescription>
+            {isEdit 
+              ? "Modifiez les informations du devis et ses lignes" 
+              : "Créez un nouveau devis avec des sections et lignes détaillées"}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto px-4 sm:px-6">
-          <form onSubmit={handleSubmit} className="py-4 space-y-4">
-            {/* Informations générales */}
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base sm:text-lg">Informations générales</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="clientId" className="text-sm font-medium">
-                      Client *
-                    </Label>
-                    {clientError && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={refreshCliens}
-                        className="text-xs h-6 px-2"
-                      >
-                        🔄 Rafraîchir
-                      </Button>
-                    )}
-                  </div>
-                  <Select
-                    value={formData.clientId > 0 ? formData.clientId.toString() : ""}
-                    onValueChange={(value) => handleInputChange("clientId", parseInt(value) || 0)}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-4">
+          <Tabs value={currentTab} onValueChange={setCurrentTab} className="flex-1 flex flex-col overflow-hidden">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="general">Informations générales</TabsTrigger>
+              <TabsTrigger value="lignes">Sections et lignes</TabsTrigger>
+              <TabsTrigger value="recap">Récapitulatif</TabsTrigger>
+            </TabsList>
+
+            {/* TAB 1: Informations générales */}
+            <TabsContent value="general" className="flex-1 overflow-y-auto space-y-4 mt-4 pr-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="clientId">Client *</Label>
+                  <Select 
+                    value={formData.clientId.toString()} 
+                    onValueChange={(value) => handleInputChange('clientId', parseInt(value))}
                     disabled={clientLoading}
                   >
-                    <SelectTrigger className="text-sm h-9">
-                      <SelectValue 
-                        placeholder={
-                          clientLoading 
-                            ? "Chargement des clients..." 
-                            : clients && clients.length === 0 
-                              ? "Aucun client disponible" 
-                              : "Sélectionner un client"
-                        } 
-                      />
+                    <SelectTrigger>
+                      <SelectValue placeholder={clientLoading ? "Chargement..." : "Sélectionner un client"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {clientLoading ? (
-                        <SelectItem value="" disabled>
-                          <div className="flex items-center gap-2">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Chargement...
-                          </div>
+                      {clients?.map(client => (
+                        <SelectItem key={client.id} value={client.id.toString()}>
+                          {`${client.nom}` || client.raisonSociale  }
                         </SelectItem>
-                      ) : clients && clients.length > 0 ? (
-                        clients.map((client) => (
-                          <SelectItem key={client.id} value={client.id.toString()}>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{client.nom}</span>
-                              {client.designation && (
-                                <span className="text-xs text-muted-foreground">{client.designation}</span>
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="" disabled>
-                          Aucun client disponible
-                        </SelectItem>
-                      )}
+                      ))}
                     </SelectContent>
                   </Select>
-                  {clientError && (
-                    <p className="text-xs text-red-600">Erreur lors du chargement des clients</p>
-                  )}
-                  {/* Affichage des informations du client sélectionné */}
-                  {getSelectedClient() && (
-                    <div className="mt-2 p-2 bg-blue-50 rounded-md border border-blue-200">
-                      <div className="text-xs text-blue-800">
-                        <div className="font-medium">Client sélectionné:</div>
-                        <div className="text-blue-700">
-                          {getSelectedClient()?.nom}
-                          {getSelectedClient()?.designation && (
-                            <span className="text-blue-600"> - {getSelectedClient()?.designation}</span>
-                          )}
-                        </div>
-                        <div className="text-blue-600">
-                          {getSelectedClient()?.email} • {getSelectedClient()?.telephone}
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="titre" className="text-sm font-medium">
-                    Titre du projet *
-                  </Label>
+                <div className="space-y-2">
+                  <Label htmlFor="titre">Titre du devis *</Label>
                   <Input
                     id="titre"
                     value={formData.titre}
-                    onChange={(e) => handleInputChange("titre", e.target.value)}
-                    className="text-sm h-9"
-                    placeholder="Titre du devis"
+                    onChange={(e) => handleInputChange('titre', e.target.value)}
+                    placeholder="Ex: Menuiserie aluminium - Projet X"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="chantier">Chantier / Site</Label>
+                  <Input
+                    id="chantier"
+                    value={formData.chantier}
+                    onChange={(e) => handleInputChange('chantier', e.target.value)}
+                    placeholder="Ex: Chantier Cocody Saint Jean"
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="dateValidite" className="text-sm font-medium">
-                    Valide jusqu'au
-                  </Label>
+                <div className="space-y-2">
+                  <Label htmlFor="contact">Contact</Label>
+                  <Input
+                    id="contact"
+                    value={formData.contact}
+                    onChange={(e) => handleInputChange('contact', e.target.value)}
+                    placeholder="Nom du contact"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="qualiteMateriel">Qualité matériel</Label>
+                  <Select 
+                    value={formData.qualiteMateriel} 
+                    onValueChange={(value) => handleInputChange('qualiteMateriel', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner la qualité" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {QualitesMateriel.map(q => (
+                        <SelectItem key={q.value} value={q.value}>{q.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="typeVitrage">Type de vitrage</Label>
+                  <Select 
+                    value={formData.typeVitrage} 
+                    onValueChange={(value) => handleInputChange('typeVitrage', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner le vitrage" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TypesVitrage.map(v => (
+                        <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => handleInputChange('description', e.target.value)}
+                  placeholder="Description du projet..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="dateValidite">Date de validité</Label>
                   <Input
                     id="dateValidite"
                     type="date"
                     value={formData.dateValidite}
-                    onChange={(e) => handleInputChange("dateValidite", e.target.value)}
-                    className="text-sm h-9"
+                    onChange={(e) => handleInputChange('dateValidite', e.target.value)}
                   />
                 </div>
+              </div>
 
-                <div className="space-y-1.5 col-span-1 sm:col-span-2 lg:col-span-3">
-                  <Label htmlFor="description" className="text-sm font-medium">
-                    Description
-                  </Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => handleInputChange("description", e.target.value)}
-                    rows={2}
-                    className="text-sm resize-none"
-                    placeholder="Description du projet"
-                  />
-                </div>
-              </CardContent>
-            </Card>
+              <div className="space-y-2">
+                <Label htmlFor="conditions">Conditions commerciales</Label>
+                <Textarea
+                  id="conditions"
+                  value={formData.conditions}
+                  onChange={(e) => handleInputChange('conditions', e.target.value)}
+                  placeholder="Conditions de paiement, délais, garanties..."
+                  rows={3}
+                />
+              </div>
 
-            {/* Lignes du devis */}
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-base sm:text-lg">Éléments du devis</CardTitle>
-                <Button type="button" onClick={addLigne} size="sm" variant="outline">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Ajouter
-                </Button>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="border rounded-md overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead className="min-w-[250px] font-medium">Désignation *</TableHead>
-                        <TableHead className="w-20 text-center font-medium">Description</TableHead>
-                        <TableHead className="w-20 text-center font-medium">Qté *</TableHead>
-                        <TableHead className="w-20 text-center font-medium">Unité</TableHead>
-                        <TableHead className="w-28 text-right font-medium">Prix unit. (FCFA) *</TableHead>
-                        <TableHead className="w-28 text-right font-medium">Total (FCFA)</TableHead>
-                        <TableHead className="w-12"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {lignes.map((ligne, index) => (
-                        <TableRow key={index}>
-                          <TableCell className="p-2">
-                            <Input
-                              value={ligne.designation}
-                              onChange={(e) => handleLigneChange(index, "designation", e.target.value)}
-                              placeholder="Ex: Pose fenêtre aluminium"
-                              className="text-sm h-8 border-0 focus:ring-1 focus:ring-primary"
-                            />
-                          </TableCell>
-                          <TableCell className="p-2">
-                            <Input
-                              value={ligne.description || ""}
-                              onChange={(e) => handleLigneChange(index, "description", e.target.value)}
-                              placeholder="Détails"
-                              className="text-sm h-8 border-0 focus:ring-1 focus:ring-primary"
-                            />
-                          </TableCell>
-                          <TableCell className="p-2">
-                            <Input
-                              type="number"
-                              min="0.01"
-                              step="0.01"
-                              value={ligne.quantite}
-                              onChange={(e) =>
-                                handleLigneChange(index, "quantite", parseFloat(e.target.value) || 1)
-                              }
-                              className="text-sm h-8 text-center border-0 focus:ring-1 focus:ring-primary"
-                            />
-                          </TableCell>
-                          <TableCell className="p-2">
-                            <Select 
-                              value={ligne.unite} 
-                              onValueChange={(value) => handleLigneChange(index, "unite", value)}
-                            >
-                              <SelectTrigger className="text-sm h-8 border-0 focus:ring-1 focus:ring-primary">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="U">Unité</SelectItem>
-                                <SelectItem value="m²">m²</SelectItem>
-                                <SelectItem value="m³">m³</SelectItem>
-                                <SelectItem value="ml">ml</SelectItem>
-                                <SelectItem value="kg">kg</SelectItem>
-                                <SelectItem value="forfait">Forfait</SelectItem>
-                                <SelectItem value="h">Heure</SelectItem>
-                                <SelectItem value="j">Jour</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell className="p-2">
-                            <Input
-                              type="number"
-                              min="0"
-                              step="100"
-                              value={ligne.prixUnitaireHT}
-                              onChange={(e) =>
-                                handleLigneChange(index, "prixUnitaireHT", parseFloat(e.target.value) || 0)
-                              }
-                              placeholder="0"
-                              className="text-sm h-8 text-right border-0 focus:ring-1 focus:ring-primary"
-                            />
-                          </TableCell>
-                          <TableCell className="p-2 font-medium text-sm text-right">
-                            {formatCurrency(ligne.quantite * ligne.prixUnitaireHT)}
-                          </TableCell>
-                          <TableCell className="p-2">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeLigne(index)}
-                              disabled={lignes.length === 1}
-                              className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-                
-                {/* Message d'aide */}
-                <div className="mt-3 text-xs text-muted-foreground">
-                  * Champs obligatoires. Utilisez le bouton "Ajouter" pour créer de nouvelles lignes.
-                </div>
-              </CardContent>
-            </Card>
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notes internes</Label>
+                <Textarea
+                  id="notes"
+                  value={formData.notes}
+                  onChange={(e) => handleInputChange('notes', e.target.value)}
+                  placeholder="Notes internes (non visibles sur le PDF client)..."
+                  rows={2}
+                />
+              </div>
+            </TabsContent>
 
-            {/* Totaux et Notes */}
-            <div className="grid gap-4 lg:grid-cols-2">
-              {/* Totaux */}
-              <Card className="border-0 shadow-sm">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base sm:text-lg flex items-center">
-                    <Calculator className="mr-2 h-4 w-4" />
-                    Récapitulatif financier
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0 space-y-3">
-                  <div className="bg-gray-50 p-3 rounded-lg space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Sous-total HT:</span>
-                      <span className="font-medium">{formatCurrency(montantHT)}</span>
+            {/* TAB 2: Sections et lignes */}
+            <TabsContent value="lignes" className="flex-1 overflow-hidden flex gap-4 mt-4">
+              {/* Sidebar des sections */}
+              <div className="w-64 border-r pr-4 flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Folder className="h-4 w-4" />
+                    Sections
+                  </h3>
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={addSection}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <div className="space-y-2 flex-1 overflow-y-auto">
+                  {sections.map((section, index) => (
+                    <div
+                      key={section.tempId}
+                      className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                        activeSectionId === section.tempId 
+                          ? 'bg-primary/10 border-primary' 
+                          : 'hover:bg-muted'
+                      }`}
+                      onClick={() => setActiveSectionId(section.tempId)}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <GripVertical className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium text-sm">{section.nom}</span>
+                        </div>
+                        {sections.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              removeSection(section.tempId)
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        {section.lignes.length} ligne(s)
+                      </Badge>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span>TVA ({tauxTVA}%):</span>
-                      <span className="font-medium">{formatCurrency(montantTVA)}</span>
-                    </div>
-                    <div className="border-t pt-2">
-                      <div className="flex justify-between text-lg font-bold text-primary">
-                        <span>Total TTC:</span>
-                        <span>{formatCurrency(montantTTC)}</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Contenu de la section active */}
+              <div className="flex-1 flex flex-col overflow-hidden">
+                {activeSection && (
+                  <>
+                    <div className="space-y-3 mb-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="section-nom">Nom de la section *</Label>
+                          <Input
+                            id="section-nom"
+                            value={activeSection.nom}
+                            onChange={(e) => updateSection(activeSection.tempId, 'nom', e.target.value)}
+                            placeholder="Ex: Restauration, Bureau, Office..."
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label htmlFor="section-ordre">Ordre</Label>
+                          <Input
+                            id="section-ordre"
+                            type="number"
+                            min="1"
+                            value={activeSection.ordre}
+                            onChange={(e) => updateSection(activeSection.tempId, 'ordre', parseInt(e.target.value) || 1)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor="section-description">Description (optionnel)</Label>
+                        <Textarea
+                          id="section-description"
+                          value={activeSection.description}
+                          onChange={(e) => updateSection(activeSection.tempId, 'description', e.target.value)}
+                          placeholder="Description de la section..."
+                          rows={2}
+                        />
                       </div>
                     </div>
-                  </div>
-                  
-                  {/* Informations supplémentaires */}
-                  <div className="text-xs text-muted-foreground space-y-1">
-                    <div>• Montants en Francs CFA (XOF)</div>
-                    <div>• TVA: Taxe sur la Valeur Ajoutée</div>
-                    <div>• TTC: Toutes Taxes Comprises</div>
-                  </div>
-                </CardContent>
-              </Card>
 
-              {/* Notes et Conditions */}
-              <Card className="border-0 shadow-sm">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base sm:text-lg">Conditions et Notes</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0 space-y-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="conditions" className="text-sm font-medium">
-                      Conditions générales
-                    </Label>
-                    <Textarea
-                      id="conditions"
-                      value={formData.conditions}
-                      onChange={(e) => handleInputChange("conditions", e.target.value)}
-                      placeholder="Ex: Acompte de 30% à la commande, solde à la livraison..."
-                      rows={3}
-                      className="text-sm resize-none"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="notes" className="text-sm font-medium">
-                      Notes internes
-                    </Label>
-                    <Textarea
-                      id="notes"
-                      value={formData.notes}
-                      onChange={(e) => handleInputChange("notes", e.target.value)}
-                      placeholder="Notes privées non visibles sur le devis final..."
-                      rows={2}
-                      className="text-sm resize-none"
-                    />
-                    <div className="text-xs text-muted-foreground">
-                      Ces notes ne seront pas affichées sur le devis client
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Lignes de "{activeSection.nom}"
+                      </h4>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => addLigne(activeSection.tempId)}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Ajouter une ligne
+                      </Button>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </form>
-        </div>
 
-        {/* Footer avec boutons d'action */}
-        <div className="flex-shrink-0 border-t bg-gray-50/50 px-4 sm:px-6 py-4">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
-            {/* Informations de validation */}
-            <div className="text-xs text-muted-foreground">
-              {isEdit ? "Modifiez les informations puis cliquez sur Modifier" : "Vérifiez toutes les informations avant de créer le devis"}
-            </div>
-            
-            {/* Boutons d'action */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => onOpenChange(false)}
-                disabled={loading}
-                className="sm:w-auto"
-              >
-                Annuler
-              </Button>
-              <Button 
-                type="submit" 
-                className="sm:w-auto" 
-                onClick={handleSubmit}
-                disabled={loading || clientLoading || !formData.titre.trim() || formData.clientId === 0 || (!clients || clients.length === 0)}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {isEdit ? "Modification en cours..." : "Création en cours..."}
-                  </>
-                ) : (
-                  <>
-                    {isEdit ? "Modifier le devis" : "Créer le devis"}
-                    {montantTTC > 0 && (
-                      <span className="ml-2 text-xs">
-                        ({formatCurrency(montantTTC)})
-                      </span>
-                    )}
+                    <div className="flex-1 overflow-y-auto border rounded-lg">
+                      <Table>
+                        <TableHeader className="sticky top-0 bg-background z-10">
+                          <TableRow>
+                            <TableHead className="w-32">Type</TableHead>
+                            <TableHead className="w-40">Désignation *</TableHead>
+                            <TableHead className="w-20">L (cm)</TableHead>
+                            <TableHead className="w-20">H (cm)</TableHead>
+                            <TableHead className="w-20">Qté *</TableHead>
+                            <TableHead className="w-24">Unité</TableHead>
+                            <TableHead className="w-28">Prix U. HT *</TableHead>
+                            <TableHead className="w-28">Total HT</TableHead>
+                            <TableHead className="w-12"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {activeSection.lignes.map((ligne) => (
+                            <TableRow key={ligne.tempId}>
+                              <TableCell>
+                                <Select 
+                                  value={ligne.typeElement} 
+                                  onValueChange={(value) => updateLigne(activeSection.tempId, ligne.tempId, 'typeElement', value)}
+                                >
+                                  <SelectTrigger className="h-8">
+                                    <SelectValue placeholder="Type" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {TypesElements.map(t => (
+                                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+
+                              <TableCell>
+                                <Input
+                                  value={ligne.designation}
+                                  onChange={(e) => updateLigne(activeSection.tempId, ligne.tempId, 'designation', e.target.value)}
+                                  placeholder="Désignation"
+                                  className="h-8"
+                                />
+                              </TableCell>
+
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={ligne.longueur || ''}
+                                  onChange={(e) => updateLigne(activeSection.tempId, ligne.tempId, 'longueur', e.target.value ? parseFloat(e.target.value) : undefined)}
+                                  placeholder="L"
+                                  className="h-8"
+                                />
+                              </TableCell>
+
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={ligne.hauteur || ''}
+                                  onChange={(e) => updateLigne(activeSection.tempId, ligne.tempId, 'hauteur', e.target.value ? parseFloat(e.target.value) : undefined)}
+                                  placeholder="H"
+                                  className="h-8"
+                                />
+                              </TableCell>
+
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={ligne.quantite}
+                                  onChange={(e) => updateLigne(activeSection.tempId, ligne.tempId, 'quantite', parseFloat(e.target.value) || 0)}
+                                  className="h-8"
+                                />
+                              </TableCell>
+
+                              <TableCell>
+                                <Select 
+                                  value={ligne.unite} 
+                                  onValueChange={(value) => updateLigne(activeSection.tempId, ligne.tempId, 'unite', value)}
+                                >
+                                  <SelectTrigger className="h-8">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {UnitesDisponibles.map(u => (
+                                      <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={ligne.prixUnitaireHT}
+                                  onChange={(e) => updateLigne(activeSection.tempId, ligne.tempId, 'prixUnitaireHT', parseFloat(e.target.value) || 0)}
+                                  className="h-8"
+                                />
+                              </TableCell>
+
+                              <TableCell className="font-medium">
+                                {formatCurrency((ligne.quantite || 0) * (ligne.prixUnitaireHT || 0))}
+                              </TableCell>
+
+                              <TableCell>
+                                {activeSection.lignes.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeLigne(activeSection.tempId, ligne.tempId)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </>
                 )}
-              </Button>
+              </div>
+            </TabsContent>
+
+            {/* TAB 3: Récapitulatif */}
+            <TabsContent value="recap" className="flex-1 overflow-y-auto space-y-4 mt-4 pr-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Récapitulatif du devis</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Infos générales */}
+                  <div>
+                    <h4 className="font-semibold mb-3">Informations générales</h4>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Client:</span>{' '}
+                        <span className="font-medium">
+                          {clients?.find(c => c.id === formData.clientId)?.raisonSociale || 
+                           clients?.find(c => c.id === formData.clientId)?.nom || 
+                           'Non sélectionné'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Titre:</span>{' '}
+                        <span className="font-medium">{formData.titre || 'Non renseigné'}</span>
+                      </div>
+                      {formData.chantier && (
+                        <div>
+                          <span className="text-muted-foreground">Chantier:</span>{' '}
+                          <span className="font-medium">{formData.chantier}</span>
+                        </div>
+                      )}
+                      {formData.qualiteMateriel && (
+                        <div>
+                          <span className="text-muted-foreground">Qualité:</span>{' '}
+                          <span className="font-medium">{formData.qualiteMateriel}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sections et lignes */}
+                  <div>
+                    <h4 className="font-semibold mb-3">Détail par section</h4>
+                    <div className="space-y-4">
+                      {sections.map((section) => {
+                        const sectionTotal = section.lignes.reduce((sum, l) => 
+                          sum + ((l.quantite || 0) * (l.prixUnitaireHT || 0)), 0
+                        )
+                        return (
+                          <div key={section.tempId} className="border rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <h5 className="font-semibold">{section.nom}</h5>
+                              <Badge>{section.lignes.length} ligne(s)</Badge>
+                            </div>
+                            <div className="space-y-2">
+                              {section.lignes.map((ligne, idx) => (
+                                <div key={ligne.tempId} className="text-sm flex justify-between">
+                                  <span>
+                                    {idx + 1}. {ligne.typeElement || ligne.designation}
+                                    {ligne.longueur && ligne.hauteur && ` (${ligne.longueur} × ${ligne.hauteur})`}
+                                    {' × '}{ligne.quantite} {ligne.unite}
+                                  </span>
+                                  <span className="font-medium">
+                                    {formatCurrency((ligne.quantite || 0) * (ligne.prixUnitaireHT || 0))}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="mt-3 pt-3 border-t flex justify-between font-semibold">
+                              <span>Total section:</span>
+                              <span>{formatCurrency(sectionTotal)}</span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Totaux */}
+                  <Card className="bg-muted/30">
+                    <CardContent className="pt-6 space-y-3">
+                      <div className="flex justify-between text-lg">
+                        <span>Sous-total HT:</span>
+                        <span className="font-semibold">{formatCurrency(totals.montantHT)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>TVA ({totals.tauxTVA}%):</span>
+                        <span className="font-medium">{formatCurrency(totals.montantTVA)}</span>
+                      </div>
+                      <div className="flex justify-between text-xl font-bold pt-3 border-t">
+                        <span>TOTAL TTC:</span>
+                        <span className="text-primary">{formatCurrency(totals.montantTTC)}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+
+          <DialogFooter className="mt-4 flex-shrink-0">
+            <div className="flex items-center justify-between w-full">
+              <div className="text-sm text-muted-foreground">
+                <Calculator className="inline h-4 w-4 mr-1" />
+                Total: <span className="font-semibold">{formatCurrency(totals.montantTTC)}</span>
+              </div>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  Annuler
+                </Button>
+                <Button type="submit" disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Enregistrement...
+                    </>
+                  ) : (
+                    isEdit ? "Modifier" : "Créer le devis"
+                  )}
+                </Button>
+              </div>
             </div>
-          </div>
-        </div>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )
