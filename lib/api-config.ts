@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Configuration centralisée de l'API
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5264/api';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://167.86.107.54/api';
 
 // Client axios configuré et réutilisable
 export const apiClient = axios.create({
