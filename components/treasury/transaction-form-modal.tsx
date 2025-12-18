@@ -789,8 +789,8 @@ export function TransactionFormModal({
                         value={formState.factureId}
                         onValueChange={(value) => handleChange("factureId", value)}
                         displayField={(facture) => `${facture.numeroFacture} - ${facture.client}`}
-                        secondaryField={(facture) => `Montant restant: ${facture.montant || 0} XOF`}
-                        getKey={(facture) => facture.id.toString()}
+                        secondaryField={(facture) => `Montant restant: ${facture.montantRestant || 0} XOF`}
+                        getKey={(facture) => facture.id?.toString()}
                       />
                     )}
 

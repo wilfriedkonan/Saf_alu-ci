@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { useRoles } from "@/hooks/useParametres"
 import { PERMISSION_LABELS } from "@/types/parametres"
@@ -26,27 +25,27 @@ export function RoleFormModal({ isOpen, onClose, role, permissions }: RoleFormMo
   const [loading, setLoading] = useState(false)
   
   const [formData, setFormData] = useState({
-    Nom: "",
-    Description: "",
-    Permissions: [] as string[],
-    Actif: true
+    nom: "",
+    description: "",
+    permissions: [] as string[],
+    actif: true
   })
 
   // Charger les données du rôle en mode édition
   useEffect(() => {
     if (role) {
       setFormData({
-        Nom: role.Nom || "",
-        Description: role.Description || "",
-        Permissions: role.Permissions || [],
-        Actif: role.Actif ?? true
+        nom: role.nom || "",
+        description: role.description || "",
+        permissions: role.permissions || [],
+        actif: role.actif ?? true
       })
     } else {
       setFormData({
-        Nom: "",
-        Description: "",
-        Permissions: [],
-        Actif: true
+        nom: "",
+        description: "",
+        permissions: [],
+        actif: true
       })
     }
   }, [role])
@@ -54,20 +53,20 @@ export function RoleFormModal({ isOpen, onClose, role, permissions }: RoleFormMo
   const handlePermissionToggle = (permission: string) => {
     setFormData(prev => ({
       ...prev,
-      Permissions: prev.Permissions.includes(permission)
-        ? prev.Permissions.filter(p => p !== permission)
-        : [...prev.Permissions, permission]
+      permissions: prev.permissions.includes(permission)
+        ? prev.permissions.filter(p => p !== permission)
+        : [...prev.permissions, permission]
     }))
   }
 
   const handleCategoryToggle = (category: string[]) => {
-    const allSelected = category.every(p => formData.Permissions.includes(p))
+    const allSelected = category.every(p => formData.permissions.includes(p))
     
     setFormData(prev => ({
       ...prev,
-      Permissions: allSelected
-        ? prev.Permissions.filter(p => !category.includes(p))
-        : [...new Set([...prev.Permissions, ...category])]
+      permissions: allSelected
+        ? prev.permissions.filter(p => !category.includes(p))
+        : [...new Set([...prev.permissions, ...category])]
     }))
   }
 
@@ -78,8 +77,8 @@ export function RoleFormModal({ isOpen, onClose, role, permissions }: RoleFormMo
     try {
       if (role) {
         // Mode édition
-        await updateRole(role.Id, {
-          Id: role.Id,
+        await updateRole(role.id, {
+          id: role.id,
           ...formData
         })
       } else {
@@ -102,24 +101,25 @@ export function RoleFormModal({ isOpen, onClose, role, permissions }: RoleFormMo
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh]">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl max-h-[95vh] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>
             {role ? 'Modifier le rôle' : 'Créer un nouveau rôle'}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <ScrollArea className="max-h-[calc(90vh-200px)] pr-4">
-            <div className="space-y-6">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          {/* Contenu avec défilement */}
+          <div className="flex-1 overflow-y-auto px-1">
+            <div className="space-y-6 py-4">
               {/* Informations de base */}
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="nom">Nom du rôle *</Label>
                   <Input
                     id="nom"
-                    value={formData.Nom}
-                    onChange={(e) => setFormData({ ...formData, Nom: e.target.value })}
+                    value={formData.nom}
+                    onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
                     placeholder="ex: gestionnaire_projets"
                     required
                   />
@@ -129,8 +129,8 @@ export function RoleFormModal({ isOpen, onClose, role, permissions }: RoleFormMo
                   <Label htmlFor="description">Description</Label>
                   <Textarea
                     id="description"
-                    value={formData.Description}
-                    onChange={(e) => setFormData({ ...formData, Description: e.target.value })}
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder="Décrivez les responsabilités de ce rôle..."
                     rows={3}
                   />
@@ -139,8 +139,8 @@ export function RoleFormModal({ isOpen, onClose, role, permissions }: RoleFormMo
                 <div className="flex items-center space-x-2">
                   <Switch
                     id="actif"
-                    checked={formData.Actif}
-                    onCheckedChange={(checked) => setFormData({ ...formData, Actif: checked })}
+                    checked={formData.actif}
+                    onCheckedChange={(checked) => setFormData({ ...formData, actif: checked })}
                   />
                   <Label htmlFor="actif">Rôle actif</Label>
                 </div>
@@ -157,8 +157,8 @@ export function RoleFormModal({ isOpen, onClose, role, permissions }: RoleFormMo
 
                 <div className="space-y-4">
                   {groupedPermissions.map(({ category, permissions: categoryPerms }) => {
-                    const allSelected = categoryPerms.every(p => formData.Permissions.includes(p))
-                    const someSelected = categoryPerms.some(p => formData.Permissions.includes(p))
+                    const allSelected = categoryPerms.every(p => formData.permissions.includes(p))
+                    const someSelected = categoryPerms.some(p => formData.permissions.includes(p))
 
                     return (
                       <div key={category} className="border rounded-lg p-4">
@@ -186,7 +186,7 @@ export function RoleFormModal({ isOpen, onClose, role, permissions }: RoleFormMo
                             <div key={permission} className="flex items-center space-x-2">
                               <Checkbox
                                 id={permission}
-                                checked={formData.Permissions.includes(permission)}
+                                checked={formData.permissions.includes(permission)}
                                 onCheckedChange={() => handlePermissionToggle(permission)}
                               />
                               <Label
@@ -203,20 +203,24 @@ export function RoleFormModal({ isOpen, onClose, role, permissions }: RoleFormMo
                   })}
                 </div>
 
-                {formData.Permissions.length > 0 && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {formData.Permissions.length} permission{formData.Permissions.length > 1 ? 's' : ''} sélectionnée{formData.Permissions.length > 1 ? 's' : ''}
+                {formData.permissions.length > 0 && (
+                  <p className="text-sm text-muted-foreground mt-4">
+                    {formData.permissions.length} permission{formData.permissions.length > 1 ? 's' : ''} sélectionnée{formData.permissions.length > 1 ? 's' : ''}
                   </p>
                 )}
               </div>
             </div>
-          </ScrollArea>
+          </div>
 
-          <DialogFooter>
+          {/* Footer fixe */}
+          <DialogFooter className="flex-shrink-0 border-t pt-4 mt-4">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Annuler
             </Button>
-            <Button type="submit" disabled={loading || !formData.Nom || formData.Permissions.length === 0}>
+            <Button 
+              type="submit" 
+              disabled={loading || !formData.nom || formData.permissions.length === 0}
+            >
               {loading ? 'Enregistrement...' : role ? 'Mettre à jour' : 'Créer le rôle'}
             </Button>
           </DialogFooter>

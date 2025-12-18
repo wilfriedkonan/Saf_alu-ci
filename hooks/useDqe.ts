@@ -125,6 +125,9 @@ export const useDqe = () => {
     }
   }, [fetchDQE]);
 
+  const refreshDQE = useCallback(() => {
+    fetchDQE();
+  }, [fetchDQE]);
   /**
    * Supprime un DQE (soft delete)
    */
@@ -187,6 +190,7 @@ export const useDqe = () => {
     updateDQE,
     deleteDQE,
     validateDQE,
+    refreshDQE
   };
 };
 

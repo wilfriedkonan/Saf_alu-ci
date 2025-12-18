@@ -1,5 +1,5 @@
 // Types pour les statuts et types de factures
-export type FactureStatut = "Brouillon" | "Envoyee" | "payee" | "en_retard" | "Annulee";
+export type FactureStatut = "Brouillon" | "Envoyee" | "payee" | "EnRetard" | "Annulee";
 export type FactureType = "Facture_Client" | "SousTraitant" | "Avoir" | "Acompte";
 
 export interface Facture {
@@ -132,7 +132,7 @@ export const invoiceStatusLabels: Record<FactureStatut, string> = {
   Brouillon: "Brouillon",
   Envoyee: "Envoyée",
   payee: "Payée",
-  en_retard: "En retard",
+  EnRetard: "En retard",
   Annulee: "Annulée"
 };
 
@@ -147,6 +147,6 @@ export const invoiceStatusColors: Record<FactureStatut, string> = {
   Brouillon: "bg-gray-100 text-gray-800",
   Envoyee: "bg-blue-100 text-blue-800",
   payee: "bg-green-100 text-green-800",
-  en_retard: "bg-red-100 text-red-800",
+  EnRetard: "bg-red-100 text-red-800",
   Annulee: "bg-orange-100 text-orange-800"
 };

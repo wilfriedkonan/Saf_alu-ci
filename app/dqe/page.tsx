@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Plus, Search, Filter, FileText, Download, Edit, Trash2, Eye, Briefcase, CheckCircle2 } from "lucide-react"
+import { Plus, Search, Filter, FileText, Download, Edit, Trash2, Eye, Briefcase, CheckCircle2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,10 +32,10 @@ import {
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { DQEFormModal } from "@/components/dqe/dqe-form-modal"
 import { useDqe, useDqeStats, useDqeExport } from "@/hooks/useDqe"
-import { 
-  formatCurrency, 
+import {
+  formatCurrency,
   formatDate,
-  DQE_STATUT_LABELS, 
+  DQE_STATUT_LABELS,
   DQE_STATUT_COLORS,
   isDQEConvertible,
   getConversionStatus,
@@ -44,18 +44,32 @@ import {
 } from "@/types/dqe"
 import { toast } from "sonner"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useAuth, usePermissions } from "@/contexts/AuthContext"
 
 export default function DQEListPage() {
-  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<DQEStatut | "all">("all")
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingDQE, setEditingDQE] = useState<DQE | null>(null)
 
+  const router = useRouter()
+  const { user } = useAuth() 
+  const { canManageDqe } = usePermissions()
+  const canAccessQuotes = !!canManageDqe()
+
+  useEffect(() => {
+    if (user && !canManageDqe) {
+      router.push("/dashboard")
+      return
+    }
+
+  }, [user, canManageDqe, router])
+
   // Hooks personnalisés
-  const { dqes, loading, error, fetchDQE, deleteDQE, validateDQE } = useDqe()
-  const { stats, loading: statsLoading } = useDqeStats()
+  const { dqes, loading, error, fetchDQE, deleteDQE, validateDQE, refreshDQE } = useDqe()
+  const { stats, loading: statsLoading, refreshStats } = useDqeStats()
   const { exportExcel, exportPDF, loading: exportLoading } = useDqeExport()
+ // Vérification des permissions
 
   // Charger les DQE au montage du composant
   useEffect(() => {
@@ -68,14 +82,18 @@ export default function DQEListPage() {
 
   // Filtrer les DQE selon la recherche
   const filteredDQEs = dqes.filter((dqe) => {
-    const matchesSearch = 
+    const matchesSearch =
       dqe.reference.toLowerCase().includes(searchQuery.toLowerCase()) ||
       dqe.nom.toLowerCase().includes(searchQuery.toLowerCase()) ||
       dqe.client?.nom.toLowerCase().includes(searchQuery.toLowerCase())
-    
+
     return matchesSearch
   })
+  const handleRefresh = useCallback(() => {
+    refreshDQE()
+    refreshStats()
 
+  }, [refreshDQE, refreshStats])
   const handleView = (id: number) => {
     router.push(`/dqe/${id}`)
   }
@@ -116,7 +134,7 @@ export default function DQEListPage() {
 
   const getConversionBadge = (dqe: DQE) => {
     const status = getConversionStatus(dqe)
-    
+
     if (status === 'converted') {
       return <Badge className="bg-purple-500">Converti</Badge>
     } else if (status === 'convertible') {
@@ -124,7 +142,10 @@ export default function DQEListPage() {
     }
     return null
   }
-
+  // Vérification des permissions avant rendu
+  if (!user || !canManageDqe) {
+    return null
+  }
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -136,12 +157,17 @@ export default function DQEListPage() {
               Gérez vos DQE et convertissez-les en projets
             </p>
           </div>
-          <Button onClick={() => setShowCreateModal(true)} size="lg">
-            <Plus className="h-5 w-5 mr-2" />
-            Nouveau DQE
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loading}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${(loading) ? 'animate-spin' : ''}`} />
+              Actualiser
+            </Button>
+            <Button onClick={() => setShowCreateModal(true)} disabled={loading}>
+              <Plus className="mr-2 h-4 w-4"/>
+              Nouveau DQE
+            </Button>
+          </div>
         </div>
-
         {/* Stats Cards */}
         {statsLoading ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -292,7 +318,7 @@ export default function DQEListPage() {
                   <TableBody>
                     {filteredDQEs.map((dqe) => (
                       <TableRow key={dqe.id} className="cursor-pointer hover:bg-muted/50">
-                        <TableCell 
+                        <TableCell
                           className="font-medium"
                           onClick={() => handleView(dqe.id)}
                         >
@@ -312,7 +338,7 @@ export default function DQEListPage() {
                         <TableCell onClick={() => handleView(dqe.id)}>
                           {getConversionBadge(dqe)}
                         </TableCell>
-                        <TableCell 
+                        <TableCell
                           className="text-right font-semibold"
                           onClick={() => handleView(dqe.id)}
                         >
@@ -333,25 +359,25 @@ export default function DQEListPage() {
                                 <Eye className="h-4 w-4 mr-2" />
                                 Voir
                               </DropdownMenuItem>
-                              
+
                               {!dqe.isConverted && (
                                 <>
                                   <DropdownMenuItem onClick={() => handleEdit(dqe)}>
                                     <Edit className="h-4 w-4 mr-2" />
                                     Modifier
                                   </DropdownMenuItem>
-                                  
+
                                   {dqe.statut === 'brouillon' && (
                                     <DropdownMenuItem onClick={() => handleValidate(dqe.id)}>
                                       <CheckCircle2 className="h-4 w-4 mr-2" />
                                       Valider
                                     </DropdownMenuItem>
                                   )}
-                                  
+
                                   {isDQEConvertible(dqe) && (
                                     <>
                                       <DropdownMenuSeparator />
-                                      <DropdownMenuItem 
+                                      <DropdownMenuItem
                                         onClick={() => handleConvert(dqe.id)}
                                         className="text-emerald-600"
                                       >
@@ -362,29 +388,29 @@ export default function DQEListPage() {
                                   )}
                                 </>
                               )}
-                              
+
                               <DropdownMenuSeparator />
-                              
-                              <DropdownMenuItem 
+
+                              <DropdownMenuItem
                                 onClick={() => handleExportPDF(dqe.id)}
                                 disabled={exportLoading}
                               >
                                 <FileText className="h-4 w-4 mr-2" />
                                 Export PDF
                               </DropdownMenuItem>
-                              
-                              <DropdownMenuItem 
+
+                              <DropdownMenuItem
                                 onClick={() => handleExportExcel(dqe.id)}
                                 disabled={exportLoading}
                               >
                                 <Download className="h-4 w-4 mr-2" />
                                 Export Excel
                               </DropdownMenuItem>
-                              
+
                               {!dqe.isConverted && (
                                 <>
                                   <DropdownMenuSeparator />
-                                  <DropdownMenuItem 
+                                  <DropdownMenuItem
                                     onClick={() => handleDelete(dqe.id)}
                                     className="text-red-600"
                                   >
