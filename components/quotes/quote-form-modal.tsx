@@ -28,6 +28,8 @@ import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "@/hooks/use-toast"
 import { useClientsList } from "@/hooks/useClients"
 import { Badge } from "@/components/ui/badge"
+import { v4 as uuidv4 } from 'uuid';
+
 
 interface QuoteFormModalProps {
   open: boolean
@@ -67,13 +69,13 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
   
   const [sections, setSections] = useState<SectionFormData[]>([
     {
-      tempId: crypto.randomUUID(),
+      tempId: uuidv4(),
       nom: "Section 1",
       ordre: 1,
       description: "",
       lignes: [
         {
-          tempId: crypto.randomUUID(),
+          tempId: uuidv4(),
           typeElement: "",
           designation: "",
           description: "",
@@ -94,12 +96,12 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
   // Fonction helper pour normaliser les sections
   const normalizeSections = (inputSections: any[]): SectionFormData[] => {
     return inputSections.map(section => ({
-      tempId: crypto.randomUUID(),
+      tempId: uuidv4(),
       nom: section.nom,
       ordre: section.ordre,
       description: section.description || "",
       lignes: (section.lignes || []).map((ligne: any) => ({
-        tempId: crypto.randomUUID(),
+        tempId: uuidv4(),
         typeElement: ligne.typeElement || "",
         designation: ligne.designation,
         description: ligne.description || "",
@@ -137,12 +139,12 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
         } else {
           // Pas de sections, créer une par défaut
           const defaultSection: SectionFormData = {
-            tempId: crypto.randomUUID(),
+            tempId: uuidv4(),
             nom: "Section 1",
             ordre: 1,
             description: "",
             lignes: [{
-              tempId: crypto.randomUUID(),
+              tempId: uuidv4(),
               typeElement: "",
               designation: "",
               description: "",
@@ -159,12 +161,12 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
       } else {
         // Mode création - formulaire vide
         const initialSection: SectionFormData = {
-          tempId: crypto.randomUUID(),
+          tempId: uuidv4(),
           nom: "Section 1",
           ordre: 1,
           description: "",
           lignes: [{
-            tempId: crypto.randomUUID(),
+            tempId: uuidv4(),
             typeElement: "",
             designation: "",
             description: "",
@@ -202,12 +204,12 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
   // Gestion des sections
   const addSection = () => {
     const newSection: SectionFormData = {
-      tempId: crypto.randomUUID(),
+      tempId: uuidv4(),
       nom: `Section ${sections.length + 1}`,
       ordre: sections.length + 1,
       description: "",
       lignes: [{
-        tempId: crypto.randomUUID(),
+        tempId: uuidv4(),
         typeElement: "",
         designation: "",
         description: "",
@@ -246,7 +248,7 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
         return {
           ...section,
           lignes: [...section.lignes, {
-            tempId: crypto.randomUUID(),
+            tempId: uuidv4(),
             typeElement: "",
             designation: "",
             description: "",
