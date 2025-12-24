@@ -348,7 +348,7 @@ export default function TreasuryPage() {
         )}
 
         {/* KPIs */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+       {user && user.Role?.Nom ==="super_admin" &&  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {/* Solde Total Card with gradient */}
           <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
             <CardHeader className="pb-2">
@@ -451,7 +451,7 @@ export default function TreasuryPage() {
               </div>
             </CardContent>
           </Card>
-        </div>
+        </div>}
 
         {/* Graphiques */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

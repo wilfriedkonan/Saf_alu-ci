@@ -453,10 +453,10 @@ export function TransactionFormModal({
       toast.info('Le montant doit être supérieur à zéro.')
       return
     }
-    if (isSortie && !formState.etapeProjetId) {
+/*     if (isSortie && !formState.etapeProjetId) {
       toast.info('En sortie de caisse la sélection d une est obligatoire .')
       return
-    }
+    } */
     if ( !formState.libelle){
       toast.info('Veillez entrer un libelle avant.')
        return
