@@ -57,6 +57,11 @@ export default function DevisPage() {
   useEffect(() => {
     let filtered = devis
 
+    // Filtrage par rôle : chef_projet et commercial ne voient que leurs devis
+    if (user?.Role?.Nom === "chef_projet" || user?.Role?.Nom === "commercial") {
+      filtered = filtered.filter((devis) => devis.utilisateurCreation === user.Id)
+    }
+
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase()
       filtered = filtered.filter(
@@ -73,7 +78,7 @@ export default function DevisPage() {
 
     setFilteredDevis(filtered)
     console.log('valeur devis de filtered:',filtered)
-  }, [devis, searchTerm, statusFilter])
+  }, [devis, searchTerm, statusFilter, user])
 
   // État devis en édition
   const [editingDevis, setEditingDevis] = useState<Devis | null>(null)
@@ -360,7 +365,7 @@ export default function DevisPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredDevis.map((devis) => (
-                    <TableRow key={devis.id}>
+                    <TableRow key={devis.id}>{}
                       <TableCell className="font-medium">{devis.numero}</TableCell>
                       <TableCell>
                         <div>

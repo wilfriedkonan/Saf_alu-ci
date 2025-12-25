@@ -55,6 +55,11 @@ export default function ProjectsPage() {
   useEffect(() => {
     let filtered = projets
 
+    // Filtrage par rôle : chef_projet et commercial ne voient que leurs projets
+    if (user?.Role?.Nom === "chef_projet" || user?.Role?.Nom === "commercial") {
+      filtered = filtered.filter((project) => project.utilisateurCreation === user.Id)
+    }
+
     if (searchTerm) {
       filtered = filtered.filter(
         (project) =>
@@ -69,7 +74,7 @@ export default function ProjectsPage() {
     }
 
     setFilteredProjects(filtered)
-  }, [projets, searchTerm, statusFilter])
+  }, [projets, searchTerm, statusFilter, user])
 
 
 

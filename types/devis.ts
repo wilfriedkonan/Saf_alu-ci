@@ -199,6 +199,7 @@ export interface DevisListItem {
   dateValidite?: string;
   chantier?: string;
   client?: ClientInfo;
+  utilisateurCreation: number
 }
 
 export interface RechercheDevisRequest {
