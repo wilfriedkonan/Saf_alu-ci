@@ -34,6 +34,8 @@ import { SubcontractorFormModal } from "../subcontractors/subcontractor-form-mod
 import { useSousTraitantList } from "@/hooks/useSoustraitant"
 import { SousTraitant } from "@/types/sous-traitants"
 import { SousTraitantService } from "@/services/sous-traitantService"
+import { useUtilisateurService } from "@/services/utilisatuerService"
+import { useUtilisateurList } from "@/hooks/use-utilisateur"
 
 interface ProjectFormModalProps {
   open: boolean
@@ -84,7 +86,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
     adresseChantier: "",
     codePostalChantier: "",
     villeChantier: "",
-    chefProjetId: "",
+    chefProjetId: 0,
   })
 
   const [stages, setStages] = useState<ProjectStageForm[]>([
@@ -112,7 +114,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
 
   const { clients, loading: clientLoading, error: clientError, refreshCliens } = useClientsList()
   const { sousTraitantList, loading: soustraitantLoading, error: soustraitantError, refreshSoutraitant } = useSousTraitantList();
-
+  const { Utilisateur, loading : utlisateurLoading, error: utilsateurError}=useUtilisateurList()
   const { createClient } = useClientActions()
 
   const getSelectedClient = () => {
@@ -152,7 +154,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
         adresseChantier: projet.adresseChantier || "",
         codePostalChantier: projet.codePostalChantier || "",
         villeChantier: projet.villeChantier || "",
-        chefProjetId: projet.chefProjetId?.toString() || "",
+        chefProjetId: projet.chefProjetId || 0,
       })
 
       // ✅ CORRECTION: Charger estActif depuis l'étape backend
@@ -274,7 +276,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
       adresseChantier: "",
       codePostalChantier: "",
       villeChantier: "",
-      chefProjetId: "",
+      chefProjetId: 0,
     })
     setStages([
       {
@@ -448,7 +450,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
       adresseChantier: formData.adresseChantier || undefined,
       codePostalChantier: formData.codePostalChantier || undefined,
       villeChantier: formData.villeChantier || undefined,
-      chefProjetId: formData.chefProjetId ? parseInt(formData.chefProjetId) : undefined,
+      chefProjetId: formData.chefProjetId ,
       statut: formData.statut || undefined,
       etapes: stages.map((stage) => ({
         id: stage.id,
@@ -732,16 +734,16 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
                   <div className="space-y-2">
                     <Label htmlFor="chefProjetId">Chef de projet</Label>
                     <Select
-                      value={formData.chefProjetId}
-                      onValueChange={(value) => setFormData({ ...formData, chefProjetId: value })}
-                      disabled={loading}
+                      value={formData.chefProjetId.toString()}
+                      onValueChange={(value) => setFormData({ ...formData, chefProjetId: Number(value)  })}
+                      disabled={utlisateurLoading}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Sélectionner un chef de projet" />
                       </SelectTrigger>
                       <SelectContent>
-                        {chefsProjets.map((chef) => (
-                          <SelectItem key={chef.id} value={chef.id.toString()}>
+                        {Utilisateur.map((chef) => (
+                          <SelectItem key={chef.id} value= {String(chef.id)}>
                             {chef.prenom} {chef.nom}
                           </SelectItem>
                         ))}
