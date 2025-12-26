@@ -152,7 +152,7 @@ export function InvoicePreviewModal({ invoice, open, onOpenChange }: InvoicePrev
             <div className="w-80 space-y-2">
               <div className="flex justify-between">
                 <span>Sous-total :</span>
-                <span>{formatCurrency(invoice.total)}</span>
+                <span>{formatCurrency(invoice.montantHT)}</span>
               </div>
               <div className="flex justify-between">
                 <span>TVA ({invoice.tauxTVA}%) :</span>
@@ -161,7 +161,7 @@ export function InvoicePreviewModal({ invoice, open, onOpenChange }: InvoicePrev
               <Separator />
               <div className="flex justify-between text-lg font-bold">
                 <span>Total TTC :</span>
-                <span>{formatCurrency(invoice.total)}</span>
+                <span>{formatCurrency(invoice.montantTTC)}</span>
               </div>
               {invoice.paidAmount > 0 && (
                 <>

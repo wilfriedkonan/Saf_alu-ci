@@ -3,7 +3,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Building2, Calendar, Mail, Phone, MapPin } from "lucide-react"
+import { Building2, Calendar, Mail, Phone, MapPin, User } from "lucide-react"
 import { Devis, DevisStatutLabels, DevisStatutColors } from "@/types/devis"
 
 interface QuotePreviewModalProps {
@@ -13,18 +13,17 @@ interface QuotePreviewModalProps {
 }
 
 export function QuotePreviewModal({ quote, open, onOpenChange }: QuotePreviewModalProps) {
+  // ✅ Formatage XOF/FCFA avec espace comme séparateur de milliers
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("fr-FR", {
-      style: "currency",
-      currency: "XOF",
       minimumFractionDigits: 0,
-    }).format(amount)
+      maximumFractionDigits: 0,
+    }).format(amount).replace(/\u202F/g, ' ') // Remplacer l'espace insécable par un espace normal
   }
 
-  const montantTVA = Math.max(0, (quote.montantTTC ?? 0) - (quote.montantHT ?? 0))
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-6xl xl:max-w-7xl max-h-[92vh] overflow-y-auto">
+    <DialogContent className="w-[95vw] max-w-6xl xl:max-w-7xl max-h-[92vh] overflow-y-auto sm:max-w-7xl">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Prévisualisation - {quote.numero}</span>
@@ -33,132 +32,159 @@ export function QuotePreviewModal({ quote, open, onOpenChange }: QuotePreviewMod
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-primary rounded-lg">
-                <Building2 className="h-6 w-6 text-primary-foreground" />
+          {/* ===== HEADER - Style SAF ALU-CI ===== */}
+          <div className="border-b-2 border-primary pb-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-16 h-16 bg-primary/10 border-2 border-primary rounded flex items-center justify-center">
+                  <Building2 className="h-8 w-8 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-primary">SAF ALU-CI</h2>
+                  <p className="text-xs text-muted-foreground italic">BTP - MENUISERIE ALUMINIUM - DIVERS</p>
+                  <p className="text-xs text-muted-foreground mt-1">+225 27 22 23 39 64 / 07 07 08 08 36</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-bold">SAF ALU-CI</h2>
-                <p className="text-sm text-muted-foreground">Entreprise de Construction</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <h3 className="text-lg font-semibold">DEVIS</h3>
-              <p className="text-sm text-muted-foreground">{quote.numero}</p>
             </div>
           </div>
 
-          <Separator />
+          {/* ===== INFORMATIONS PROFORMAT ===== */}
+          <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold">Proformat N° {quote.numero}</h3>
+              <span className="text-sm text-muted-foreground">
+                Date : {new Date(quote.dateCreation).toLocaleDateString("fr-FR")}
+              </span>
+            </div>
 
-          {/* Client Info */}
-          <div className="grid md:grid-cols-2 gap-6">
+            {quote.client?.nom && (
+              <div className="flex items-start space-x-2">
+                <span className="text-sm font-medium">Client :</span>
+                <span className="text-sm font-bold">{quote.client.nom}</span>
+              </div>
+            )}
+
+            {quote.contact && (
+              <div className="flex items-start space-x-2">
+                <span className="text-sm font-medium">Contact :</span>
+                <span className="text-sm">{quote.contact}</span>
+              </div>
+            )}
+
+            {quote.chantier && (
+              <div className="flex items-start space-x-2">
+                <span className="text-sm font-medium">Chantier :</span>
+                <span className="text-sm font-bold">{quote.chantier}</span>
+              </div>
+            )}
+          </div>
+
+          {/* ===== QUALITÉ MATÉRIEL ===== */}
+          {(quote.qualiteMateriel || quote.typeVitrage) && (
             <div>
-              <h4 className="font-semibold mb-3">Informations client</h4>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                  <span>{quote.client?.nom}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span>{quote.client?.email}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span>{quote.client?.telephone}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <span>{quote.client?.adresse}</span>
-                </div>
-              </div>
+              <h4 className="text-sm font-bold text-destructive mb-2">QUALITE MATERIEL</h4>
+              {quote.qualiteMateriel && (
+                <p className="text-sm font-bold">{quote.qualiteMateriel}</p>
+              )}
+              {quote.typeVitrage && (
+                <p className="text-sm">{quote.typeVitrage}</p>
+              )}
             </div>
-            <div>
-              <h4 className="font-semibold mb-3">Détails du devis</h4>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>Créé le {new Date(quote.dateCreation).toLocaleDateString("fr-FR")}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>Valide jusqu'au {quote.dateValidite ? new Date(quote.dateValidite).toLocaleDateString("fr-FR") : "N/A"}</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          )}
 
           <Separator />
 
-          {/* Project Details */}
+          {/* ===== TABLEAU DES SECTIONS ET LIGNES ===== */}
           <div>
-            <h4 className="font-semibold mb-3">Projet</h4>
-            <h5 className="text-lg font-medium">{quote.titre}</h5>
-            <p className="text-muted-foreground mt-1">{quote.description}</p>
-          </div>
-
-          <Separator />
-
-          {/* Items Table */}
-          <div>
-            <h4 className="font-semibold mb-3">Détail des prestations</h4>
-            <div className="border rounded-lg overflow-hidden overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="text-left p-3">Description</th>
-                    <th className="text-right p-3">Qté</th>
-                    <th className="text-right p-3">Unité</th>
-                    <th className="text-right p-3">Prix unitaire</th>
-                    <th className="text-right p-3">Total</th>
+            <div className="border rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted">
+                    <th className="text-left p-3 font-bold">DESIGNATION</th>
+                    <th className="text-center p-3 font-bold w-16">L</th>
+                    <th className="text-center p-3 font-bold w-16">H</th>
+                    <th className="text-center p-3 font-bold w-16">QTE</th>
+                    <th className="text-right p-3 font-bold w-28">P.UNITAIRE</th>
+                    <th className="text-right p-3 font-bold w-28">P.TOTAL</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {quote.lignes?.map((ligne, index) => (
-                    <tr key={ligne.id} className={index % 2 === 0 ? "bg-background" : "bg-muted/50"}>
-                      <td className="p-3">{ligne.designation}</td>
-                      <td className="text-right p-3">{ligne.quantite}</td>
-                      <td className="text-right p-3">{ligne.unite}</td>
-                      <td className="text-right p-3">{formatCurrency(ligne.prixUnitaireHT)}</td>
-                      <td className="text-right p-3 font-medium">{formatCurrency(ligne.totalHT)}</td>
-                    </tr>
+                  {quote.sections?.map((section) => (
+                    <>
+                      {/* En-tête de section */}
+                      <tr key={`section-${section.id}`} className="bg-muted/50">
+                        <td colSpan={6} className="p-3 font-bold text-primary">
+                          {section.nom}
+                        </td>
+                      </tr>
+                      
+                      {/* Lignes de la section */}
+                      {section.lignes?.map((ligne) => (
+                        <tr key={`ligne-${ligne.id}`} className="border-t hover:bg-muted/20">
+                          <td className="p-3">
+                            <div className="font-medium text-xs">
+                              {ligne.typeElement || ligne.designation}
+                            </div>
+                          </td>
+                          <td className="text-center p-3 text-xs">
+                            {ligne.longueur ? formatCurrency(ligne.longueur) : "-"}
+                          </td>
+                          <td className="text-center p-3 text-xs">
+                            {ligne.hauteur ? formatCurrency(ligne.hauteur) : "-"}
+                          </td>
+                          <td className="text-center p-3 text-xs">
+                            {formatCurrency(ligne.quantite)}
+                          </td>
+                          <td className="text-right p-3 text-xs">
+                            {formatCurrency(ligne.prixUnitaireHT)}
+                          </td>
+                          <td className="text-right p-3 font-bold text-xs">
+                            {formatCurrency(ligne.totalHT)}
+                          </td>
+                        </tr>
+                      ))}
+                    </>
                   ))}
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* Totals */}
-          <div className="flex justify-end">
-            <div className="w-80 space-y-2">
-              <div className="flex justify-between">
-                <span>Sous-total :</span>
-                <span>{formatCurrency(quote.montantHT)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>TVA ({quote.tauxTVA}%) :</span>
-                <span>{formatCurrency(montantTVA)}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total TTC :</span>
-                <span>{formatCurrency(quote.montantTTC)}</span>
+          {/* ===== TOTAL HT ===== */}
+          <div className="flex justify-end pt-4">
+            <div className="border-t-2 border-black pt-2">
+              <div className="flex items-center space-x-8">
+                <span className="text-lg font-bold">MONTANT TOTAL HT</span>
+                <span className="text-lg font-bold text-right min-w-[150px]">
+                  {formatCurrency(quote.montantHT)}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Notes */}
-          {quote.notes && (
-            <>
-              <Separator />
-              <div>
-                <h4 className="font-semibold mb-2">Notes</h4>
-                <p className="text-muted-foreground">{quote.notes}</p>
-              </div>
-            </>
-          )}
+          {/* ===== ESPACE SIGNATURES ===== */}
+          <div className="grid grid-cols-2 gap-16 pt-8">
+            <div className="space-y-12">
+              <p className="text-sm font-bold">Signature Client</p>
+              <div className="border-t border-muted-foreground"></div>
+            </div>
+            <div className="space-y-12">
+              <p className="text-sm font-bold">Signature et cachet</p>
+              <div className="border-t border-muted-foreground"></div>
+            </div>
+          </div>
+
+          <Separator className="bg-destructive" />
+
+          {/* ===== FOOTER ===== */}
+          <div className="text-center space-y-1">
+            <p className="text-xs text-muted-foreground">
+              Abidjan, Akouedo route de Bingerville | Email infos@safalu-ci.com - 27 22 23 29 64 / 08 BP 2932 Abidjan 08
+            </p>
+            <p className="text-xs text-muted-foreground">
+              RC N°: CI ABJ-2018-B-29139 / CCN° 1858272P centre des impôts Abidjan Cocody - Bridge Bank 01105110006 27
+            </p>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
