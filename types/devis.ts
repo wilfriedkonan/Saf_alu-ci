@@ -1,4 +1,5 @@
 // types/devis.ts
+// ✅ VERSION MISE À JOUR AVEC REMISES
 
 export interface Client {
   id: number;
@@ -22,11 +23,11 @@ export interface ClientInfo {
 export interface DevisSection {
   id: number;
   devisId: number;
-  nom: string; // Ex: "Restauration", "Office", "Bureau"
+  nom: string;
   ordre: number;
   description?: string;
   lignes?: LigneDevis[];
-  totalSectionHT: number; // CHANGÉ: Retiré le ? pour rendre obligatoire
+  totalSectionHT: number;
 }
 
 export interface DevisSectionResponse {
@@ -54,11 +55,11 @@ export interface LigneDevis {
   devisId: number;
   sectionId?: number;
   ordre: number;
-  typeElement?: string; // Ex: "Fenetre coulissante", "Soufflet", "Fixe"
+  typeElement?: string;
   designation: string;
   description?: string;
-  longueur?: number; // en cm
-  hauteur?: number; // en cm
+  longueur?: number;
+  hauteur?: number;
   quantite: number;
   unite: string;
   prixUnitaireHT: number;
@@ -104,6 +105,11 @@ export interface Devis {
   montantHT: number;
   tauxTVA: number;
   montantTTC: number;
+  
+  // ✅ NOUVEAUX CHAMPS DE REMISE
+  remiseValeur: number;
+  remisePourcentage: number;
+  
   dateCreation: string;
   dateValidite?: string;
   dateEnvoi?: string;
@@ -115,18 +121,15 @@ export interface Devis {
   utilisateurCreation: number;
   utilisateurValidation?: number;
   
-  // Nouveaux champs
   chantier?: string;
   contact?: string;
   qualiteMateriel?: string;
   typeVitrage?: string;
   
-  // Relations
   client?: Client;
   sections?: DevisSection[];
 }
 
-// Type unifié pour les réponses complètes (compatible avec Devis)
 export interface DevisCompletResponse {
   id: number;
   numero: string;
@@ -137,6 +140,11 @@ export interface DevisCompletResponse {
   montantHT: number;
   tauxTVA: number;
   montantTTC: number;
+  
+  // ✅ NOUVEAUX CHAMPS DE REMISE
+  remiseValeur: number;
+  remisePourcentage: number;
+  
   dateCreation: string;
   dateValidite?: string;
   dateEnvoi?: string;
@@ -144,7 +152,6 @@ export interface DevisCompletResponse {
   conditions?: string;
   notes?: string;
   
-  // Nouveaux champs
   chantier?: string;
   contact?: string;
   qualiteMateriel?: string;
@@ -174,16 +181,38 @@ export interface CreateDevisRequest {
   conditions?: string;
   notes?: string;
   
-  // Nouveaux champs
   chantier?: string;
   contact?: string;
   qualiteMateriel?: string;
   typeVitrage?: string;
   
+  // ✅ NOUVEAUX CHAMPS DE REMISE
+  remiseValeur?: number;
+  remisePourcentage?: number;
+  
   sections?: CreateDevisSectionRequest[];
 }
 
 export interface UpdateDevisRequest extends CreateDevisRequest {}
+
+// ✅ NOUVEAU: Request pour appliquer une remise
+export interface AppliquerRemiseRequest {
+  remiseValeur?: number;
+  remisePourcentage?: number;
+}
+
+// ✅ NOUVEAU: Response de simulation de remise
+export interface SimulationRemise {
+  simulation: true;
+  montantHTBrut: number;
+  remiseValeur: number;
+  remisePourcentage: number;
+  montantRemiseTotal: number;
+  montantHTNet: number;
+  montantTTC: number;
+  economie: number;
+  pourcentageEconomie: number;
+}
 
 // =====================================================
 // LISTE ET RECHERCHE
@@ -195,11 +224,16 @@ export interface DevisListItem {
   titre: string;
   statut: DevisStatut;
   montantTTC: number;
+  
+  // ✅ NOUVEAUX CHAMPS DE REMISE
+  remiseValeur: number;
+  remisePourcentage: number;
+  
   dateCreation: string;
   dateValidite?: string;
   chantier?: string;
   client?: ClientInfo;
-  utilisateurCreation: number
+  utilisateurCreation: number;
 }
 
 export interface RechercheDevisRequest {
@@ -233,6 +267,10 @@ export interface StatistiquesDevis {
   expire: number;
   montantTotal: number;
   montantValide: number;
+  
+  // ✅ NOUVELLES STATISTIQUES DE REMISE
+  montantRemisesTotal?: number;
+  pourcentageRemiseMoyen?: number;
 }
 
 // =====================================================
@@ -284,7 +322,7 @@ export const UnitesDisponibles = [
 ];
 
 // =====================================================
-// TYPES D'ÉLÉMENTS (Basé sur le PDF)
+// TYPES D'ÉLÉMENTS
 // =====================================================
 
 export const TypesElements = [
@@ -324,6 +362,64 @@ export const TypesVitrage = [
 ];
 
 // =====================================================
+// ✅ NOUVELLES FONCTIONS HELPER POUR LES REMISES
+// =====================================================
+
+/**
+ * Calcule le montant HT brut (avant remises)
+ */
+export function calculateMontantHTBrut(devis: Devis | DevisCompletResponse): number {
+  if (!devis.sections || devis.sections.length === 0) {
+    return devis.montantHT;
+  }
+  
+  return devis.sections.reduce((sum, section) => {
+    return sum + (section.lignes?.reduce((lineSum, ligne) => {
+      return lineSum + (ligne.quantite * ligne.prixUnitaireHT);
+    }, 0) || 0);
+  }, 0);
+}
+
+/**
+ * Calcule le montant total de la remise
+ */
+export function calculateMontantRemiseTotal(
+  montantHTBrut: number,
+  remiseValeur: number,
+  remisePourcentage: number
+): number {
+  const remisePourcentageAmount = montantHTBrut * (remisePourcentage / 100);
+  const montantApresRemisePourcentage = montantHTBrut - remisePourcentageAmount;
+  const montantHTNet = Math.max(0, montantApresRemisePourcentage - remiseValeur);
+  return montantHTBrut - montantHTNet;
+}
+
+/**
+ * Calcule le montant HT net (après remises)
+ */
+export function calculateMontantHTNet(
+  montantHTBrut: number,
+  remiseValeur: number,
+  remisePourcentage: number
+): number {
+  const remisePourcentageAmount = montantHTBrut * (remisePourcentage / 100);
+  const montantApresRemisePourcentage = montantHTBrut - remisePourcentageAmount;
+  const montantHTNet = Math.max(0, montantApresRemisePourcentage - remiseValeur);
+  return montantHTNet;
+}
+
+/**
+ * Calcule le pourcentage d'économie total
+ */
+export function calculatePourcentageEconomie(
+  montantHTBrut: number,
+  montantRemiseTotal: number
+): number {
+  if (montantHTBrut === 0) return 0;
+  return Math.round((montantRemiseTotal / montantHTBrut) * 100 * 100) / 100;
+}
+
+// =====================================================
 // FONCTION HELPER POUR CALCULER LE TOTAL D'UNE SECTION
 // =====================================================
 
@@ -352,15 +448,17 @@ export function devisCompletToEditFormat(devis: DevisCompletResponse): Devis {
     montantHT: devis.montantHT,
     tauxTVA: devis.tauxTVA,
     montantTTC: devis.montantTTC,
+    remiseValeur: devis.remiseValeur || 0,  // ✅
+    remisePourcentage: devis.remisePourcentage || 0,  // ✅
     dateCreation: devis.dateCreation,
     dateValidite: devis.dateValidite,
     dateEnvoi: devis.dateEnvoi,
     dateValidation: devis.dateValidation,
-    dateModification: devis.dateCreation, // Utiliser dateCreation comme fallback
+    dateModification: devis.dateCreation,
     conditions: devis.conditions,
     notes: devis.notes,
     cheminPDF: undefined,
-    utilisateurCreation: 0, // Sera ignoré en mode édition
+    utilisateurCreation: 0,
     utilisateurValidation: undefined,
     chantier: devis.chantier,
     contact: devis.contact,
@@ -379,4 +477,15 @@ export function devisCompletToEditFormat(devis: DevisCompletResponse): Devis {
       }))
     }))
   };
+}
+
+// =====================================================
+// ✅ FONCTION HELPER POUR FORMATER LES MONTANTS FCFA
+// =====================================================
+
+export function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat("fr-FR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount).replace(/\u202F/g, ' ');
 }

@@ -3,8 +3,16 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Building2, Calendar, Mail, Phone, MapPin, User } from "lucide-react"
-import { Devis, DevisStatutLabels, DevisStatutColors } from "@/types/devis"
+import { Building2, Percent, Tag } from "lucide-react"
+import { 
+  Devis, 
+  DevisStatutLabels, 
+  DevisStatutColors,
+  calculateMontantHTBrut,
+  calculateMontantRemiseTotal,
+  formatCurrency
+} from "@/types/devis"
+import { useEffect, Fragment } from "react"
 
 interface QuotePreviewModalProps {
   quote: Devis
@@ -13,21 +21,34 @@ interface QuotePreviewModalProps {
 }
 
 export function QuotePreviewModal({ quote, open, onOpenChange }: QuotePreviewModalProps) {
-  // ✅ Formatage XOF/FCFA avec espace comme séparateur de milliers
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("fr-FR", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount).replace(/\u202F/g, ' ') // Remplacer l'espace insécable par un espace normal
-  }
+  // Calculer les montants avec remises
+  const montantHTBrut = calculateMontantHTBrut(quote)
+  const montantRemiseTotal = calculateMontantRemiseTotal(
+    montantHTBrut,
+    quote.remiseValeur || 0,
+    quote.remisePourcentage || 0
+  )
+  useEffect(()=>{console.log('valeur remise: ', quote.remiseValeur, 'valeur remise Pourcentage: ', quote.remisePourcentage)},[])
+  const hasRemise = (quote.remiseValeur && quote.remiseValeur > 0) || 
+                    (quote.remisePourcentage && quote.remisePourcentage > 0)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="w-[95vw] max-w-6xl xl:max-w-7xl max-h-[92vh] overflow-y-auto sm:max-w-7xl">
+      <DialogContent className="w-[95vw] max-w-6xl xl:max-w-7xl max-h-[92vh] overflow-y-auto sm:max-w-7xl">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Prévisualisation - {quote.numero}</span>
-            <Badge className={DevisStatutColors[quote.statut]}>{DevisStatutLabels[quote.statut]}</Badge>
+            <div className="flex items-center gap-2">
+              {hasRemise && (
+                <Badge variant="secondary" className="bg-green-100 text-green-800">
+                  <Tag className="h-3 w-3 mr-1" />
+                  Remise appliquée
+                </Badge>
+              )}
+              <Badge className={DevisStatutColors[quote.statut]}>
+                {DevisStatutLabels[quote.statut]}
+              </Badge>
+            </div>
           </DialogTitle>
         </DialogHeader>
 
@@ -110,9 +131,9 @@ export function QuotePreviewModal({ quote, open, onOpenChange }: QuotePreviewMod
                 </thead>
                 <tbody>
                   {quote.sections?.map((section) => (
-                    <>
+                    <Fragment key={`section-${section.id}`}>
                       {/* En-tête de section */}
-                      <tr key={`section-${section.id}`} className="bg-muted/50">
+                      <tr className="bg-muted/50">
                         <td colSpan={6} className="p-3 font-bold text-primary">
                           {section.nom}
                         </td>
@@ -143,21 +164,62 @@ export function QuotePreviewModal({ quote, open, onOpenChange }: QuotePreviewMod
                           </td>
                         </tr>
                       ))}
-                    </>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* ===== TOTAL HT ===== */}
+          {/* ===== TOTAUX AVEC REMISES ===== */}
           <div className="flex justify-end pt-4">
-            <div className="border-t-2 border-black pt-2">
-              <div className="flex items-center space-x-8">
-                <span className="text-lg font-bold">MONTANT TOTAL HT</span>
-                <span className="text-lg font-bold text-right min-w-[150px]">
-                  {formatCurrency(quote.montantHT)}
-                </span>
+            <div className="w-96 space-y-3">
+              {/* Montant HT Brut */}
+              {hasRemise && (
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Montant HT brut :</span>
+                  <span>{formatCurrency(montantHTBrut)}</span>
+                </div>
+              )}
+
+              {/* Remise en pourcentage */}
+              {quote.remisePourcentage && quote.remisePourcentage > 0 && (
+                <div className="flex justify-between items-center text-sm text-green-600">
+                  <span className="flex items-center gap-1">
+                    <Percent className="h-3 w-3" />
+                    Remise {quote.remisePourcentage}% :
+                  </span>
+                  <span>-{formatCurrency(montantHTBrut * (quote.remisePourcentage / 100))}</span>
+                </div>
+              )}
+
+              {/* Remise en valeur */}
+              {quote.remiseValeur && quote.remiseValeur > 0 && (
+                <div className="flex justify-between items-center text-sm text-green-600">
+                  <span className="flex items-center gap-1">
+                    <Tag className="h-3 w-3" />
+                    Remise forfaitaire :
+                  </span>
+                  <span>-{formatCurrency(quote.remiseValeur)}</span>
+                </div>
+              )}
+
+              {/* Montant total de la remise */}
+              {hasRemise && (
+                <div className="flex justify-between text-sm font-semibold text-green-600 border-t pt-2">
+                  <span>Remise totale :</span>
+                  <span>-{formatCurrency(montantRemiseTotal)}</span>
+                </div>
+              )}
+
+              {/* Montant HT Net */}
+              <div className="border-t-2 border-black pt-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-lg font-bold">MONTANT TOTAL HT</span>
+                  <span className="text-lg font-bold">
+                    {formatCurrency(quote.montantHT)}
+                  </span>
+                </div>
               </div>
             </div>
           </div>

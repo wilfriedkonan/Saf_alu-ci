@@ -1,4 +1,5 @@
 // services/devisService.ts
+// ✅ VERSION MISE À JOUR AVEC GESTION DES REMISES
 
 import axios, { AxiosResponse } from 'axios';
 import { 
@@ -7,11 +8,11 @@ import {
   CreateDevisRequest, 
   UpdateDevisRequest, 
   ApiResponse,
-  DevisStatut 
+  DevisStatut,
+  AppliquerRemiseRequest,
+  SimulationRemise
 } from '@/types/devis';
 import apiClient from '@/lib/auth';
-
-
 
 export class DevisService {
   
@@ -19,9 +20,10 @@ export class DevisService {
    * Récupère tous les devis
    */
   static async getAllDevis(): Promise<any[]> {
-    try {console.log("Récupération des devis")
+    try {
+      console.log("Récupération des devis")
       const response: AxiosResponse<any[]> = await apiClient.get('/devis');
-      console.log('Reponse: ',response.data)
+      console.log('Reponse: ', response.data)
       return response.data;
     } catch (error) {
       console.error('Erreur lors de la récupération des devis:', error);
@@ -48,11 +50,10 @@ export class DevisService {
   static async createDevis(devisData: CreateDevisRequest): Promise<ApiResponse<Devis>> {
     try {
       const response: AxiosResponse<ApiResponse<Devis>> = await apiClient.post('/devis', devisData);
-      console.log('Reponse neDevisData:',response)
-
+      console.log('Reponse neDevisData:', response)
       return response.data;
-    } catch (error) {      console.log('Retour de service devis :')
-
+    } catch (error) {
+      console.log('Retour de service devis :')
       console.error('Erreur lors de la création du devis:', error);
       throw this.handleError(error);
     }
@@ -83,6 +84,61 @@ export class DevisService {
       throw this.handleError(error);
     }
   }
+
+  // =====================================================
+  // ✅ NOUVELLES MÉTHODES POUR LES REMISES
+  // =====================================================
+
+  /**
+   * Applique une remise sur un devis
+   */
+  static async appliquerRemise(id: number, remise: AppliquerRemiseRequest): Promise<ApiResponse<{
+    id: number;
+    remiseValeur: number;
+    remisePourcentage: number;
+    montantHTBrut: number;
+    montantRemiseTotal: number;
+    montantHT: number;
+    montantTTC: number;
+  }>> {
+    try {
+      const response = await apiClient.patch(`/devis/${id}/remise`, remise);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur lors de l'application de la remise sur le devis ${id}:`, error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Simule une remise sans l'appliquer
+   */
+  static async simulerRemise(id: number, remise: AppliquerRemiseRequest): Promise<SimulationRemise> {
+    try {
+      const response: AxiosResponse<SimulationRemise> = await apiClient.post(`/devis/${id}/remise/simuler`, remise);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur lors de la simulation de remise sur le devis ${id}:`, error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Supprime les remises d'un devis
+   */
+  static async supprimerRemise(id: number): Promise<ApiResponse<void>> {
+    try {
+      const response: AxiosResponse<ApiResponse<void>> = await apiClient.delete(`/devis/${id}/remise`);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur lors de la suppression des remises du devis ${id}:`, error);
+      throw this.handleError(error);
+    }
+  }
+
+  // =====================================================
+  // MÉTHODES EXISTANTES (inchangées)
+  // =====================================================
 
   /**
    * Envoie un devis
@@ -209,6 +265,8 @@ export class DevisService {
     expire: number;
     montantTotal: number;
     montantValide: number;
+    montantRemisesTotal?: number;
+    pourcentageRemiseMoyen?: number;
   }> {
     try {
       const response = await apiClient.get('/devis/statistiques');
@@ -227,7 +285,6 @@ export class DevisService {
     
     if (axios.isAxiosError(error)) {
       if (error.response) {
-        // Erreur de réponse du serveur
         const status = error.response.status;
         const data = error.response.data;
         
@@ -257,7 +314,6 @@ export class DevisService {
             message = data?.message || `Erreur ${status}`;
         }
       } else if (error.request) {
-        // Erreur de réseau
         message = 'Erreur de connexion - Vérifiez votre réseau';
       }
     }
@@ -281,5 +337,9 @@ export const useDevisService = () => {
     exporterDevisPDF: DevisService.exporterDevisPDF,
     rechercherDevis: DevisService.rechercherDevis,
     getStatistiquesDevis: DevisService.getStatistiquesDevis,
+    // ✅ Nouvelles méthodes pour les remises
+    appliquerRemise: DevisService.appliquerRemise,
+    simulerRemise: DevisService.simulerRemise,
+    supprimerRemise: DevisService.supprimerRemise,
   };
 };

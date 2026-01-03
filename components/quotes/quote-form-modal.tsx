@@ -12,9 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Plus, Trash2, Calculator, Loader2, GripVertical, Folder, FileText } from "lucide-react"
-import { 
-  CreateDevisRequest, 
-  CreateDevisSectionRequest, 
+import {
+  CreateDevisRequest,
+  CreateDevisSectionRequest,
   CreateLigneDevisRequest,
   Devis,
   DevisCompletResponse,
@@ -29,6 +29,9 @@ import { toast } from "@/hooks/use-toast"
 import { useClientsList } from "@/hooks/useClients"
 import { Badge } from "@/components/ui/badge"
 import { v4 as uuidv4 } from 'uuid';
+import { RemiseForm } from "./remise-form-component"
+import { calculateMontantHTBrut } from "@/types/devis"
+import { formatCurrency } from "@/types/devis"
 
 
 interface QuoteFormModalProps {
@@ -66,7 +69,7 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
     qualiteMateriel: "",
     typeVitrage: "",
   })
-  
+
   const [sections, setSections] = useState<SectionFormData[]>([
     {
       tempId: uuidv4(),
@@ -90,9 +93,22 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
   ])
 
   const [activeSectionId, setActiveSectionId] = useState<string>(sections[0]?.tempId)
+  const [remiseValeur, setRemiseValeur] = useState(0)
+  const [remisePourcentage, setRemisePourcentage] = useState(0)
 
   const { clients, loading: clientLoading } = useClientsList()
 
+  // Calculer le montant HT brut à partir des sections
+  const montantHTBrut = sections.reduce((total, section) => {
+    return total + section.lignes.reduce((sum, ligne) => {
+      return sum + (ligne.quantite * ligne.prixUnitaireHT)
+    }, 0)
+  }, 0)
+  // Handler pour les changements de remise
+  const handleRemiseChange = (valeur: number, pourcentage: number) => {
+    setRemiseValeur(valeur)
+    setRemisePourcentage(pourcentage)
+  }
   // Fonction helper pour normaliser les sections
   const normalizeSections = (inputSections: any[]): SectionFormData[] => {
     return inputSections.map(section => ({
@@ -131,6 +147,8 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
           qualiteMateriel: devis.qualiteMateriel || "",
           typeVitrage: devis.typeVitrage || "",
         })
+        setRemiseValeur(devis.remiseValeur || 0)
+        setRemisePourcentage(devis.remisePourcentage || 0)
 
         if (devis.sections && devis.sections.length > 0) {
           const loadedSections = normalizeSections(devis.sections)
@@ -196,9 +214,12 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
     }
   }, [open, isEdit, devis])
 
+
+
   // Gestion du formulaire général
   const handleInputChange = (field: keyof typeof formData, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }))
+    console.log("formData", formData)
   }
 
   // Gestion des sections
@@ -236,7 +257,7 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
   }
 
   const updateSection = (tempId: string, field: keyof Omit<SectionFormData, 'tempId' | 'lignes'>, value: any) => {
-    setSections(prev => prev.map(s => 
+    setSections(prev => prev.map(s =>
       s.tempId === tempId ? { ...s, [field]: value } : s
     ))
   }
@@ -281,7 +302,7 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
       if (section.tempId === sectionTempId) {
         return {
           ...section,
-          lignes: section.lignes.map(ligne => 
+          lignes: section.lignes.map(ligne =>
             ligne.tempId === ligneTempId ? { ...ligne, [field]: value } : ligne
           )
         }
@@ -292,18 +313,38 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
 
   // Calcul des totaux
   const calculateTotals = () => {
-    let montantHT = 0
+    // Calculer le montant HT brut (somme de toutes les lignes)
+    let montantHTBrut = 0
     sections.forEach(section => {
       section.lignes.forEach(ligne => {
-        montantHT += (ligne.quantite || 0) * (ligne.prixUnitaireHT || 0)
+        montantHTBrut += (ligne.quantite || 0) * (ligne.prixUnitaireHT || 0)
       })
     })
-    
-    const tauxTVA = 18
-    const montantTVA = montantHT * (tauxTVA / 100)
-    const montantTTC = montantHT + montantTVA
 
-    return { montantHT, tauxTVA, montantTVA, montantTTC }
+    // Appliquer les remises
+    // 1. D'abord la remise en pourcentage
+    const montantRemisePourcentage = montantHTBrut * (remisePourcentage / 100)
+    const montantApresRemisePourcentage = montantHTBrut - montantRemisePourcentage
+
+    // 2. Puis la remise en valeur
+    const montantHTNet = Math.max(0, montantApresRemisePourcentage - remiseValeur)
+
+    // Calculer le total de la remise
+    const montantRemiseTotal = montantHTBrut - montantHTNet
+
+    // Calculer la TVA et le TTC sur le montant net
+    const tauxTVA = 18
+    const montantTVA = montantHTNet * (tauxTVA / 100)
+    const montantTTC = montantHTNet + montantTVA
+
+    return {
+      montantHTBrut,           // ✅ Nouveau
+      montantRemiseTotal,      // ✅ Nouveau
+      montantHT: montantHTNet, // ✅ Modifié (montant net après remises)
+      tauxTVA,
+      montantTVA,
+      montantTTC
+    }
   }
 
   // Validation et soumission
@@ -386,6 +427,8 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
       contact: formData.contact.trim() || undefined,
       qualiteMateriel: formData.qualiteMateriel || undefined,
       typeVitrage: formData.typeVitrage || undefined,
+      remiseValeur: remiseValeur > 0 ? remiseValeur : undefined,  // ✅
+      remisePourcentage: remisePourcentage > 0 ? remisePourcentage : undefined,
       sections: sections.map(section => ({
         nom: section.nom.trim(),
         ordre: section.ordre,
@@ -402,7 +445,7 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
         }))
       }))
     }
-
+    console.log("devisData", devisData) 
     await onSubmit(devisData)
   }
 
@@ -419,25 +462,26 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
- <DialogContent className="w-[98vw] max-w-[98vw] h-[95vh] max-h-[95vh] lg:max-w-[90vw] xl:max-w-[85vw] 2xl:max-w-[80vw] p-0">        <DialogHeader>
- <DialogHeader className="px-6 py-4 border-b">
+      <DialogContent className="w-[98vw] max-w-[98vw] h-[95vh] max-h-[95vh] lg:max-w-[90vw] xl:max-w-[85vw] 2xl:max-w-[80vw] p-0">        <DialogHeader>
+        <DialogHeader className="px-6 py-4 border-b">
           <DialogTitle className="text-xl font-semibold">
 
             {isEdit ? "Modifier le devis" : "Nouveau devis"}
           </DialogTitle>
-          </DialogHeader>
-          <DialogDescription>
-            {isEdit 
-              ? "Modifiez les informations du devis et ses lignes" 
-              : "Créez un nouveau devis avec des sections et lignes détaillées"}
-          </DialogDescription>
         </DialogHeader>
+        <DialogDescription>
+          {isEdit
+            ? "Modifiez les informations du devis et ses lignes"
+            : "Créez un nouveau devis avec des sections et lignes détaillées"}
+        </DialogDescription>
+      </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-4">
           <Tabs value={currentTab} onValueChange={setCurrentTab} className="flex-1 flex flex-col overflow-hidden">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="general">Informations générales</TabsTrigger>
               <TabsTrigger value="lignes">Sections et lignes</TabsTrigger>
+              <TabsTrigger value="remise">💰 Remises</TabsTrigger>
               <TabsTrigger value="recap">Récapitulatif</TabsTrigger>
             </TabsList>
 
@@ -446,8 +490,8 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="clientId">Client *</Label>
-                  <Select 
-                    value={formData.clientId.toString()} 
+                  <Select
+                    value={formData.clientId.toString()}
                     onValueChange={(value) => handleInputChange('clientId', parseInt(value))}
                     disabled={clientLoading}
                   >
@@ -457,7 +501,7 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
                     <SelectContent>
                       {clients?.map(client => (
                         <SelectItem key={client.id} value={client.id.toString()}>
-                          {`${client.nom}` || client.raisonSociale  }
+                          {`${client.nom}` || client.raisonSociale}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -500,8 +544,8 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="qualiteMateriel">Qualité matériel</Label>
-                  <Select 
-                    value={formData.qualiteMateriel} 
+                  <Select
+                    value={formData.qualiteMateriel}
                     onValueChange={(value) => handleInputChange('qualiteMateriel', value)}
                   >
                     <SelectTrigger>
@@ -517,8 +561,8 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
 
                 <div className="space-y-2">
                   <Label htmlFor="typeVitrage">Type de vitrage</Label>
-                  <Select 
-                    value={formData.typeVitrage} 
+                  <Select
+                    value={formData.typeVitrage}
                     onValueChange={(value) => handleInputChange('typeVitrage', value)}
                   >
                     <SelectTrigger>
@@ -588,9 +632,9 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
                     <Folder className="h-4 w-4" />
                     Sections
                   </h3>
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
+                  <Button
+                    type="button"
+                    variant="ghost"
                     size="sm"
                     onClick={addSection}
                   >
@@ -602,11 +646,10 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
                   {sections.map((section, index) => (
                     <div
                       key={section.tempId}
-                      className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                        activeSectionId === section.tempId 
-                          ? 'bg-primary/10 border-primary' 
-                          : 'hover:bg-muted'
-                      }`}
+                      className={`p-3 rounded-lg border cursor-pointer transition-colors ${activeSectionId === section.tempId
+                        ? 'bg-primary/10 border-primary'
+                        : 'hover:bg-muted'
+                        }`}
                       onClick={() => setActiveSectionId(section.tempId)}
                     >
                       <div className="flex items-center justify-between mb-2">
@@ -681,9 +724,9 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
                         <FileText className="h-4 w-4" />
                         Lignes de "{activeSection.nom}"
                       </h4>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
+                      <Button
+                        type="button"
+                        variant="outline"
                         size="sm"
                         onClick={() => addLigne(activeSection.tempId)}
                       >
@@ -711,8 +754,8 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
                           {activeSection.lignes.map((ligne) => (
                             <TableRow key={ligne.tempId}>
                               <TableCell>
-                                <Select 
-                                  value={ligne.typeElement} 
+                                <Select
+                                  value={ligne.typeElement}
                                   onValueChange={(value) => updateLigne(activeSection.tempId, ligne.tempId, 'typeElement', value)}
                                 >
                                   <SelectTrigger className="h-8">
@@ -769,8 +812,8 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
                               </TableCell>
 
                               <TableCell>
-                                <Select 
-                                  value={ligne.unite} 
+                                <Select
+                                  value={ligne.unite}
                                   onValueChange={(value) => updateLigne(activeSection.tempId, ligne.tempId, 'unite', value)}
                                 >
                                   <SelectTrigger className="h-8">
@@ -821,7 +864,25 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
               </div>
             </TabsContent>
 
-            {/* TAB 3: Récapitulatif */}
+            {/* TAB 3: Remise */}
+            <TabsContent value="remise" className="space-y-4">
+              <RemiseForm
+                montantHTBrut={sections.reduce((total, section) =>
+                  total + section.lignes.reduce((sum, ligne) =>
+                    sum + (ligne.quantite * ligne.prixUnitaireHT), 0
+                  ), 0
+                )}
+                remiseValeur={remiseValeur}
+                remisePourcentage={remisePourcentage}
+                onRemiseChange={(valeur, pourcentage) => {
+                  setRemiseValeur(valeur)
+                  setRemisePourcentage(pourcentage)
+                }}
+                disabled={loading}
+              />
+            </TabsContent>
+
+            {/* TAB 4: Récapitulatif */}
             <TabsContent value="recap" className="flex-1 overflow-y-auto space-y-4 mt-4 pr-2">
               <Card>
                 <CardHeader>
@@ -835,9 +896,9 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
                       <div>
                         <span className="text-muted-foreground">Client:</span>{' '}
                         <span className="font-medium">
-                          {clients?.find(c => c.id === formData.clientId)?.raisonSociale || 
-                           clients?.find(c => c.id === formData.clientId)?.nom || 
-                           'Non sélectionné'}
+                          {clients?.find(c => c.id === formData.clientId)?.raisonSociale ||
+                            clients?.find(c => c.id === formData.clientId)?.nom ||
+                            'Non sélectionné'}
                         </span>
                       </div>
                       <div>
@@ -864,7 +925,7 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
                     <h4 className="font-semibold mb-3">Détail par section</h4>
                     <div className="space-y-4">
                       {sections.map((section) => {
-                        const sectionTotal = section.lignes.reduce((sum, l) => 
+                        const sectionTotal = section.lignes.reduce((sum, l) =>
                           sum + ((l.quantite || 0) * (l.prixUnitaireHT || 0)), 0
                         )
                         return (
@@ -900,18 +961,47 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
                   {/* Totaux */}
                   <Card className="bg-muted/30">
                     <CardContent className="pt-6 space-y-3">
-                      <div className="flex justify-between text-lg">
-                        <span>Sous-total HT:</span>
-                        <span className="font-semibold">{formatCurrency(totals.montantHT)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>TVA ({totals.tauxTVA}%):</span>
-                        <span className="font-medium">{formatCurrency(totals.montantTVA)}</span>
-                      </div>
+                      {(remiseValeur > 0 || remisePourcentage > 0) &&
+                        (<div className="flex justify-between text-lg">
+                          <span> Montant HT brut:</span>
+                          <span className="font-semibold">{formatCurrency(totals.montantHTBrut)}</span>
+                        </div>)}
+                      {remisePourcentage > 0 && (
+                        <div className="flex justify-between">
+                          <span> Remise {remisePourcentage}%:</span>
+                          <span className="font-medium">-{formatCurrency(totals.montantHTBrut * (remisePourcentage / 100))}</span>
+                        </div>)}
+                      {remiseValeur > 0 && (
+                        <div className="flex justify-between text-xl font-bold pt-3 border-t">
+                          <span>Remise forfaitaire:</span>
+                          <span className="text-primary">-{formatCurrency(remiseValeur)}</span>
+                        </div>)}
+                      {(remiseValeur > 0 || remisePourcentage > 0) && (
+                        <div className="flex justify-between text-xl font-bold pt-3 border-t">
+                          <span>Remise totale:</span>
+                          <span className="text-primary">-{formatCurrency(totals.montantRemiseTotal)}</span>
+                        </div>)}
+                      {/* Montant HT net */}
                       <div className="flex justify-between text-xl font-bold pt-3 border-t">
-                        <span>TOTAL TTC:</span>
+                        <span>{(remiseValeur > 0 || remisePourcentage > 0) ? 'Montant HT net:' : 'Sous-total HT:'}</span>
+                        <span className="text-primary">{formatCurrency(totals.montantHT)}</span>
+                      </div>
+                      {/* TVA */}
+                      <div className="flex justify-between text-xl font-bold pt-3 border-t">
+                        <span> TVA ({totals.tauxTVA}%):</span>
+                        <span className="text-primary">{formatCurrency(totals.montantTVA)}</span>
+                      </div>
+                      {/* Total TTC */}
+                      <div className="flex justify-between text-xl font-bold pt-3 border-t">
+                        <span> TOTAL TTC:</span>
                         <span className="text-primary">{formatCurrency(totals.montantTTC)}</span>
                       </div>
+                      {/* Badge économie si remise */}
+                      {(remiseValeur > 0 || remisePourcentage > 0) && (
+                        <div className="flex justify-between text-xl font-bold pt-3 border-t">
+                          <span>💰 Économie totale</span>
+                          <span className="text-primary">-{formatCurrency(totals.montantRemiseTotal)}</span>
+                        </div>)}
                     </CardContent>
                   </Card>
                 </CardContent>

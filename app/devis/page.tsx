@@ -1,4 +1,5 @@
 // pages/devis/page.tsx
+// ✅ VERSION MODIFIÉE AVEC MODAL DE CHOIX DE TYPE DE DEVIS
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
@@ -22,7 +23,9 @@ import {
 } from "@/types/devis"
 import { useDevisList, useDevisStatistiques, useDevisActions } from "@/hooks/useDevis"
 import { QuoteActions } from "@/components/quotes/quote-actions"
-import { QuoteFormModalV2 } from "@/components/quotes/quote-form-modal"
+import { QuoteFormModalV2 } from "@/components/quotes/quote-form-modal"  //  Devis technique
+import { QuoteFormModal } from "@/components/quotes/quote-form-modal2"   //  Devis classique
+import { DevisTypeModal } from "@/components/quotes/devis-type"    
 import { useAuth, usePermissions } from "@/contexts/AuthContext"
 import { toast } from "@/hooks/use-toast"
 import { useDevisService } from "@/services/devisService"
@@ -31,7 +34,11 @@ export default function DevisPage() {
   const [filteredDevis, setFilteredDevis] = useState<DevisListItem[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<DevisStatut | "all">("all")
-  const [showDevisForm, setShowDevisForm] = useState(false)
+  
+  // ✅ NOUVEAUX ÉTATS pour gérer les 3 modales
+  const [showTypeModal, setShowTypeModal] = useState(false)           // Modal choix de type
+  const [showTechnicalForm, setShowTechnicalForm] = useState(false)   // Devis technique
+  const [showClassicForm, setShowClassicForm] = useState(false)       // Devis classique
   
   const router = useRouter()
   const { user } = useAuth() 
@@ -50,7 +57,6 @@ export default function DevisPage() {
       router.push("/dashboard")
       return
     }
-
   }, [user, canAccessQuotes, router])
 
   // Filtrage des devis
@@ -77,30 +83,65 @@ export default function DevisPage() {
     }
 
     setFilteredDevis(filtered)
-    console.log('valeur devis de filtered:',filtered)
   }, [devis, searchTerm, statusFilter, user])
 
   // État devis en édition
   const [editingDevis, setEditingDevis] = useState<Devis | null>(null)
+  
   const handleRefresh = useCallback(() => {
     refreshDevis()
     refreshStats()
-  
   }, [refreshDevis, refreshStats])
   
-  // Gestionnaire création/modification
-  const handleSubmitDevis = async (newDevisData: any) => {
+  //  NOUVEAU: Gestionnaire de sélection de type
+  const handleSelectType = (type: 'technique' | 'classique') => {
+    if (type === 'technique') {
+      setShowTechnicalForm(true)
+    } else {
+      setShowClassicForm(true)
+    }
+  }
+
+  //  Gestionnaire création/modification - TECHNIQUE
+  const handleSubmitTechnicalDevis = async (newDevisData: any) => {
     try {
       const response = editingDevis
         ? await updateDevis(editingDevis.id, newDevisData)
         : await createDevis(newDevisData)
+      
       toast({
         title: editingDevis ? "Devis modifié" : "Devis créé",
         description: response.message || (editingDevis ? "Le devis a été modifié avec succès" : "Le devis a été créé avec succès"),
       })
+      
       refreshDevis()
       refreshStats()
-      setShowDevisForm(false)
+      setShowTechnicalForm(false)
+      setEditingDevis(null)
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : (editingDevis ? "Erreur lors de la modification du devis" : "Erreur lors de la création du devis"),
+        variant: "destructive",
+      })
+    }
+  }
+
+  // ✅ Gestionnaire création/modification - CLASSIQUE
+  const handleSubmitClassicDevis = async (newDevisData: any) => {
+    try {
+      const response = editingDevis
+        ? await updateDevis(editingDevis.id, newDevisData)
+        : await createDevis(newDevisData)
+      
+      toast({
+        title: editingDevis ? "Devis modifié" : "Devis créé",
+        description: response.message || (editingDevis ? "Le devis a été modifié avec succès" : "Le devis a été créé avec succès"),
+      })
+      
+      refreshDevis()
+      refreshStats()
+      setShowClassicForm(false)
       setEditingDevis(null)
     } catch (error) {
       toast({
@@ -116,7 +157,15 @@ export default function DevisPage() {
     try {
       const theOne = await getDevisById(item.id)
       setEditingDevis(theOne)
-      setShowDevisForm(true)
+      
+      // ✅ Déterminer le type de devis
+      // Si le devis a des sections, c'est un devis technique
+      if (theOne.sections && theOne.sections.length > 0) {
+        setShowTechnicalForm(true)
+      } else {
+        // Sinon c'est un devis classique
+        setShowClassicForm(true)
+      }
     } catch (error) {
       toast({
         title: "Erreur",
@@ -189,23 +238,26 @@ export default function DevisPage() {
             <p className="text-muted-foreground">Créez, gérez et suivez vos devis clients</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={devisLoading }>
-              <RefreshCw className={`mr-2 h-4 w-4 ${(devisLoading ) ? 'animate-spin' : ''}`} />
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={devisLoading}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${devisLoading ? 'animate-spin' : ''}`} />
               Actualiser
             </Button>
+            {/*  MODIFIÉ: Ouvre la modal de choix */}
             <Button 
-            onClick={() => { setEditingDevis(null); setShowDevisForm(true) }}
-            disabled={devisLoading}
-          >
-            {devisLoading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Plus className="mr-2 h-4 w-4" />
-            )}
-            Nouveau devis
-          </Button>
+              onClick={() => { 
+                setEditingDevis(null)
+                setShowTypeModal(true)  //  Ouvre modal de choix
+              }}
+              disabled={devisLoading}
+            >
+              {devisLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="mr-2 h-4 w-4" />
+              )}
+              Nouveau devis
+            </Button>
           </div>
-         
         </div>
 
         {/* Affichage des erreurs */}
@@ -343,7 +395,7 @@ export default function DevisPage() {
                   }
                 </p>
                 {!searchTerm && statusFilter === "all" && (
-                  <Button onClick={() => setShowDevisForm(true)}>
+                  <Button onClick={() => setShowTypeModal(true)}>
                     <Plus className="mr-2 h-4 w-4" />
                     Créer un devis
                   </Button>
@@ -365,7 +417,7 @@ export default function DevisPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredDevis.map((devis) => (
-                    <TableRow key={devis.id}>{}
+                    <TableRow key={devis.id}>
                       <TableCell className="font-medium">{devis.numero}</TableCell>
                       <TableCell>
                         <div>
@@ -409,11 +461,33 @@ export default function DevisPage() {
         </Card>
       </div>
 
-      {/* Modal de création de devis */}
+      {/*  NOUVEAU: Modal de choix de type */}
+      <DevisTypeModal
+        open={showTypeModal}
+        onOpenChange={setShowTypeModal}
+        onSelectType={handleSelectType}
+      />
+
+      {/* ✅ Modal devis TECHNIQUE */}
       <QuoteFormModalV2 
-        open={showDevisForm} 
-        onOpenChange={(open) => { if (!open) setEditingDevis(null); setShowDevisForm(open) }} 
-        onSubmit={handleSubmitDevis}
+        open={showTechnicalForm} 
+        onOpenChange={(open) => { 
+          if (!open) setEditingDevis(null)
+          setShowTechnicalForm(open) 
+        }} 
+        onSubmit={handleSubmitTechnicalDevis}
+        devis={editingDevis || undefined}
+        loading={actionLoading}
+      />
+
+      {/* ✅ NOUVEAU: Modal devis CLASSIQUE */}
+      <QuoteFormModal 
+        open={showClassicForm} 
+        onOpenChange={(open) => { 
+          if (!open) setEditingDevis(null)
+          setShowClassicForm(open) 
+        }} 
+        onSubmit={handleSubmitClassicDevis}
         devis={editingDevis || undefined}
         loading={actionLoading}
       />
