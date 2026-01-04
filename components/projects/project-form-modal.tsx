@@ -114,7 +114,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
 
   const { clients, loading: clientLoading, error: clientError, refreshCliens } = useClientsList()
   const { sousTraitantList, loading: soustraitantLoading, error: soustraitantError, refreshSoutraitant } = useSousTraitantList();
-  const { Utilisateur, loading : utlisateurLoading, error: utilsateurError}=useUtilisateurList()
+  const { Utilisateur, loading: utlisateurLoading, error: utilsateurError } = useUtilisateurList()
   const { createClient } = useClientActions()
 
   const getSelectedClient = () => {
@@ -375,9 +375,9 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("========== HANDLE SUBMIT ==========")
-    console.log("Début du processus de soumission")
-    console.log("FormData initial :", formData)
+    /*  console.log("========== HANDLE SUBMIT ==========")
+     console.log("Début du processus de soumission")
+     console.log("FormData initial :", formData) */
 
     // Validation
     if (!formData.nom.trim()) {
@@ -406,37 +406,37 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
       })
       return
     }
+    if (isEditMode) {
+      const activeStages = stages.filter(s => s.estActif)
+      if (activeStages.length === 0) {
+        toast({
+          title: "Erreur de validation",
+          description: "Au moins une étape active est requise",
+          variant: "destructive",
+        })
+        return
+      }
 
-    const activeStages = stages.filter(s => s.estActif)
-    if (activeStages.length === 0) {
-      toast({
-        title: "Erreur de validation",
-        description: "Au moins une étape active est requise",
-        variant: "destructive",
-      })
-      return
+      const invalidStages = activeStages.filter(
+        (s) => !s.nom.trim() || !s.budgetPrevu || parseFloat(s.budgetPrevu) <= 0
+      )
+
+      if (invalidStages.length > 0) {
+        toast({
+          title: "Erreur de validation",
+          description: "Toutes les étapes actives doivent avoir un nom et un budget prévu valide",
+          variant: "destructive",
+        })
+        return
+      }
     }
-
-    const invalidStages = activeStages.filter(
-      (s) => !s.nom.trim() || !s.budgetPrevu || parseFloat(s.budgetPrevu) <= 0
-    )
-
-    if (invalidStages.length > 0) {
-      toast({
-        title: "Erreur de validation",
-        description: "Toutes les étapes actives doivent avoir un nom et un budget prévu valide",
-        variant: "destructive",
-      })
-      return
-    }
-
     // ✅ DEBUG: Afficher l'état de estActif avant soumission
-    console.log("Stages avant soumission:", stages.map(s => ({
+    /* console.log("Stages avant soumission:", stages.map(s => ({
       id: s.id,
       nom: s.nom,
       estActif: s.estActif,
       type: typeof s.estActif
-    })))
+    }))) */
 
     const projetData: CreateProjetRequest = {
       nom: formData.nom,
@@ -450,9 +450,9 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
       adresseChantier: formData.adresseChantier || undefined,
       codePostalChantier: formData.codePostalChantier || undefined,
       villeChantier: formData.villeChantier || undefined,
-      chefProjetId: formData.chefProjetId ,
+      chefProjetId: formData.chefProjetId,
       statut: formData.statut || undefined,
-      etapes: stages.map((stage) => ({
+      etapes: isEditMode ? stages.map((stage) => ({
         id: stage.id,
         nom: stage.nom,
         description: stage.description || undefined,
@@ -464,7 +464,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
         statut: stage.statut,
         estActif: stage.estActif,  // ✅ boolean (pas number)
         idSousTraitant: stage.idSoustraitant > 0 ? stage.idSoustraitant : undefined,
-      })),
+      })) : undefined,
     }
 
     // ✅ DEBUG: Afficher les données avant envoi
@@ -735,7 +735,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
                     <Label htmlFor="chefProjetId">Chef de projet</Label>
                     <Select
                       value={formData.chefProjetId.toString()}
-                      onValueChange={(value) => setFormData({ ...formData, chefProjetId: Number(value)  })}
+                      onValueChange={(value) => setFormData({ ...formData, chefProjetId: Number(value) })}
                       disabled={utlisateurLoading}
                     >
                       <SelectTrigger>
@@ -743,7 +743,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
                       </SelectTrigger>
                       <SelectContent>
                         {Utilisateur.map((chef) => (
-                          <SelectItem key={chef.id} value= {String(chef.id)}>
+                          <SelectItem key={chef.id} value={String(chef.id)}>
                             {chef.prenom} {chef.nom}
                           </SelectItem>
                         ))}
@@ -757,12 +757,36 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
               </CardContent>
             </Card>
 
+            {/* Message informatif en mode création */}
+            {!isEditMode && (
+              <Card className="bg-blue-50 border-blue-200">
+                <CardContent className="pt-6">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-full bg-blue-100 p-2">
+                      <svg className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-blue-900 mb-1">
+                        Gestion des étapes
+                      </h4>
+                      <p className="text-sm text-blue-700">
+                        Après la création du projet, vous pourrez ajouter et gérer les étapes du projet
+                        (planning, budgets, sous-traitants, etc.) depuis la page de modification.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Étapes du projet */}
-            <Card>
+            {isEditMode && ( <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle>Étapes du projet *</CardTitle>
-                  <Button
+                 <Button
                     type="button"
                     variant="outline"
                     size="sm"
@@ -1037,6 +1061,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
                 })()}
               </CardContent>
             </Card>
+            )}
           </form>
         </div>
 
