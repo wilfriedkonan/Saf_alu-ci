@@ -739,7 +739,7 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
                       <Table>
                         <TableHeader className="sticky top-0 bg-background z-10">
                           <TableRow>
-                            <TableHead className="w-32">Type</TableHead>
+                            {/* <TableHead className="w-32">Type</TableHead> */}
                             <TableHead className="w-40">Désignation *</TableHead>
                             <TableHead className="w-20">L (cm)</TableHead>
                             <TableHead className="w-20">H (cm)</TableHead>
@@ -753,7 +753,7 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
                         <TableBody>
                           {activeSection.lignes.map((ligne) => (
                             <TableRow key={ligne.tempId}>
-                              <TableCell>
+                             {/*  <TableCell>
                                 <Select
                                   value={ligne.typeElement}
                                   onValueChange={(value) => updateLigne(activeSection.tempId, ligne.tempId, 'typeElement', value)}
@@ -767,7 +767,7 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
                                     ))}
                                   </SelectContent>
                                 </Select>
-                              </TableCell>
+                              </TableCell> */}
 
                               <TableCell>
                                 <Input
