@@ -12,7 +12,7 @@ import { SubcontractorFormModal } from "@/components/subcontractors/subcontracto
 import { SousTraitantService } from "@/services/sous-traitantService"
 import { useRouter } from "next/navigation"
 import { useAuth, usePermissions } from "@/contexts/AuthContext"
-import { useSousTraitantList, useSpecialiteList } from "@/hooks/useSoustraitant"
+import { useCreateSoustraitant, useSousTraitantList, useSpecialiteList } from "@/hooks/useSoustraitant"
 import { SousTraitant, Specialite } from "@/types/sous-traitants"
 import { toast } from "@/hooks/use-toast"
 
@@ -30,8 +30,9 @@ export default function SubcontractorsPage() {
   const router = useRouter()
   const { user } = useAuth()
   const { canManageSousTraitants } = usePermissions()
-  const { sousTraitantList } = useSousTraitantList()
+  const { sousTraitantList, refreshSoutraitant } = useSousTraitantList()
   const { specialite } = useSpecialiteList()
+  const { createSoustraitant } = useCreateSoustraitant()
 const {getSoustraitantsById}=SousTraitantService
 
   // Vérification des permissions
@@ -75,7 +76,7 @@ const {getSoustraitantsById}=SousTraitantService
 
       const matchesSpecialty =
         specialtyFilter === "all" ||
-        (sub.specialites?.some((s) => s.specialiteId?.toString() === specialtyFilter) ?? false)
+        (sub.specialites?.some((s) => s.id?.toString() === specialtyFilter) ?? false)
 
       let matchesRating = true
       if (ratingFilter === "5") {
@@ -131,9 +132,35 @@ const {getSoustraitantsById}=SousTraitantService
       ).toFixed(1)
       : "0.0"
 
-  const handleCreateSubcontractor = (_subcontractorData: any) => {
-    // Intégration API à implémenter. Pour l'instant, fermeture du modal.
-    setEditingSubcontractor(null)
+  const handleCreateSubcontractor = async (subcontractorData: any) => {
+    try {
+      const payload = {
+        nom: subcontractorData.nom,
+        raisonSociale: subcontractorData.raisonSociale || null,
+        email: subcontractorData.email || null,
+        telephone: subcontractorData.telephone || null,
+        adresse: subcontractorData.adresse || null,
+        ville: subcontractorData.ville || null,
+        ncc: subcontractorData.ncc || null,
+        nomContact: subcontractorData.contactNom || null,
+        emailContact: subcontractorData.contactEmail || null,
+        telephoneContact: subcontractorData.contactTelephone || null,
+      }
+
+      await createSoustraitant(payload)
+      toast({
+        title: "Succès",
+        description: "Le sous-traitant a été créé avec succès.",
+      })
+      refreshSoutraitant()
+      handleCloseModal()
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de créer le sous-traitant",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleDeleteSubcontractor = (_subcontractorId: number) => {
@@ -312,8 +339,8 @@ const {getSoustraitantsById}=SousTraitantService
                 {renderStars(subcontractor.noteMoyenne)}
 
                 <div className="flex flex-wrap gap-1">
-                  {subcontractor.specialites?.slice(0, 3).map((s) => (
-                    <Badge key={`${s.specialiteId}`} variant="secondary" className="text-xs">
+                  {subcontractor.specialites?.slice(0, 3).map((s,index) => (
+                    <Badge key={`${s.id} - ${s.description} - ${index}`} variant="secondary" className="text-xs">
                       {getSpecialtyLabel(s.description || "test")}
                     </Badge>
                   ))}

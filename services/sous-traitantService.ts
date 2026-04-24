@@ -4,6 +4,7 @@ import axios, { AxiosResponse } from 'axios';
 import {
   SousTraitant,
   CreateSousTraitantRequest,
+  CreatSpecialiteResquest,
   CreateEvaluationRequest,
   ApiResponse,
   SousTraitantListResponse,
@@ -40,6 +41,22 @@ export class SousTraitantService {
       return response.data;
     } catch (error) {
       console.error('Erreur lors de la récupération des spécialités:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Crée une nouvelle spécialité
+   */
+  static async createSpecialite(specialiteData: CreatSpecialiteResquest): Promise<ApiResponse<Specialite>> {
+    try {
+      const response: AxiosResponse<ApiResponse<Specialite>> = await apiClient.post(
+        '/SousTraitants/CreatSpecialite',
+        specialiteData
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la création de la spécialité:', error);
       throw this.handleError(error);
     }
   }
@@ -254,6 +271,7 @@ export const useSousTraitantService = () => {
     
     // Spécialités
     getListeSpecialites: SousTraitantService.getAllSpecialite,
+    createSpecialite: SousTraitantService.createSpecialite,
     
     // ✅ Évaluations
     createEvaluation: SousTraitantService.createEvaluation,

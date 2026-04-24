@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { ArrowUpRight, ArrowDownRight, Eye, ChevronLeft, ChevronRight } from "lucide-react"
+import { ArrowUpRight, ArrowDownRight, Eye, ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { formatCurrency, formatDate, typeMouvementColors, MouvementFinancier, Compte } from "@/types/tresorerie"
@@ -21,6 +21,8 @@ interface RecentTransactionsProps {
   loading?: boolean
   error?: string | null
   comptesMap?: Map<number, Compte>
+  onEdit?: (mouvement: MouvementFinancier) => void
+  onDelete?: (mouvement: MouvementFinancier) => void
 }
 
 export function RecentTransactions({ 
@@ -30,6 +32,8 @@ export function RecentTransactions({
   loading = false,
   error = null,
   comptesMap,
+  onEdit,
+  onDelete,
 }: RecentTransactionsProps) {
   const [selectedTransactionId, setSelectedTransactionId] = useState<number | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -218,7 +222,7 @@ export function RecentTransactions({
                 </div>
               </div>
 
-              {/* Montant, badge et bouton détails */}
+              {/* Montant, badge et actions */}
               <div className="flex items-center gap-3 ml-3">
                 <div className="text-right space-y-1">
                   <p className={`font-semibold ${
@@ -235,16 +239,39 @@ export function RecentTransactions({
                   </Badge>
                 </div>
 
-                {/* Bouton œil - visible au survol */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={() => handleViewDetails(transaction.id)}
-                  title="Voir les détails"
-                >
-                  <Eye className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {onEdit && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => onEdit(transaction)}
+                      title="Modifier le mouvement"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {onDelete && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-red-600 hover:text-red-700"
+                      onClick={() => onDelete(transaction)}
+                      title="Supprimer le mouvement"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => handleViewDetails(transaction.id)}
+                    title="Voir les détails"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           )

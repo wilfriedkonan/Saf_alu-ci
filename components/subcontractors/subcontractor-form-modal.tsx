@@ -12,8 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Plus, X } from "lucide-react"
-import type { SubcontractorSpecialty } from "@/lib/subcontractors"
-import { Specialite } from "@/types/sous-traitants"
+import { useCreateSpecialite, useSpecialiteList } from "@/hooks/useSoustraitant"
+import { toast } from "@/hooks/use-toast"
 
 interface SubcontractorFormModalProps {
   isOpen: boolean
@@ -36,12 +36,17 @@ export function SubcontractorFormModal({ isOpen, onClose, onSubmit, editData }: 
     contactTelephone: "",
   })
 
-  const [specialties, setSpecialties] = useState<Specialite[]>([])
-  const [newSpecialty, setNewSpecialty] = useState<SubcontractorSpecialty | "">("")
+  const [specialties, setSpecialties] = useState<string[]>([])
+  const [newSpecialty, setNewSpecialty] = useState("")
+  const [isCreateSpecialtyOpen, setIsCreateSpecialtyOpen] = useState(false)
+  const [specialtyForm, setSpecialtyForm] = useState({ nom: "", designation: "" })
+  const { createSpecialite, loading: isCreatingSpecialite } = useCreateSpecialite()
+  const { specialite: apiSpecialites } = useSpecialiteList()
 
-  const availableSpecialties: SubcontractorSpecialty[] = [
+  const defaultSpecialties: string[] = [
     "electricite",
     "plomberie",
+    "maconnerie",
     "peinture",
     "carrelage",
     "menuiserie",
@@ -55,7 +60,7 @@ export function SubcontractorFormModal({ isOpen, onClose, onSubmit, editData }: 
     "terrassement"
   ]
 
-  const specialtyLabels: Record<SubcontractorSpecialty, string> = {
+  const specialtyLabels: Record<string, string> = {
     electricite: "Électricité",
     plomberie: "Plomberie",
     maconnerie: "Maçonnerie",
@@ -72,6 +77,47 @@ export function SubcontractorFormModal({ isOpen, onClose, onSubmit, editData }: 
     terrassement: "Terrassement",
   }
 
+  const apiSpecialtyLabels = (apiSpecialites || []).reduce<Record<string, string>>((acc, item) => {
+    const key = item.nom?.trim()
+    if (!key) return acc
+    acc[key] = item.description?.trim() || getPrettySpecialtyName(key)
+    return acc
+  }, {})
+
+  const apiSpecialtyValues = (apiSpecialites || [])
+    .map((item) => item.nom?.trim())
+    .filter((item): item is string => Boolean(item))
+
+  function getPrettySpecialtyName(specialty: string) {
+    return specialty
+      .replace(/[_-]+/g, " ")
+      .trim()
+      .replace(/\b\w/g, (char) => char.toUpperCase())
+  }
+
+  const getSpecialtyLabel = (specialty: string) => {
+    if (specialtyLabels[specialty]) return specialtyLabels[specialty]
+    if (apiSpecialtyLabels[specialty]) return apiSpecialtyLabels[specialty]
+    return getPrettySpecialtyName(specialty)
+  }
+
+  const normalizeSpecialties = (rawSpecialties: unknown): string[] => {
+    if (!Array.isArray(rawSpecialties)) return []
+
+    return rawSpecialties
+      .map((item) => {
+        if (typeof item === "string") return item
+        if (item && typeof item === "object") {
+          const description = (item as { description?: unknown }).description
+          const name = (item as { nom?: unknown }).nom
+          if (typeof description === "string") return description
+          if (typeof name === "string") return name
+        }
+        return null
+      })
+      .filter((item): item is string => item !== null)
+  }
+
   useEffect(() => {
     if (editData) {
       setFormData({
@@ -86,7 +132,7 @@ export function SubcontractorFormModal({ isOpen, onClose, onSubmit, editData }: 
         contactEmail: editData.contact?.emailContact || "",
         contactTelephone: editData.contact?.telephoneContact || "",
       })
-      setSpecialties(editData?.specialites || [])
+      setSpecialties(normalizeSpecialties(editData?.specialites ?? editData?.specialties))
     } else {
       setFormData({
         nom: "",
@@ -104,18 +150,53 @@ export function SubcontractorFormModal({ isOpen, onClose, onSubmit, editData }: 
     }
   }, [editData, isOpen])
 
-  useEffect(()=>{
-console.log('Debug Specialité :',specialties)
-  },[specialties])
   const addSpecialty = () => {
-    if (newSpecialty && !specialties.includes(newSpecialty as SubcontractorSpecialty)) {
-      setSpecialties([...specialties, newSpecialty as SubcontractorSpecialty])
+    if (newSpecialty && !specialties.includes(newSpecialty)) {
+      setSpecialties([...specialties, newSpecialty])
       setNewSpecialty("")
     }
   }
 
-  const removeSpecialty = (specialty: Specialite) => {
+  const removeSpecialty = (specialty: string) => {
     setSpecialties(specialties.filter((s) => s !== specialty))
+  }
+
+  const handleCreateSpecialty = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const nom = specialtyForm.nom.trim()
+    const designation = specialtyForm.designation.trim()
+
+    if (!nom) {
+      toast({
+        title: "Champ requis",
+        description: "Le nom de la spécialité est obligatoire.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const response = await createSpecialite({
+        nom,
+        description: designation || null,
+      })
+
+      const createdSpecialty = response.data?.nom || nom
+      setNewSpecialty(createdSpecialty)
+      setIsCreateSpecialtyOpen(false)
+      setSpecialtyForm({ nom: "", designation: "" })
+
+      toast({
+        title: "Succès",
+        description: "La spécialité a été créée et sélectionnée.",
+      })
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de créer la spécialité",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -285,11 +366,11 @@ console.log('Debug Specialité :',specialties)
                         <SelectValue placeholder="Sélectionner une spécialité" />
                       </SelectTrigger>
                       <SelectContent>
-                        {availableSpecialties
+                        {[...new Set([...defaultSpecialties, ...apiSpecialtyValues, ...specialties, newSpecialty].filter(Boolean))]
                           .filter((specialty) => !specialties.includes(specialty))
                           .map((specialty) => (
                             <SelectItem key={specialty} value={specialty}>
-                              {specialtyLabels[specialty]}
+                              {getSpecialtyLabel(specialty)}
                             </SelectItem>
                           ))}
                       </SelectContent>
@@ -297,15 +378,18 @@ console.log('Debug Specialité :',specialties)
                     <Button type="button" onClick={addSpecialty} disabled={!newSpecialty}>
                       <Plus className="h-4 w-4" />
                     </Button>
+                    <Button type="button" variant="outline" onClick={() => setIsCreateSpecialtyOpen(true)}>
+                      Ajouter spécialité
+                    </Button>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
                     {specialties.map((specialty) => (
-                      <Badge key={specialty.id} variant="secondary" className="flex items-center gap-1">
-                        {specialtyLabels[specialty?.description]}
+                      <Badge key={specialty} variant="secondary" className="flex items-center gap-1">
+                        {getSpecialtyLabel(specialty)}
                         <button
                           type="button"
-                          onClick={() => removeSpecialty(specialty.id)}
+                          onClick={() => removeSpecialty(specialty)}
                           className="ml-1 hover:bg-red-100 rounded-full p-0.5"
                         >
                           <X className="h-3 w-3" />
@@ -334,6 +418,42 @@ console.log('Debug Specialité :',specialties)
           </div>
         </div>
       </DialogContent>
+      <Dialog open={isCreateSpecialtyOpen} onOpenChange={setIsCreateSpecialtyOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nouvelle spécialité</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateSpecialty} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="specialite-nom">Nom</Label>
+              <Input
+                id="specialite-nom"
+                value={specialtyForm.nom}
+                onChange={(e) => setSpecialtyForm((prev) => ({ ...prev, nom: e.target.value }))}
+                placeholder="Ex: domotique"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="specialite-designation">Désignation</Label>
+              <Textarea
+                id="specialite-designation"
+                value={specialtyForm.designation}
+                onChange={(e) => setSpecialtyForm((prev) => ({ ...prev, designation: e.target.value }))}
+                placeholder="Description courte..."
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsCreateSpecialtyOpen(false)}>
+                Annuler
+              </Button>
+              <Button type="submit" disabled={isCreatingSpecialite}>
+                Valider
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }

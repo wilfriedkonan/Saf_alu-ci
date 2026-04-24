@@ -15,10 +15,11 @@ import { CalendarIcon, RefreshCw, Search, X, Check } from "lucide-react"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 import { cn } from "@/lib/utils"
-import { useTresorerie } from "@/hooks/useTresorerie"
+import { useMouvement, useTresorerie } from "@/hooks/useTresorerie"
 import {
   categoriesMouvementList,
   CreateMouvementRequest,
+  MouvementFinancier,
   formatDateForAPI,
   typeMouvementLabels,
   typesMouvementList,
@@ -72,6 +73,8 @@ interface TransactionFormModalProps {
   comptes?: Compte[]
   loadingComptes?: boolean
   errorComptes?: string | null
+  mode?: "create" | "edit"
+  editMouvement?: MouvementFinancier | null
 }
 
 interface FormState {
@@ -354,6 +357,8 @@ export function TransactionFormModal({
   comptes: comptesFromProps,
   loadingComptes: loadingComptesFromProps,
   errorComptes: errorComptesFromProps,
+  mode = "create",
+  editMouvement = null,
 }: TransactionFormModalProps) {
 /*   const { toast } = useToast()
  */  const tresorerieHook = useTresorerie()
@@ -372,10 +377,17 @@ export function TransactionFormModal({
 
   const {
     createMouvement,
+    updateMouvement,
     loadingMouvementActions,
     errorMouvementActions,
     refreshComptes,
   } = tresorerieHook
+  const editMouvementId = mode === "edit" && editMouvement ? editMouvement.id : null
+  const {
+    mouvement: loadedMouvement,
+    loading: loadingMouvementDetail,
+    error: errorMouvementDetail,
+  } = useMouvement(editMouvementId)
 
   // Filtrer uniquement les comptes actifs
   const comptes = useMemo(() => {
@@ -403,6 +415,28 @@ export function TransactionFormModal({
       resetForm()
     }
   }, [isOpen, resetForm])
+
+  useEffect(() => {
+    if (!isOpen || mode !== "edit" || !editMouvement) return
+    const sourceMouvement = loadedMouvement ?? editMouvement
+    const etapeProjetId = (sourceMouvement as MouvementFinancier & { etapeProjetId?: number }).etapeProjetId
+    setFormState({
+      typeMouvement: sourceMouvement.typeMouvement,
+      compteId: sourceMouvement.compteId?.toString() || "",
+      compteDestinationId: sourceMouvement.compteDestinationId?.toString() || "",
+      libelle: sourceMouvement.libelle || "",
+      description: sourceMouvement.description || "",
+      categorie: sourceMouvement.categorie || "",
+      montant: sourceMouvement.montant?.toString() || "",
+      modePaiement: sourceMouvement.modePaiement || "",
+      reference: sourceMouvement.reference || "",
+      factureId: sourceMouvement.factureId?.toString() || "",
+      projetId: sourceMouvement.projetId?.toString() || "",
+      sousTraitantId: sourceMouvement.sousTraitantId?.toString() || "",
+      etapeProjetId: etapeProjetId?.toString() || "",
+    })
+    setTransactionDate(sourceMouvement.dateMouvement ? new Date(sourceMouvement.dateMouvement) : new Date())
+  }, [isOpen, mode, editMouvement, loadedMouvement])
 
   // Rafraîchir les comptes à l'ouverture
   useEffect(() => {
@@ -499,12 +533,19 @@ export function TransactionFormModal({
 
     try {
       console.log('TransactionFormModal - Envoi du mouvement:', payload)
-      const response = await createMouvement(payload)
-      if (response && response.success === false) {
-        throw new Error(response.message || "Échec de la création du mouvement")
+      if (mode === "edit" && editMouvement) {
+        const response = await updateMouvement(editMouvement.id, payload)
+        if (response && response.success === false) {
+          throw new Error(response.message || "Échec de la mise à jour du mouvement")
+        }
+        toast.info(`Le mouvement "${payload.libelle}" a été modifié avec succès.`)
+      } else {
+        const response = await createMouvement(payload)
+        if (response && response.success === false) {
+          throw new Error(response.message || "Échec de la création du mouvement")
+        }
+        toast.info(`Le mouvement "${payload.libelle}" a été créé avec succès.`)
       }
-
-      toast.info(`Le mouvement "${payload.libelle}" a été créé avec succès.`)
 
       onClose()
       resetForm()
@@ -527,7 +568,7 @@ export function TransactionFormModal({
         <div className="space-y-0 overflow-y-auto" >
           <DialogHeader className="px-6 pt-6">
             <div className="flex items-center justify-between">
-              <DialogTitle>Nouvelle transaction</DialogTitle>
+              <DialogTitle>{mode === "edit" ? "Modifier la transaction" : "Nouvelle transaction"}</DialogTitle>
               <Button
                 type="button"
                 variant="ghost"
@@ -549,6 +590,21 @@ export function TransactionFormModal({
             {errorMouvementActions && (
               <Alert variant="destructive" className="mb-4">
                 <AlertDescription>{errorMouvementActions}</AlertDescription>
+              </Alert>
+            )}
+            {mode === "edit" && loadingMouvementDetail && (
+              <Alert className="mb-4">
+                <AlertDescription className="flex items-center gap-2">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Chargement des informations du mouvement...
+                </AlertDescription>
+              </Alert>
+            )}
+            {mode === "edit" && errorMouvementDetail && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertDescription>
+                  {errorMouvementDetail}. Les données disponibles ont été préchargées, vous pouvez continuer la modification.
+                </AlertDescription>
               </Alert>
             )}
 
@@ -856,7 +912,7 @@ export function TransactionFormModal({
               disabled={loadingMouvementActions || loadingComptes || comptes.length === 0}
             >
               {loadingMouvementActions && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
-              Enregistrer
+              {mode === "edit" ? "Mettre à jour" : "Enregistrer"}
             </Button>
           </div>
         </div>

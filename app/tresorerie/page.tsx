@@ -7,9 +7,11 @@ import {
   CreditCard,
   DollarSign,
   Download,
+  Pencil,
   Plus,
   RefreshCw,
   Search,
+  Trash2,
   TrendingDown,
   TrendingUp,
 } from "lucide-react"
@@ -48,6 +50,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { ExpenseBreakdown } from "@/components/treasury/expense-breakdown"
 import { CashFlowChart } from "@/components/treasury/cash-flow-chart"
 import { RecentTransactions } from "@/components/treasury/recent-transactions"
+import type { MouvementFinancier } from "@/types/tresorerie"
 
 type PeriodFilter = "week" | "month" | "quarter" | "year"
 
@@ -72,6 +75,8 @@ export default function TreasuryPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [showAddTransaction, setShowAddTransaction] = useState(false)
   const [showAddAccount, setShowAddAccount] = useState(false)
+  const [editingMouvement, setEditingMouvement] = useState<MouvementFinancier | null>(null)
+  const [deletingMouvement, setDeletingMouvement] = useState<MouvementFinancier | null>(null)
   const [compteForm, setCompteForm] = useState(initialCompteForm)
   const [reportRange, setReportRange] = useState(() => {
     const end = new Date()
@@ -89,6 +94,8 @@ export default function TreasuryPage() {
     errorComptes,
     refreshComptes,
     createCompte,
+    deleteMouvement,
+    loadingMouvementActions,
     loadingCompteActions,
     exporterRapportPDF,
     exporterRapportExcel,
@@ -305,6 +312,32 @@ export default function TreasuryPage() {
       })
     }
   }, [reportRange, exporterRapportExcel, toast])
+
+  const openEditMouvementModal = useCallback((mouvement: MouvementFinancier) => {
+    setEditingMouvement(mouvement)
+    setShowAddTransaction(true)
+  }, [])
+
+  const handleDeleteMouvement = useCallback(async () => {
+    if (!deletingMouvement) return
+    try {
+      await deleteMouvement(deletingMouvement.id)
+      toast({
+        title: "Mouvement supprimé",
+        description: `Le mouvement "${deletingMouvement.libelle}" a été supprimé.`,
+      })
+      setDeletingMouvement(null)
+      refreshMouvements()
+      refreshStats()
+      refreshComptes()
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de supprimer le mouvement",
+        variant: "destructive",
+      })
+    }
+  }, [deletingMouvement, deleteMouvement, toast, refreshMouvements, refreshStats, refreshComptes])
 
   if (!user || !canManageTresorerie) {
     return null
@@ -544,6 +577,8 @@ export default function TreasuryPage() {
                 loading={loadingMouvements}
                 error={mouvementsError}
                 comptesMap={comptesMap}
+                onEdit={openEditMouvementModal}
+                onDelete={setDeletingMouvement}
               />
             </CardContent>
           </Card>
@@ -570,6 +605,31 @@ export default function TreasuryPage() {
                       onChange={(e) => setReportRange((prev) => ({ ...prev, dateFin: e.target.value }))}
                     />
                   </div>
+                </div>
+              </div>
+
+              <div className="space-y-2 border-t pt-3">
+                <p className="text-sm font-medium">Actions rapides</p>
+                <div className="space-y-2">
+                  {displayedMouvements.slice(0, 3).map((mouvement) => (
+                    <div key={mouvement.id} className="flex items-center justify-between rounded-md border p-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{mouvement.libelle}</p>
+                        <p className="text-xs text-muted-foreground">{formatCurrency(mouvement.montant)}</p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button size="icon" variant="ghost" onClick={() => openEditMouvementModal(mouvement)} title="Modifier">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => setDeletingMouvement(mouvement)} title="Supprimer">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {displayedMouvements.length === 0 && (
+                    <p className="text-xs text-muted-foreground">Aucun mouvement à afficher.</p>
+                  )}
                 </div>
               </div>
 
@@ -650,12 +710,17 @@ export default function TreasuryPage() {
       {/* Modal Nouvelle transaction */}
       <TransactionFormModal
         isOpen={showAddTransaction}
-        onClose={() => setShowAddTransaction(false)}
+        onClose={() => {
+          setShowAddTransaction(false)
+          setEditingMouvement(null)
+        }}
         onSuccess={() => {
           refreshMouvements()
           refreshComptes()
           refreshStats()
         }}
+        mode={editingMouvement ? "edit" : "create"}
+        editMouvement={editingMouvement}
         comptes={comptes}
         loadingComptes={loadingComptes}
         errorComptes={errorComptes}
@@ -716,6 +781,28 @@ export default function TreasuryPage() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(deletingMouvement)} onOpenChange={(open) => !open && setDeletingMouvement(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirmer la suppression</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Voulez-vous vraiment supprimer le mouvement{" "}
+            <span className="font-medium text-foreground">{deletingMouvement?.libelle}</span> ?
+            Cette action est irreversible.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setDeletingMouvement(null)}>
+              Annuler
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleDeleteMouvement} disabled={loadingMouvementActions}>
+              {loadingMouvementActions && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
+              Supprimer
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </DashboardLayout>

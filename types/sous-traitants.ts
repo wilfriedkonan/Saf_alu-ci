@@ -38,14 +38,18 @@ export interface Specialite {
   couleur: string; // Default: "#059669"
   actif: boolean; // Default: true
 }
-
+export interface CreatSpecialiteResquest
+{
+    nom: string; 
+    description?: string |null;
+}
 /**
  * Relation entre un sous-traitant et ses spécialités avec niveau d'expertise
  */
 export interface SousTraitantSpecialite {
   couleur:string;
   nom: string;
-  specialiteId: number;
+  id: number;
   niveauExpertise: number; // 1-5, default: 3
   description: string;
   niveauLabel: string;

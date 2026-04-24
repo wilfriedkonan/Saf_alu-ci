@@ -3,6 +3,8 @@ import { SousTraitantService } from '@/services/sous-traitantService';
 import { 
   SousTraitant,
   Specialite,
+  CreateSousTraitantRequest,
+  CreatSpecialiteResquest,
   CreateEvaluationRequest,
   EvaluationSousTraitant,
   ApiResponse
@@ -82,6 +84,43 @@ export const useGetSoustraitant = (id:number) => {
     refreshSoutraitant
   };
 };
+
+// ========================================
+// Hook pour créer un sous-traitant
+// ========================================
+export const useCreateSoustraitant = () => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const createSoustraitant = useCallback(
+    async (payload: CreateSousTraitantRequest): Promise<ApiResponse<SousTraitant>> => {
+      try {
+        setLoading(true);
+        setError(null);
+        return await SousTraitantService.createSoustraitants(payload);
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Erreur lors de la création du sous-traitant';
+        setError(errorMessage);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  const resetError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  return {
+    createSoustraitant,
+    loading,
+    error,
+    resetError
+  };
+};
 // ========================================
 // Hook pour gérer la liste des spécialités
 // ========================================
@@ -116,6 +155,43 @@ export const useSpecialiteList = () => {
     loading,
     error,
     refreshSpecialite
+  };
+};
+
+// ========================================
+// Hook pour créer une spécialité
+// ========================================
+export const useCreateSpecialite = () => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const createSpecialite = useCallback(
+    async (payload: CreatSpecialiteResquest): Promise<ApiResponse<Specialite>> => {
+      try {
+        setLoading(true);
+        setError(null);
+        return await SousTraitantService.createSpecialite(payload);
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Erreur lors de la création de la spécialité';
+        setError(errorMessage);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  const resetError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  return {
+    createSpecialite,
+    loading,
+    error,
+    resetError
   };
 };
 

@@ -543,7 +543,7 @@ export const addEvaluation = (
     subcontractor.evaluations.push(newEvaluation)
 
     // Recalculate average rating
-    const totalRating = subcontractor.evaluations.reduce((sum, eval) => sum + eval.rating, 0)
+    const totalRating = subcontractor.evaluations.reduce((sum: number, evaluation: SubcontractorEvaluation) => sum + evaluation.rating, 0)
     subcontractor.averageRating = Math.round((totalRating / subcontractor.evaluations.length) * 10) / 10
 
     subcontractor.updatedAt = new Date().toISOString().split("T")[0]

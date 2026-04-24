@@ -137,6 +137,21 @@ export const useCompteActions = () => {
     }
   }, []);
 
+  const deleteCompte = useCallback(async (id: number) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await TresorerieService.deleteCompte(id);
+      return response;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erreur lors de la suppression du compte';
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const desactiverCompte = useCallback(async (id: number) => {
     try {
       setLoading(true);
@@ -187,6 +202,7 @@ export const useCompteActions = () => {
     error,
     createCompte,
     updateCompte,
+    deleteCompte,
     desactiverCompte,
     reactiverCompte,
     corrigerSolde,
@@ -675,6 +691,7 @@ export const useTresorerie = () => {
     // Actions sur les comptes
     createCompte: compteActions.createCompte,
     updateCompte: compteActions.updateCompte,
+    deleteCompte: compteActions.deleteCompte,
     desactiverCompte: compteActions.desactiverCompte,
     reactiverCompte: compteActions.reactiverCompte,
     corrigerSolde: compteActions.corrigerSolde,

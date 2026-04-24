@@ -164,6 +164,21 @@ export class TresorerieService {
   }
 
   /**
+   * Supprime un compte
+   */
+  static async deleteCompte(id: number): Promise<ApiResponse<void>> {
+    try {
+      const response: AxiosResponse<ApiResponse<void>> = await apiClient.delete(
+        `/Tresorerie/comptes/${id}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur lors de la suppression du compte ${id}:`, error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
    * Corrige le solde d'un compte
    */
   static async corrigerSolde(
@@ -556,6 +571,7 @@ export const useTresorerieService = () => {
     getCompteById: TresorerieService.getCompteById,
     createCompte: TresorerieService.createCompte,
     updateCompte: TresorerieService.updateCompte,
+    deleteCompte: TresorerieService.deleteCompte,
     desactiverCompte: TresorerieService.desactiverCompte,
     reactiverCompte: TresorerieService.reactiverCompte,
     corrigerSolde: TresorerieService.corrigerSolde,
