@@ -16,6 +16,7 @@ import {
 
 interface RecentTransactionsProps {
   mouvements: MouvementFinancier[]
+  user: any | null
   searchTerm?: string
   selectedCompteId?: number | string
   loading?: boolean
@@ -26,6 +27,7 @@ interface RecentTransactionsProps {
 }
 
 export function RecentTransactions({ 
+  user,
   mouvements, 
   searchTerm = "", 
   selectedCompteId,
@@ -251,7 +253,7 @@ export function RecentTransactions({
                       <Pencil className="h-4 w-4" />
                     </Button>
                   )}
-                  {onDelete && (
+                  {onDelete && (user?.Role?.Nom === "super_admin" || user?.Role?.Nom === "admin") && (
                     <Button
                       variant="ghost"
                       size="icon"

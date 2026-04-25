@@ -579,6 +579,7 @@ export default function TreasuryPage() {
                 comptesMap={comptesMap}
                 onEdit={openEditMouvementModal}
                 onDelete={setDeletingMouvement}
+                user={user}
               />
             </CardContent>
           </Card>
@@ -621,9 +622,9 @@ export default function TreasuryPage() {
                         <Button size="icon" variant="ghost" onClick={() => openEditMouvementModal(mouvement)} title="Modifier">
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button size="icon" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => setDeletingMouvement(mouvement)} title="Supprimer">
+                        {user?.Role?.Nom === "super_admin" || user?.Role?.Nom === "admin" && <Button size="icon" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => setDeletingMouvement(mouvement)} title="Supprimer">
                           <Trash2 className="h-4 w-4" />
-                        </Button>
+                        </Button>}
                       </div>
                     </div>
                   ))}
