@@ -12,7 +12,7 @@ import { SubcontractorFormModal } from "@/components/subcontractors/subcontracto
 import { SousTraitantService } from "@/services/sous-traitantService"
 import { useRouter } from "next/navigation"
 import { useAuth, usePermissions } from "@/contexts/AuthContext"
-import { useCreateSoustraitant, useSousTraitantList, useSpecialiteList } from "@/hooks/useSoustraitant"
+import { useCreateSoustraitant, useDeleteSoustraitant, useSousTraitantList, useSpecialiteList, useUpdateSoustraitant } from "@/hooks/useSoustraitant"
 import { SousTraitant, Specialite } from "@/types/sous-traitants"
 import { toast } from "@/hooks/use-toast"
 
@@ -33,7 +33,9 @@ export default function SubcontractorsPage() {
   const { sousTraitantList, refreshSoutraitant } = useSousTraitantList()
   const { specialite } = useSpecialiteList()
   const { createSoustraitant } = useCreateSoustraitant()
-const {getSoustraitantsById}=SousTraitantService
+  const { updateSoustraitant, loading: updatingSubcontractor } = useUpdateSoustraitant()
+  const { deleteSoustraitant, loading: deletingSubcontractor } = useDeleteSoustraitant()
+  const { getSoustraitantsById } = SousTraitantService
 
   // Vérification des permissions
   useEffect(() => {
@@ -132,40 +134,80 @@ const {getSoustraitantsById}=SousTraitantService
       ).toFixed(1)
       : "0.0"
 
-  const handleCreateSubcontractor = async (subcontractorData: any) => {
-    try {
-      const payload = {
-        nom: subcontractorData.nom,
-        raisonSociale: subcontractorData.raisonSociale || null,
-        email: subcontractorData.email || null,
-        telephone: subcontractorData.telephone || null,
-        adresse: subcontractorData.adresse || null,
-        ville: subcontractorData.ville || null,
-        ncc: subcontractorData.ncc || null,
-        nomContact: subcontractorData.contactNom || null,
-        emailContact: subcontractorData.contactEmail || null,
-        telephoneContact: subcontractorData.contactTelephone || null,
+  const buildSubcontractorPayload = (subcontractorData: any) => {
+    console.log('buildSubcontractorPayload subcontractorData:',subcontractorData)
+    const selectedSpecialiteIds = (subcontractorData.specialties || [])
+      .map((specialtyName: string) =>
+        allSpecialties?.find((item) => item.nom?.toLowerCase() === specialtyName?.toLowerCase())?.id
+      )
+      .filter((id: number | undefined): id is number => typeof id === "number")
+console.log('buildSubcontractorPayload selectedSpecialiteIds:',selectedSpecialiteIds)
+    return {
+      nom: subcontractorData.nom,
+      raisonSociale: subcontractorData.raisonSociale || null,
+      email: subcontractorData.email || null,
+      telephone: subcontractorData.telephone || null,
+      adresse: subcontractorData.adresse || null,
+      ville: subcontractorData.ville || null,
+      ncc: subcontractorData.ncc || null,
+      nomContact: subcontractorData.contactNom || null,
+      emailContact: subcontractorData.contactEmail || null,
+      telephoneContact: subcontractorData.contactTelephone || null,
+      specialiteIds: selectedSpecialiteIds,
+    }
+  }
+
+  const handleSubmitSubcontractor = async (subcontractorData: any) => {
+    try { console.log('handleSubmitSubcontractor subcontractorData:',subcontractorData)
+      const payload = buildSubcontractorPayload(subcontractorData)
+      console.log('handleSubmitSubcontractor payload:',payload)
+
+      if (editingSubcontractor?.id) {
+        await updateSoustraitant(editingSubcontractor.id, payload)
+        toast({
+          title: "Succès",
+          description: "Le sous-traitant a été modifié avec succès.",
+        })
+      } else {
+        await createSoustraitant(payload)
+        toast({
+          title: "Succès",
+          description: "Le sous-traitant a été créé avec succès.",
+        })
       }
 
-      await createSoustraitant(payload)
-      toast({
-        title: "Succès",
-        description: "Le sous-traitant a été créé avec succès.",
-      })
       refreshSoutraitant()
       handleCloseModal()
     } catch (error) {
       toast({
         title: "Erreur",
-        description: error instanceof Error ? error.message : "Impossible de créer le sous-traitant",
+        description:
+          error instanceof Error
+            ? error.message
+            : editingSubcontractor
+              ? "Impossible de modifier le sous-traitant"
+              : "Impossible de créer le sous-traitant",
         variant: "destructive",
       })
     }
   }
 
-  const handleDeleteSubcontractor = (_subcontractorId: number) => {
+  const handleDeleteSubcontractor = async (subcontractorId: number) => {
     if (confirm("Êtes-vous sûr de vouloir supprimer ce sous-traitant ?")) {
-      // Intégration API à implémenter
+      try {
+        await deleteSoustraitant(subcontractorId)
+        toast({
+          title: "Succès",
+          description: "Le sous-traitant a été supprimé avec succès.",
+        })
+        refreshSoutraitant()
+      } catch (error) {
+        toast({
+          title: "Erreur",
+          description: error instanceof Error ? error.message : "Impossible de supprimer le sous-traitant",
+          variant: "destructive",
+        })
+      }
     }
   }
 
@@ -190,7 +232,7 @@ const {getSoustraitantsById}=SousTraitantService
   }
 
   // Vérification des permissions avant rendu
-  if (!user || !canManageSousTraitants) {
+  if (!user || !canManageSousTraitants()) {
     return null
   }
 
@@ -319,6 +361,7 @@ const {getSoustraitantsById}=SousTraitantService
                       variant="outline"
                       size="sm"
                       onClick={() => handleEditSubcontractor(subcontractor)}
+                      disabled={updatingSubcontractor || deletingSubcontractor}
                       className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 p-1 h-auto"
                     >
                       <Edit className="h-3 w-3" />
@@ -327,6 +370,7 @@ const {getSoustraitantsById}=SousTraitantService
                       variant="outline"
                       size="sm"
                       onClick={() => handleDeleteSubcontractor(subcontractor.id)}
+                      disabled={updatingSubcontractor || deletingSubcontractor}
                       className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1 h-auto"
                     >
                       <Trash2 className="h-3 w-3" />
@@ -389,7 +433,7 @@ const {getSoustraitantsById}=SousTraitantService
       <SubcontractorFormModal
         isOpen={isSubcontractorFormOpen}
         onClose={handleCloseModal}
-        onSubmit={handleCreateSubcontractor}
+        onSubmit={handleSubmitSubcontractor}
         editData={editingSubcontractor}
       />
     </DashboardLayout>

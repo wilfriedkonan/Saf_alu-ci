@@ -18,7 +18,7 @@ import { toast } from "@/hooks/use-toast"
 interface SubcontractorFormModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (subcontractor: any) => void
+  onSubmit: (subcontractor: any) => Promise<void>
   editData?: any
 }
 
@@ -39,6 +39,7 @@ export function SubcontractorFormModal({ isOpen, onClose, onSubmit, editData }: 
   const [specialties, setSpecialties] = useState<string[]>([])
   const [newSpecialty, setNewSpecialty] = useState("")
   const [isCreateSpecialtyOpen, setIsCreateSpecialtyOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [specialtyForm, setSpecialtyForm] = useState({ nom: "", designation: "" })
   const { createSpecialite, loading: isCreatingSpecialite } = useCreateSpecialite()
   const { specialite: apiSpecialites } = useSpecialiteList()
@@ -128,7 +129,7 @@ export function SubcontractorFormModal({ isOpen, onClose, onSubmit, editData }: 
         telephone: editData.telephone || "",
         ville: editData.ville || "",
         adresse: editData.adresse || "",
-        contactNom: editData.contact?.nom || "",
+        contactNom: editData.contact?.nomContact|| "",
         contactEmail: editData.contact?.emailContact || "",
         contactTelephone: editData.contact?.telephoneContact || "",
       })
@@ -199,9 +200,11 @@ export function SubcontractorFormModal({ isOpen, onClose, onSubmit, editData }: 
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
+console.log('formData:',formData)
+console.log('specialties:',specialties)
+console.log('editData:',editData)
     const subcontractor = {
       ...formData,
       ...(editData && { id: editData.id }),
@@ -217,8 +220,12 @@ export function SubcontractorFormModal({ isOpen, onClose, onSubmit, editData }: 
       updatedAt: new Date().toISOString().split("T")[0],
     }
 
-    onSubmit(subcontractor)
-    onClose()
+    try {
+      setIsSubmitting(true)
+      await onSubmit(subcontractor)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -412,7 +419,7 @@ export function SubcontractorFormModal({ isOpen, onClose, onSubmit, editData }: 
             <Button type="button" variant="outline" onClick={onClose}>
               Annuler
             </Button>
-            <Button type="submit" onClick={handleSubmit} disabled={specialties.length === 0}>
+            <Button type="submit" onClick={handleSubmit} disabled={specialties.length === 0 || isSubmitting}>
               {editData ? "Enregistrer les modifications" : "Créer le sous-traitant"}
             </Button>
           </div>

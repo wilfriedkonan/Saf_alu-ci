@@ -4,6 +4,7 @@ import {
   SousTraitant,
   Specialite,
   CreateSousTraitantRequest,
+  UpdateSousTraitantRequest,
   CreatSpecialiteResquest,
   CreateEvaluationRequest,
   EvaluationSousTraitant,
@@ -116,6 +117,80 @@ export const useCreateSoustraitant = () => {
 
   return {
     createSoustraitant,
+    loading,
+    error,
+    resetError
+  };
+};
+
+// ========================================
+// Hook pour modifier un sous-traitant
+// ========================================
+export const useUpdateSoustraitant = () => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const updateSoustraitant = useCallback(
+    async (id: number, payload: UpdateSousTraitantRequest): Promise<ApiResponse<void>> => {
+      try {
+        setLoading(true);
+        setError(null);
+        return await SousTraitantService.updateSoustraitants(id, payload);
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Erreur lors de la modification du sous-traitant';
+        setError(errorMessage);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  const resetError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  return {
+    updateSoustraitant,
+    loading,
+    error,
+    resetError
+  };
+};
+
+// ========================================
+// Hook pour supprimer un sous-traitant
+// ========================================
+export const useDeleteSoustraitant = () => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const deleteSoustraitant = useCallback(
+    async (id: number): Promise<ApiResponse<void>> => {
+      try {
+        setLoading(true);
+        setError(null);
+        return await SousTraitantService.deleteSoustraitants(id);
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Erreur lors de la suppression du sous-traitant';
+        setError(errorMessage);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  const resetError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  return {
+    deleteSoustraitant,
     loading,
     error,
     resetError
