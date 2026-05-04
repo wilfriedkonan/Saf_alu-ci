@@ -34,7 +34,7 @@ import {
   PiggyBank,
   Banknote
 } from "lucide-react"
-import type { Project, ProjectStage } from "@/types/projet"
+import type { Project, ProjectStage, SousTraitantEtapeJoin } from "@/types/projet"
 import { useProjetEtapes } from "@/hooks/useProjet"
 import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "sonner"
@@ -52,16 +52,36 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
   const { user } = useAuth()
   const { updateEtape, loading } = useProjetEtapes(projet.id)
 
-  // ✅ CORRECTION: Utiliser le hook avec l'ID du sous-traitant si disponible
-  const sousTraitantId = stage?.idSousTraitant || stage?.sousTraitant?.id
+  const toJoinList = (s: typeof stage): SousTraitantEtapeJoin[] => {
+    if (s?.sousTraitants?.length) return s.sousTraitants
+    if (s?.sousTraitant) {
+      return [{
+        id: -1,
+        etapeProjetId: s.id ?? 0,
+        sousTraitantId: s.sousTraitant.id,
+        sousTraitant: s.sousTraitant as any,
+      }]
+    }
+    return []
+  }
+
+  const sousTraitantsList = toJoinList(stage)
+
+  const [selectedSousTraitantId, setSelectedSousTraitantId] = useState<number | undefined>(
+    sousTraitantsList[0]?.sousTraitantId
+  )
+
   const {
     createEvaluation,
-    evaluations,
-    noteMoyenne,
-    totalEvaluations,
     loading: evaluationLoading,
-    refreshEvaluations
-  } = useSousTraitantEvaluations(sousTraitantId)
+  } = useSousTraitantEvaluations(selectedSousTraitantId)
+
+  const selectedSousTraitant = sousTraitantsList.find(st => st.sousTraitantId === selectedSousTraitantId)
+
+  // Données d'affichage issues directement du stage (pas d'appel API supplémentaire)
+  const noteMoyenne = selectedSousTraitant?.sousTraitant?.noteMoyenne ?? 0
+  const totalEvaluations = selectedSousTraitant?.sousTraitant?.nombreEvaluations ?? 0
+  const evaluations = selectedSousTraitant?.sousTraitant?.evaluations ?? []
 
   const [progression, setProgression] = useState(0)
   const [note, setNote] = useState(0)
@@ -86,7 +106,6 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
     if (stage && open) {
       setProgression(stage.pourcentageAvancement)
       setCurrentStatut(stage.statut)
-      // Réinitialiser les champs d'évaluation (on affichera les évaluations existantes séparément)
       setNote(0)
       setCommentaire("")
       setCriteresEvaluation({
@@ -96,6 +115,8 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
         professionnalisme: 0,
         proprete: 0
       })
+      const list = toJoinList(stage)
+      setSelectedSousTraitantId(list[0]?.sousTraitantId ?? undefined)
     }
   }, [stage, open])
 
@@ -152,8 +173,8 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
   // ✅ CORRECTION: Implémenter correctement la fonction de sauvegarde d'évaluation
   const handleSaveEvaluation = async () => {
     // Validation
-    if (!sousTraitantId) {
-      toast.error("Aucun sous-traitant assigné à cette étape")
+    if (!selectedSousTraitantId) {
+      toast.error("Aucun sous-traitant sélectionné")
       return
     }
 
@@ -175,7 +196,7 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
     try {
       // Préparer les données d'évaluation selon CreateEvaluationRequest
       const evaluationData = {
-        sousTraitantId: sousTraitantId,
+        sousTraitantId: selectedSousTraitantId,
         projetId: projet.id,
         etapeProjetId: stage.id,
         note: note,
@@ -184,9 +205,9 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
       }
 
       // Créer l'évaluation via le service
-      const response = await createEvaluation(sousTraitantId, evaluationData)
+      const response = await createEvaluation(selectedSousTraitantId, evaluationData)
 
-      if (response.success) {
+      if (response.message) {
         toast.success("Évaluation enregistrée avec succès")
         // Réinitialiser les champs
         setNote(0)
@@ -198,9 +219,7 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
           professionnalisme: 0,
           proprete: 0
         })
-        // Rafraîchir les évaluations
-        refreshEvaluations()
-        // Rafraîchir les données du projet
+        // Rafraîchir les données du projet (les notes seront mises à jour via le refresh)
         onUpdate()
       } else {
         toast.error(response.error || "Erreur lors de l'enregistrement de l'évaluation")
@@ -357,6 +376,8 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
     }
     return labels[statut] || statut
   }
+const getSousTraitantItemNom = (item: any) =>
+  item?.nom ?? item?.sousTraitant?.nom ?? "Sous-traitant"
 
   const getStatusColor = (statut: string) => {
     const colors: Record<string, string> = {
@@ -621,19 +642,24 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
                 </div>
 
                 {/* Responsable */}
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <Label className="text-sm flex items-center gap-2">
                     <User className="h-4 w-4" />
                     Type de responsable
                   </Label>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">
-                      {stage.typeResponsable === "Interne" ? "👨‍💼 Interne" : "🏢 Sous-traitant"}
-                    </Badge>
-                    <div className="flex flex-col">
-                      {stage.sousTraitant ? stage.sousTraitant.nom : ""}
+                  <Badge variant="outline" className="w-fit">
+                    {stage.typeResponsable === "Interne" ? "👨‍💼 Interne" : "🏢 Sous-traitant"}
+                  </Badge>
+                  {sousTraitantsList.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {sousTraitantsList.map((st) => (
+                        <Badge key={st.sousTraitantId ?? st.id} variant="secondary" className="text-xs">
+                          {st.sousTraitant?.nom ?? "Sous-traitant"}
+                          {st.sousTraitant?.telephone ? ` • ${st.sousTraitant.telephone}` : ""}
+                        </Badge>
+                      ))}
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Lien DQE */}
@@ -660,7 +686,7 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
           </TabsContent>
 
           <TabsContent value="evaluation" className="space-y-4">
-            {!sousTraitantId ? (
+            {sousTraitantsList.length === 0 ? (
               <Card>
                 <CardContent className="pt-6">
                   <div className="text-center py-8 text-muted-foreground">
@@ -675,71 +701,133 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
               </Card>
             ) : (
               <>
-                {/* Informations sur le sous-traitant et note moyenne */}
-                {noteMoyenne > 0 && (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-sm font-medium text-muted-foreground">
-                            Sous-traitant: {stage.sousTraitant?.nom || "Non spécifié"}
-                          </Label>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {totalEvaluations} évaluation{totalEvaluations > 1 ? "s" : ""}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <div className="flex items-center gap-2">
-                            <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
-                            <span className="text-2xl font-bold">{noteMoyenne.toFixed(1)}</span>
-                            <span className="text-sm text-muted-foreground">/5</span>
+                {/* Notes de tous les sous-traitants */}
+                <div className="space-y-3">
+                  {sousTraitantsList.map((st) => {
+                    const stEvaluations = st.sousTraitant?.evaluations ?? []
+                    const stNombre = st.sousTraitant?.nombreEvaluations ?? stEvaluations.length
+                    const stNote = st.sousTraitant?.noteMoyenne ?? 0
+                    return (
+                      <Card key={st.sousTraitantId ?? st.id}>
+                        <CardContent className="pt-4 pb-4 space-y-3">
+                          {/* En-tête : nom + note */}
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium">{st.sousTraitant?.nom ?? "Sous-traitant"}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {stNombre} évaluation{stNombre > 1 ? "s" : ""}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex">
+                                {[1, 2, 3, 4, 5].map((s) => (
+                                  <span
+                                    key={s}
+                                    className={`text-xl ${s <= Math.round(stNote) ? "text-yellow-400" : "text-gray-200"}`}
+                                  >★</span>
+                                ))}
+                              </div>
+                              <span className="font-bold text-sm">
+                                {stNote > 0 ? stNote.toFixed(1) : "—"}<span className="text-muted-foreground font-normal">/5</span>
+                              </span>
+                            </div>
                           </div>
-                          <p className="text-xs text-muted-foreground">Note moyenne</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
 
-                {/* Formulaire de nouvelle évaluation */}
+                          {/* Historique des évaluations */}
+                          {stEvaluations.length > 0 && (
+                            <div className="space-y-2 border-t pt-3">
+                              {stEvaluations.map((ev, i) => {
+                                let criteresParsed: Record<string, number> | null = null
+                                if (ev.criteres) {
+                                  try {
+                                    criteresParsed = typeof ev.criteres === "string"
+                                      ? JSON.parse(ev.criteres)
+                                      : ev.criteres
+                                  } catch { /* ignore */ }
+                                }
+                                return (
+                                  <div key={ev.id ?? i} className="bg-muted/50 rounded-md px-3 py-2">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-1">
+                                        {[...Array(5)].map((_, idx) => (
+                                          <span key={idx} className={`text-sm ${idx < ev.note ? "text-yellow-400" : "text-gray-300"}`}>★</span>
+                                        ))}
+                                        <span className="text-xs font-medium ml-1">{ev.note}/5</span>
+                                      </div>
+                                      <span className="text-xs text-muted-foreground">
+                                        {new Date(ev.dateEvaluation).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
+                                      </span>
+                                    </div>
+                                    {ev.commentaire && (
+                                      <p className="text-xs text-muted-foreground italic mt-1">"{ev.commentaire}"</p>
+                                    )}
+                                    {criteresParsed && Object.keys(criteresParsed).length > 0 && (
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {Object.entries(criteresParsed).map(([key, val]) => (
+                                          <Badge key={key} variant="outline" className="text-xs px-1.5 py-0">{key}: {val}/5</Badge>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
+
+                {/* Formulaire d'ajout d'évaluation */}
                 <Card>
-                  <CardContent className="pt-6 space-y-6">
-                    <div className="space-y-4">
-                      <Label className="text-base font-medium flex items-center gap-2">
-                        <Star className="h-5 w-5" />
-                        Nouvelle évaluation (sur 5 étoiles)
-                      </Label>
-                      <div className="flex items-center gap-2">
-                        {[1, 2, 3, 4, 5].map((star) => (
+                  <CardContent className="pt-6 space-y-4">
+                    <Label className="text-base font-medium flex items-center gap-2">
+                      <Star className="h-5 w-5" />
+                      Nouvelle évaluation
+                    </Label>
+
+                    {/* Sélecteur de prestataire si plusieurs */}
+                    {sousTraitantsList.length > 1 && (
+                      <div className="flex flex-wrap gap-2">
+                        {sousTraitantsList.map((st) => (
                           <button
-                            key={star}
+                            key={st.sousTraitantId ?? st.id}
                             type="button"
-                            onClick={() => setNote(star)}
-                            onMouseEnter={() => setHoveredStar(star)}
-                            onMouseLeave={() => setHoveredStar(0)}
-                            className="text-4xl transition-colors focus:outline-none disabled:opacity-50"
-                            disabled={evaluationLoading}
+                            onClick={() => setSelectedSousTraitantId(st.sousTraitantId)}
+                            className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                              selectedSousTraitantId === st.sousTraitantId
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-background border-input hover:bg-muted"
+                            }`}
                           >
-                            <span
-                              className={
-                                star <= (hoveredStar || note)
-                                  ? "text-yellow-400"
-                                  : "text-gray-300"
-                              }
-                            >
-                              ★
-                            </span>
+                            {st.sousTraitant?.nom ?? "Sous-traitant"}
                           </button>
                         ))}
-                        {note > 0 && (
-                          <span className="ml-2 text-lg font-medium">{note}/5</span>
-                        )}
                       </div>
+                    )}
+
+                    {/* Étoiles */}
+                    <div className="flex items-center gap-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setNote(star)}
+                          onMouseEnter={() => setHoveredStar(star)}
+                          onMouseLeave={() => setHoveredStar(0)}
+                          className="text-4xl transition-colors focus:outline-none disabled:opacity-50"
+                          disabled={evaluationLoading}
+                        >
+                          <span className={star <= (hoveredStar || note) ? "text-yellow-400" : "text-gray-300"}>★</span>
+                        </button>
+                      ))}
+                      {note > 0 && <span className="ml-1 text-lg font-medium">{note}/5</span>}
                     </div>
 
                     {/* Commentaire */}
-                    <div className="space-y-2">
-                      <Label htmlFor="comment" className="flex items-center gap-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="comment" className="flex items-center gap-2 text-sm">
                         <MessageSquare className="h-4 w-4" />
                         Commentaire (optionnel)
                       </Label>
@@ -747,13 +835,12 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
                         id="comment"
                         value={commentaire}
                         onChange={(e) => setCommentaire(e.target.value)}
-                        placeholder="Ajoutez vos remarques sur cette étape..."
-                        rows={4}
+                        placeholder="Ajoutez vos remarques..."
+                        rows={3}
                         disabled={evaluationLoading}
                       />
                     </div>
 
-                    {/* Bouton de sauvegarde */}
                     <Button
                       onClick={handleSaveEvaluation}
                       disabled={evaluationLoading || note === 0}
@@ -764,100 +851,6 @@ export function StageProgressModal({ stage, projet, open, onOpenChange, onUpdate
                     </Button>
                   </CardContent>
                 </Card>
-
-                {/* Liste des évaluations existantes */}
-                {evaluations.length > 0 && (
-                  <Card>
-                    <CardContent className="pt-6 space-y-4">
-                      <Label className="text-base font-medium flex items-center gap-2">
-                        <History className="h-5 w-5" />
-                        Évaluations précédentes ({evaluations.length})
-                      </Label>
-                      <div className="space-y-4">
-                        {evaluations.map((evaluation, index) => {
-                          // Parser les critères si c'est une chaîne JSON
-                          let criteresParsed: Record<string, number> | null = null
-                          if (evaluation.criteres) {
-                            try {
-                              criteresParsed = typeof evaluation.criteres === 'string'
-                                ? JSON.parse(evaluation.criteres)
-                                : evaluation.criteres
-                            } catch (e) {
-                              console.error("Erreur parsing criteres:", e)
-                            }
-                          }
-
-                          return (
-                            <div
-                              key={evaluation.id || index}
-                              className="bg-muted rounded-lg p-4 space-y-2 border"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <div className="flex">
-                                    {[...Array(5)].map((_, i) => (
-                                      <span
-                                        key={i}
-                                        className={`text-lg ${i < evaluation.note ? "text-yellow-400" : "text-gray-300"
-                                          }`}
-                                      >
-                                        ★
-                                      </span>
-                                    ))}
-                                  </div>
-                                  <span className="text-sm font-medium">
-                                    {evaluation.note}/5
-                                  </span>
-                                </div>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(evaluation.dateEvaluation).toLocaleDateString("fr-FR", {
-                                    day: "numeric",
-                                    month: "short",
-                                    year: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit"
-                                  })}
-                                </span>
-                              </div>
-                              {evaluation.commentaire && (
-                                <p className="text-sm text-muted-foreground italic mt-2">
-                                  "{evaluation.commentaire}"
-                                </p>
-                              )}
-                              {criteresParsed && Object.keys(criteresParsed).length > 0 && (
-                                <div className="mt-2 pt-2 border-t">
-                                  <p className="text-xs font-medium text-muted-foreground mb-1">
-                                    Critères:
-                                  </p>
-                                  <div className="flex flex-wrap gap-2">
-                                    {Object.entries(criteresParsed).map(([key, value]) => (
-                                      <Badge key={key} variant="outline" className="text-xs">
-                                        {key}: {value}/5
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Message si aucune évaluation */}
-                {evaluations.length === 0 && noteMoyenne === 0 && !evaluationLoading && (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <div className="text-center py-4 text-muted-foreground">
-                        <Star className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">Aucune évaluation pour le moment</p>
-                        <p className="text-xs mt-1">Soyez le premier à évaluer ce sous-traitant</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
               </>
             )}
           </TabsContent>

@@ -11,12 +11,13 @@ import {
   CorrectionSoldeRequest,
   TresorerieStats,
   RapportTresorerie,
+  PaiementsSousTraitant,
 } from '@/types/tresorerie';
 import { apiClient } from '@/lib/api-config';
 
 
 interface ComptesApiResponse {
-    comptes: Compte[]  // ← Notez le "c" minuscule
+    comptes: Compte[]
     resume?: {
       nombreComptes: number
       soldeTotal: number
@@ -29,6 +30,16 @@ interface ComptesApiResponse {
       }>
     }
   }
+
+interface PaiementsSousTraitantsApiResponse {
+  resume?: {
+    nombreSousTraitants: number
+    totalGlobalPaye: number
+    nombrePaiementsTotal: number
+    filtresAppliques?: Record<string, unknown>
+  }
+  sousTraitants: PaiementsSousTraitant[]
+}
 
 interface ApiResponse<T> {
   success: boolean;
@@ -471,6 +482,43 @@ export class TresorerieService {
       return { blob: response.data, filename };
     } catch (error) {
       console.error('Erreur lors de l\'export Excel du rapport:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  // =============================================
+  // PAIEMENTS PAR SOUS-TRAITANT
+  // =============================================
+
+  static async getPaiementsSousTraitants(params?: {
+    sousTraitantId?: number;
+    projetId?: number;
+    dateDebut?: string;
+    dateFin?: string;
+  }): Promise<PaiementsSousTraitant[]> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            queryParams.append(key, value.toString());
+          }
+        });
+      }
+      const url = queryParams.toString()
+        ? `/Tresorerie/paiements-sous-traitants?${queryParams.toString()}`
+        : '/Tresorerie/paiements-sous-traitants';
+
+      const response = await apiClient.get<PaiementsSousTraitantsApiResponse | PaiementsSousTraitant[]>(url);
+
+      if (Array.isArray(response.data)) return response.data;
+
+      const d = response.data as PaiementsSousTraitantsApiResponse;
+      if (Array.isArray(d.sousTraitants)) return d.sousTraitants;
+
+      return [];
+    } catch (error) {
+      console.error('Erreur lors de la récupération des paiements sous-traitants:', error);
       throw this.handleError(error);
     }
   }

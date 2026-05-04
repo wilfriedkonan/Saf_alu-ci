@@ -55,7 +55,7 @@ export function ProjectTimeline({ projet, onUpdate }: ProjectTimelineProps) {
     }
     return labels[statut] || statut
   }
-
+  const getSousTraitantItemNom = (item: any) => item?.sousTraitant?.nom ?? item?.nom ?? "Sous-traitant"
   const handleStageClick = (stage: ProjectStage) => {
     setSelectedStage(stage)
   }
@@ -175,9 +175,8 @@ export function ProjectTimeline({ projet, onUpdate }: ProjectTimelineProps) {
                                 
                               </span>
                             )}
-                            <div>
-                              {stage.sousTraitant?.nom ?? ""} </div>
-
+                            <div> {stage.sousTraitants?.map((sousTraitant) => getSousTraitantItemNom(sousTraitant)).join(", ") ?? ""} {stage.sousTraitants?.length && stage.sousTraitants?.length > 1 && <span className="text-xs text-muted-foreground">
+                               {" "} {stage.sousTraitants?.length - 1} autres</span>} </div>
                             <Badge
                               variant="secondary"
                               className="text-xs"

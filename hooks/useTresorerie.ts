@@ -12,6 +12,7 @@ import {
   CorrectionSoldeRequest,
   TresorerieStats,
   RapportTresorerie,
+  PaiementsSousTraitant,
 } from '@/types/tresorerie';
 
 // =============================================
@@ -666,6 +667,50 @@ export const useMouvementSearch = () => {
     total,
     searchMouvements,
   };
+};
+
+// =============================================
+// HOOKS POUR LES PAIEMENTS SOUS-TRAITANTS
+// =============================================
+
+export const usePaiementsSousTraitants = (
+  projetId?: number | null,
+  sousTraitantId?: number,
+  dateDebut?: string,
+  dateFin?: string,
+) => {
+  const [paiements, setPaiements] = useState<PaiementsSousTraitant[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!projetId && !sousTraitantId) return;
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    TresorerieService.getPaiementsSousTraitants({
+      projetId: projetId ?? undefined,
+      sousTraitantId,
+      dateDebut,
+      dateFin,
+    })
+      .then(data => {
+        if (!cancelled) setPaiements(data);
+      })
+      .catch(err => {
+        if (!cancelled)
+          setError(err instanceof Error ? err.message : 'Erreur chargement paiements sous-traitants');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [projetId, sousTraitantId, dateDebut, dateFin]);
+
+  return { paiements, loading, error };
 };
 
 // =============================================

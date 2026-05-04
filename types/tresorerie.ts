@@ -448,6 +448,50 @@ export interface Compte {
     }, {} as Record<string, MouvementFinancier[]>)
   }
   
+  // ============================================
+  // DTOs PAIEMENTS PAR SOUS-TRAITANT
+  // ============================================
+
+  export interface DetailPaiementSousTraitant {
+    id: number
+    libelle: string
+    description?: string
+    montant: number
+    dateMouvement: string
+    modePaiement?: string
+    reference?: string
+    categorie?: string
+    etapeProjetId?: number
+    etapeNom: string
+    projetId?: number
+    projetNom?: string
+    compteNom: string
+  }
+
+  export interface PaiementsParEtape {
+    etapeId?: number
+    etapeNom: string
+    projetId?: number
+    projetNom?: string
+    totalPaye: number
+    nombrePaiements: number
+    dateDernierPaiement?: string
+    paiements: DetailPaiementSousTraitant[]
+  }
+
+  export interface PaiementsSousTraitant {
+    sousTraitantId: number
+    sousTraitantNom: string
+    sousTraitantEmail?: string
+    sousTraitantTelephone?: string
+    totalPaye: number
+    nombrePaiements: number
+    dateDernierPaiement?: string
+    paiementsParEtape: PaiementsParEtape[]
+  }
+
+  // ============================================
+
   /**
    * Calcule les totaux par catégorie
    */

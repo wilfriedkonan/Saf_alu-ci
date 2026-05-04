@@ -2,7 +2,15 @@
 // INTERFACES PRINCIPALES - VERSION HIÉRARCHIQUE
 // ============================================
 
+import { SousTraitant } from "./sous-traitants"
 import { MouvementFinancier } from "./tresorerie"
+
+export interface SousTraitantEtapeJoin {
+  id: number
+  etapeProjetId: number
+  sousTraitantId: number
+  sousTraitant?: SousTraitant
+}
 
 export interface Project {
   id: number
@@ -98,8 +106,9 @@ export interface ProjectStage {
   // Responsable
   responsableId?: number
   typeResponsable: ResponsableType
-  idSousTraitant?: number
-  
+/*   sousTraitantIds?: number[] | undefined
+ */  
+  sousTraitants?: SousTraitantEtapeJoin[] | undefined
   // Traçabilité DQE complète
   linkedDqeLotId?: number | null
   linkedDqeLotCode?: string | null
@@ -218,7 +227,10 @@ export interface CreateEtapeProjetRequest {
   statut?: StageStatus
   
   // Responsable
-  idSousTraitant?: number
+  /* idSousTraitant?: number */
+  // 🆕 Liste des IDs sous-traitants
+  sousTraitantIds?: number[] | undefined
+
   typeResponsable?: ResponsableType
   
   // Traçabilité DQE

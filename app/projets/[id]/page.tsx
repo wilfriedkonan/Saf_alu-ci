@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -21,7 +22,8 @@ import {
   MapPin,
   User,
   Briefcase,
-  Edit
+  Edit,
+  Wallet
 } from "lucide-react"
 import {
   type Project,
@@ -34,6 +36,7 @@ import { useAuth, usePermissions } from "@/contexts/AuthContext"
 import { ProjectDQELinkBanner } from "@/components/projects/project-dqe-link-banner"
 import { ProjectFormModal } from "@/components/projects/project-form-modal"
 import { useProjet } from "@/hooks/useProjet"
+import { usePaiementsSousTraitants } from "@/hooks/useTresorerie"
 import { toast } from "sonner"
 
 export default function ProjectDetailPage() {
@@ -44,10 +47,18 @@ export default function ProjectDetailPage() {
 
   const projectId = params.id ? parseInt(params.id as string) : null
   const { projet, loading, error, refreshProjet } = useProjet(projectId)
+  const { paiements: paiementsST, loading: loadingPaiements, error: errorPaiements } = usePaiementsSousTraitants(projectId)
 
   const [showEditModal, setShowEditModal] = useState(false)
   // ✅ État pour préserver l'onglet actif lors du refresh
   const [activeTab, setActiveTab] = useState("overview")
+  const [openST, setOpenST] = useState<string[]>([])
+
+  useEffect(() => {
+    if (paiementsST.length > 0) {
+      setOpenST(paiementsST.map((st) => String(st.sousTraitantId)))
+    }
+  }, [paiementsST])
 
   const totalDepenseProjet = projet?.depenseProjet
     ?.filter((mvt) => mvt.typeMouvement === "Sortie")
@@ -73,7 +84,6 @@ export default function ProjectDetailPage() {
       minimumFractionDigits: 0,
     }).format(amount)
   }
-
   const calculateDuration = (startDate?: string, endDate?: string) => {
     if (!startDate || !endDate) return 0
     const start = new Date(startDate)
@@ -84,6 +94,40 @@ export default function ProjectDetailPage() {
   const calculateBudgetPercentage = (actual: number, total: number) => {
     if (total === 0) return 0
     return Math.round((actual / total) * 100)
+  }
+
+  const getEtapeSousTraitants = (etape: any) => {
+    const normalized = new Map<string, { id?: number; nom: string; telephone?: string | null }>()
+
+    if (Array.isArray(etape?.sousTraitants)) {
+      etape.sousTraitants.forEach((item: any) => {
+        const source = item?.sousTraitant ?? item
+        const id = item?.sousTraitantId ?? source?.id
+        const nom = source?.nom
+        if (!nom) return
+        const key = id ? `id-${id}` : `nom-${nom.toLowerCase()}`
+        normalized.set(key, {
+          id,
+          nom,
+          telephone: source?.telephone ?? null,
+        })
+      })
+    }
+
+    if (etape?.idSousTraitant || etape?.sousTraitant?.id) {
+      const id = etape?.idSousTraitant ?? etape?.sousTraitant?.id
+      const nom = etape?.sousTraitant?.nom ?? "Sous-traitant"
+      const key = id ? `id-${id}` : `nom-${nom.toLowerCase()}`
+      if (!normalized.has(key)) {
+        normalized.set(key, {
+          id,
+          nom,
+          telephone: etape?.sousTraitant?.telephone ?? null,
+        })
+      }
+    }
+
+    return Array.from(normalized.values())
   }
   const totalDepenses = projet ? projet.etapes
     ?.reduce((sum, etape) => sum + (etape.depense || 0), 0) : 0;
@@ -250,6 +294,7 @@ export default function ProjectDetailPage() {
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="offers">Offres</TabsTrigger>
             <TabsTrigger value="depenses">Dépenses</TabsTrigger>
+            <TabsTrigger value="paiements-st">Paiements sous-traitants</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
@@ -387,22 +432,25 @@ export default function ProjectDetailPage() {
                     </h4>
                     <div className="space-y-2">
                       {projet.etapes
-                        .filter(etape => etape.idSousTraitant)
+                        .filter((etape) => getEtapeSousTraitants(etape).length > 0)
                         .map((etape) => (
                           <div
                             key={etape.id}
                             className="flex items-center justify-between p-2 bg-muted rounded-lg"
                           >
                             <span className="text-sm">{etape.nom}</span>
-                            <Badge variant="secondary">
-                              <div className="items-center justify-between text-xs">
-                                {etape.typeResponsable === "Interne" ? "Interne" : etape?.sousTraitant?.nom}
-                                <div className="flex flex-col">
-                                  {etape.typeResponsable === "Interne" ? "Interne" : etape?.sousTraitant?.telephone}
-                                </div>
-                              </div>
-
-                            </Badge>
+                            <div className="flex flex-wrap justify-end gap-1">
+                              {etape.typeResponsable === "Interne" ? (
+                                <Badge variant="secondary">Interne</Badge>
+                              ) : (
+                                getEtapeSousTraitants(etape).map((st) => (
+                                  <Badge key={`${etape.id}-${st.id ?? st.nom}`} variant="secondary" className="text-xs">
+                                    {st.nom}
+                                    {st.telephone ? ` • ${st.telephone}` : ""}
+                                  </Badge>
+                                ))
+                              )}
+                            </div>
                           </div>
                         ))}
                     </div>
@@ -542,6 +590,125 @@ export default function ProjectDetailPage() {
                     </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="paiements-st" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wallet className="h-5 w-5" />
+                  Paiements aux sous-traitants
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loadingPaiements ? (
+                  <div className="flex items-center justify-center py-10">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : errorPaiements ? (
+                  <p className="text-sm text-red-600 text-center py-8">{errorPaiements}</p>
+                ) : paiementsST.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    Aucun paiement enregistré pour ce projet
+                  </p>
+                ) : (
+                  <Accordion
+                    type="multiple"
+                    value={openST}
+                    onValueChange={setOpenST}
+                    className="space-y-2"
+                  >
+                    {paiementsST.map((st) => (
+                      <AccordionItem
+                        key={st.sousTraitantId}
+                        value={String(st.sousTraitantId)}
+                        className="border rounded-lg overflow-hidden"
+                      >
+                        <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/30 [&>svg]:shrink-0">
+                          <div className="flex items-center justify-between w-full mr-3">
+                            <div className="flex items-center gap-3">
+                              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <User className="h-4 w-4 text-primary" />
+                              </div>
+                              <div className="text-left">
+                                <p className="font-semibold">{st.sousTraitantNom}</p>
+                                {st.sousTraitantTelephone && (
+                                  <p className="text-xs text-muted-foreground">{st.sousTraitantTelephone}</p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <Badge variant="secondary">
+                                {st.nombrePaiements} paiement{st.nombrePaiements > 1 ? "s" : ""}
+                              </Badge>
+                              <span className="font-bold text-red-600 text-sm">
+                                {formatCurrency(st.totalPaye)}
+                              </span>
+                            </div>
+                          </div>
+                        </AccordionTrigger>
+
+                        <AccordionContent className="pb-0">
+                          {/* Paiements groupés par étape */}
+                          <div className="divide-y">
+                            {st.paiementsParEtape.map((etape) => (
+                              <div key={etape.etapeId ?? "sans-etape"} className="px-4 py-3">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    {etape.etapeNom}
+                                  </span>
+                                  <span className="text-xs font-semibold text-red-500">
+                                    {formatCurrency(etape.totalPaye)}
+                                  </span>
+                                </div>
+                                <div className="space-y-1.5">
+                                  {etape.paiements.map((p) => (
+                                    <div
+                                      key={p.id}
+                                      className="flex items-center justify-between rounded-md bg-muted/30 px-3 py-2 text-sm"
+                                    >
+                                      <div className="min-w-0 flex-1">
+                                        <p className="font-medium">{p.libelle}</p>
+                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                          {new Date(p.dateMouvement).toLocaleDateString("fr-FR")}
+                                          {p.compteNom ? ` • ${p.compteNom}` : ""}
+                                          {p.modePaiement ? ` • ${p.modePaiement}` : ""}
+                                          {p.reference ? ` • Réf: ${p.reference}` : ""}
+                                        </p>
+                                      </div>
+                                      <span className="font-semibold text-red-600 whitespace-nowrap ml-4">
+                                        -{formatCurrency(p.montant)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Total par sous-traitant */}
+                          <div className="flex items-center justify-between bg-red-50 border-t border-red-100 px-4 py-2">
+                            <span className="text-sm font-medium text-red-800">
+                              Total versé à {st.sousTraitantNom}
+                            </span>
+                            <span className="font-bold text-red-700">{formatCurrency(st.totalPaye)}</span>
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                )}
+
+                {/* Récapitulatif global */}
+                {paiementsST.length > 0 && (
+                  <div className="mt-6 flex items-center justify-between rounded-lg border bg-muted/50 px-4 py-3">
+                    <span className="font-medium">Total paiements sous-traitants</span>
+                    <span className="text-lg font-bold text-red-600">
+                      {formatCurrency(paiementsST.reduce((sum, st) => sum + st.totalPaye, 0))}
+                    </span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
