@@ -17,6 +17,7 @@ import { DevisFournisseurService, FournisseurService } from "@/services/devisFou
 import { useFournisseurs, useComparaisonDevis } from "@/hooks/useDevisFournisseur"
 import type { DemandeCreee } from "@/components/devis-fournisseur/whatsapp-send-panel"
 import type { CreateFournisseurRequest, DevisDemande } from "@/types/devis-fournisseur"
+import { API_BASE_URL } from "@/lib/api-config"
 
 const fCurrency = (n: number) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(n)
@@ -219,7 +220,7 @@ export function EnvoyerDemandesModal({
             otp: d.otp,
             dateExpiration: d.dateExpiration,
             messageWhatsApp: d.messageWhatsApp ?? "",
-            lienDevis: `${window.location.origin}/devis-fournisseurs/public/${d.token}`,
+            lienDevis: `${API_BASE_URL}/devis-fournisseurs/public/${d.token}`,
           }))
         toast({ title: "Une demande a déjà été envoyée à ce fournisseur", description: "Les informations existantes ont été chargées." })
         onSuccess(existantes)
