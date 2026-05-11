@@ -1,10 +1,10 @@
 // ============================================
 // SERVICE - WhatsApp API
 // Base URL : NEXT_PUBLIC_WHATSAPP_API_URL
-// Auth     : header X-Api-Key
+// Auth     : header X-Api-Key (via api-config)
 // ============================================
 
-import axios from 'axios'
+import { whatsappClient } from '@/lib/api-config'
 import type {
   CreateInstanceRequest,
   InstanceStatus,
@@ -17,14 +17,6 @@ import type {
   MessageApiResponse,
   WebhookPayload,
 } from '@/types/whatsapp'
-
-const whatsappClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_WHATSAPP_API_URL ?? 'http://167.86.107.54:9090',
-  headers: {
-    'Content-Type': 'application/json',
-    'X-Api-Key': process.env.NEXT_PUBLIC_WHATSAPP_API_KEY ?? '',
-  },
-})
 
 // ============================================
 // INSTANCES

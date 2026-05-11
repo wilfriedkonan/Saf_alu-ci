@@ -1,9 +1,9 @@
 import axios from 'axios';
 
-// Configuration centralisée de l'API
+// ── API principale ────────────────────────────────────────────
+
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://167.86.107.54/api';
 
-// Client axios configuré et réutilisable
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -36,3 +36,15 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// ── API WhatsApp ──────────────────────────────────────────────
+
+export const WHATSAPP_API_URL = process.env.NEXT_PUBLIC_WHATSAPP_API_URL ?? 'http://167.86.107.54:9090';
+
+export const whatsappClient = axios.create({
+  baseURL: WHATSAPP_API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Api-Key': process.env.NEXT_PUBLIC_WHATSAPP_API_KEY ?? '',
+  },
+});
