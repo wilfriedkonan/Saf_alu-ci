@@ -220,7 +220,7 @@ export function EnvoyerDemandesModal({
             otp: d.otp,
             dateExpiration: d.dateExpiration,
             messageWhatsApp: d.messageWhatsApp ?? "",
-            lienDevis: `${API_BASE_URL }/devis-fournisseurs/public/${d.token}`,
+            lienDevis: `${API_BASE_URL }/public/${d.token}`,
           }))
         toast({ title: "Une demande a déjà été envoyée à ce fournisseur", description: "Les informations existantes ont été chargées." })
         onSuccess(existantes)
