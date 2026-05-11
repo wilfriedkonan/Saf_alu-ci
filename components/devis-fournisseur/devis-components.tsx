@@ -17,7 +17,6 @@ import { DevisFournisseurService, FournisseurService } from "@/services/devisFou
 import { useFournisseurs, useComparaisonDevis } from "@/hooks/useDevisFournisseur"
 import type { DemandeCreee } from "@/components/devis-fournisseur/whatsapp-send-panel"
 import type { CreateFournisseurRequest, DevisDemande } from "@/types/devis-fournisseur"
-import { API_BASE_URL } from "@/lib/api-config"
 
 const fCurrency = (n: number) =>
   new Intl.NumberFormat("fr-FR", { style: "currency", currency: "XOF", minimumFractionDigits: 0 }).format(n)
@@ -199,29 +198,40 @@ export function EnvoyerDemandesModal({
         Array.isArray(res?.demandes?.$values) ? res.demandes.$values :
         []
 
-      const demandes: DemandeCreee[] = rawList.map((d: any) => ({
-        id: d.id, fournisseurId: d.fournisseurId,
-        fournisseurNom: d.fournisseurNom, fournisseurTelephone: d.fournisseurTelephone,
-        token: d.token, otp: d.otp, dateExpiration: d.dateExpiration,
-        messageWhatsApp: d.messageWhatsApp, lienDevis: d.lienDevis,
-      }))
+      const demandes: DemandeCreee[] = rawList.map((d: any) => {
+        const lienFrontend = `${window.location.origin}/public/${d.token}`
+        return {
+          id: d.id, fournisseurId: d.fournisseurId,
+          fournisseurNom: d.fournisseurNom, fournisseurTelephone: d.fournisseurTelephone,
+          token: d.token, otp: d.otp, dateExpiration: d.dateExpiration,
+          lienDevis: lienFrontend,
+          messageWhatsApp: d.lienDevis
+            ? (d.messageWhatsApp ?? "").replace(d.lienDevis, lienFrontend)
+            : (d.messageWhatsApp ?? ""),
+        }
+      })
 
       if (demandes.length === 0) {
         // L'API n'a créé aucune nouvelle demande : ces fournisseurs ont déjà une demande active.
         // On récupère leurs demandes existantes depuis devis.demandes.
         const existantes: DemandeCreee[] = demandesExistantes
           .filter(d => selectedIds.has(d.fournisseurId))
-          .map(d => ({
-            id: d.id,
-            fournisseurId: d.fournisseurId,
-            fournisseurNom: d.fournisseurNom ?? "",
-            fournisseurTelephone: d.fournisseurTelephone,
-            token: d.token,
-            otp: d.otp,
-            dateExpiration: d.dateExpiration,
-            messageWhatsApp: d.messageWhatsApp ?? "",
-            lienDevis: `${API_BASE_URL }/public/${d.token}`,
-          }))
+          .map(d => {
+            const lienFrontend = `${window.location.origin}/public/${d.token}`
+            return {
+              id: d.id,
+              fournisseurId: d.fournisseurId,
+              fournisseurNom: d.fournisseurNom ?? "",
+              fournisseurTelephone: d.fournisseurTelephone,
+              token: d.token,
+              otp: d.otp,
+              dateExpiration: d.dateExpiration,
+              lienDevis: lienFrontend,
+              messageWhatsApp: d.lienDevis
+                ? (d.messageWhatsApp ?? "").replace(d.lienDevis, lienFrontend)
+                : (d.messageWhatsApp ?? ""),
+            }
+          })
         toast({ title: "Une demande a déjà été envoyée à ce fournisseur", description: "Les informations existantes ont été chargées." })
         onSuccess(existantes)
       } else {

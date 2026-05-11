@@ -79,6 +79,7 @@ export interface DevisDemande {
   otpValideA?: string
   statut: StatutDemande
   messageWhatsApp?: string
+  lienDevis?: string
   dateEnvoi?: string
   dateOuvertureLien?: string
   dateReponse?: string
