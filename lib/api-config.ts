@@ -45,6 +45,6 @@ export const whatsappClient = axios.create({
   baseURL: WHATSAPP_API_URL,
   headers: {
     'Content-Type': 'application/json',
-    'X-Api-Key': process.env.NEXT_PUBLIC_WHATSAPP_API_KEY ?? '',
+    'X-Api-Key': process.env.NEXT_PUBLIC_WHATSAPP_API_KEY ?? 'MON-SERVICE-API-KEY-2026-Lunette3485',
   },
 });

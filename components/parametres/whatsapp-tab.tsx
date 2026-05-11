@@ -579,8 +579,10 @@ function QrCodeModal({
   loading: boolean
 }) {
   const imgSrc = qrCode?.base64
-    ? `data:image/png;base64,${qrCode.base64}`
-    : qrCode?.qrcode ?? null
+    ? qrCode.base64.startsWith("data:")
+      ? qrCode.base64
+      : `data:image/png;base64,${qrCode.base64}`
+    : qrCode?.code ?? null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
