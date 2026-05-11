@@ -3,13 +3,14 @@
 import { useState } from "react"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, Shield, BarChart3, Settings as SettingsIcon } from "lucide-react"
+import { Users, Shield, BarChart3, Settings as SettingsIcon, MessageSquare } from "lucide-react"
 
 // Import des composants d'onglets
 import { UsersSearchTab } from "@/components/parametres/users-search-tab"
 import { RolesTab } from "@/components/parametres/roles-tab"
 import { StatsTab } from "@/components/parametres/stats-tab"
 import { SystemTab } from "@/components/parametres/system-tab"
+import { WhatsAppTab } from "@/components/parametres/whatsapp-tab"
 
 export default function ParametresPage() {
   const [activeTab, setActiveTab] = useState("users")
@@ -27,7 +28,7 @@ export default function ParametresPage() {
 
         {/* Onglets */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               Utilisateurs
@@ -39,6 +40,10 @@ export default function ParametresPage() {
             <TabsTrigger value="stats" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Statistiques
+            </TabsTrigger>
+            <TabsTrigger value="whatsapp" className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              WhatsApp
             </TabsTrigger>
             <TabsTrigger value="system" className="flex items-center gap-2">
               <SettingsIcon className="h-4 w-4" />
@@ -59,6 +64,11 @@ export default function ParametresPage() {
           {/* Onglet Statistiques */}
           <TabsContent value="stats">
             <StatsTab />
+          </TabsContent>
+
+          {/* Onglet WhatsApp */}
+          <TabsContent value="whatsapp">
+            <WhatsAppTab />
           </TabsContent>
 
           {/* Onglet Paramètres Système */}

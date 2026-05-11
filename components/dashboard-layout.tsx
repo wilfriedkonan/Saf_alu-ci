@@ -49,6 +49,7 @@ const navigation: NavigationItem[] = [
   { name: "Factures", href: "/factures", icon: Receipt, permission: "factures" },
   { name: "Clients", href: "/clients", icon: Users, permission: "clients" },
   { name: "Sous-traitants", href: "/sous-traitants", icon: Users, permission: "sous_traitants" },
+  { name: "Devis-fournisseurs", href: "/devis-fournisseurs", icon: FileText, permission: "sous_traitants" },
   { name: "Trésorerie", href: "/tresorerie", icon: Wallet, permission: "tresorerie" },
   { name: "Paramètres", href: "/parametres", icon: UserCog, permission: "utilisateurs" },
   { name: "Notifications", href: "/notifications", icon: Bell, permission: "notifications" },
