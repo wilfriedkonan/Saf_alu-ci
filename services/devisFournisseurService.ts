@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { apiClient, API_BASE_URL } from '@/lib/api-config'
+import { apiClient, API_BASE_URL, publicApiClient } from '@/lib/api-config'
 import type {
   DevisFournisseur,
   Fournisseur,
@@ -157,14 +157,15 @@ export const DevisFournisseurPublicService = {
 // API — Public (no auth)
 // ============================================================
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ""
 
-export async function apiPublic<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}/devis-fournisseur/public/${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
+export async function apiPublic<T>(
+  path: string,
+  options?: { method?: string; body?: string }
+): Promise<T> {
+  const res = await publicApiClient.request<T>({
+    url:    `/devis-fournisseur/public/${path}`,
+    method: options?.method ?? "GET",
+    data:   options?.body ? JSON.parse(options.body) : undefined,
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data?.message ?? "Erreur serveur")
-  return data
+  return res.data
 }

@@ -48,3 +48,12 @@ export const whatsappClient = axios.create({
     'X-Api-Key': process.env.NEXT_PUBLIC_WHATSAPP_API_KEY ?? 'MON-SERVICE-API-KEY-2026-Lunette3485',
   },
 });
+// ── API publique (sans auth) — pour les pages fournisseurs ───
+
+export const publicApiClient = axios.create({
+  baseURL: API_BASE_URL,   // même URL que apiClient : http://167.86.107.54/api
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  // Pas d'intercepteur auth, pas de redirection 401
+});

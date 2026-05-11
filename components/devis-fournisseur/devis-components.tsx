@@ -70,7 +70,7 @@ function CreerFournisseurForm({
         <p className="font-semibold text-sm">Nouveau fournisseur</p>
       </div>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="px-6 py-4 space-y-4">
           {/* Infos principales */}
           <div className="space-y-3">
@@ -235,7 +235,7 @@ export function EnvoyerDemandesModal({
 
   return (
     <Dialog open={open} onOpenChange={v => { if (!loading) { onOpenChange(v); setShowCreer(false) } }}>
-      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col p-0">
+      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col p-0 overflow-hidden">
 
         {/* ── Vue : formulaire nouveau fournisseur ── */}
         {showCreer ? (
@@ -273,7 +273,8 @@ export function EnvoyerDemandesModal({
               />
             </div>
 
-            <ScrollArea className="flex-1 px-6 py-3">
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="px-6 py-3">
               {loadingF ? (
                 <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
               ) : filtres.length === 0 ? (
@@ -312,6 +313,7 @@ export function EnvoyerDemandesModal({
                   ))}
                 </div>
               )}
+              </div>
             </ScrollArea>
 
             <div className="px-6 py-4 border-t bg-muted/20 space-y-4 shrink-0">
