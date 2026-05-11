@@ -1,4 +1,5 @@
 import axios from 'axios';
+const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://167.86.107.54:8081"
 
 // ── API principale ────────────────────────────────────────────
 
