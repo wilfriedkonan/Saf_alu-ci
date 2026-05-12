@@ -286,10 +286,10 @@ export default function DevisFournisseurPage() {
             {/* Cartes résumé */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: "Total",        value: resume?.Total        ?? 0, icon: <FileText className="h-4 w-4" />,     color: "text-muted-foreground" },
-                { label: "En cours",     value: resume?.EnCours      ?? 0, icon: <Send className="h-4 w-4" />,         color: "text-blue-600" },
-                { label: "Sélectionnés", value: resume?.Selectionnes ?? 0, icon: <CheckCircle2 className="h-4 w-4" />, color: "text-green-600" },
-                { label: "Clôturés",     value: resume?.Clotures     ?? 0, icon: <XCircle className="h-4 w-4" />,      color: "text-red-600" },
+                { label: "Total",        value: resume?.total        ?? 0, icon: <FileText className="h-4 w-4" />,     color: "text-muted-foreground" },
+                { label: "En cours",     value: resume?.enCours      ?? 0, icon: <Send className="h-4 w-4" />,         color: "text-blue-600" },
+                { label: "Sélectionnés", value: resume?.selectionnes ?? 0, icon: <CheckCircle2 className="h-4 w-4" />, color: "text-green-600" },
+                { label: "Clôturés",     value: resume?.clotures     ?? 0, icon: <XCircle className="h-4 w-4" />,      color: "text-red-600" },
               ].map(card => (
                 <Card key={card.label}>
                   <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -323,7 +323,7 @@ export default function DevisFournisseurPage() {
               <div className="space-y-3">
                 {devisFiltres.map(d => {
                   const nbReponses = d.demandes?.filter(dm => dm.statut === "Repondu").length ?? 0
-                  const nbDemandes = d.demandes?.length ?? 0
+                  const nbDemandes = d.nbDemandes ?? 0
                   const dateLimite = new Date(d.dateLimiteReponse)
                   const estExpire  = dateLimite < new Date() && d.statut === "EnCours"
                   const isDeleting = deletingId === d.id

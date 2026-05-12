@@ -140,16 +140,16 @@ export const DevisFournisseurService = {
 
 export const DevisFournisseurPublicService = {
   getFormulaire: async (token: string): Promise<FormulairePublicDevis> => {
-    const r = await publicClient.get(`/devis-fournisseur/public/${token}`)
+    const r = await publicClient.get(`/public/${token}`)
     return r.data
   },
 
   validerOtp: async (token: string, data: ValiderOtpRequest): Promise<void> => {
-    await publicClient.post(`/devis-fournisseur/public/${token}/valider-otp`, data)
+    await publicClient.post(`/public/${token}/valider-otp`, data)
   },
 
   soumettreReponses: async (token: string, data: SoumettreReponsesRequest): Promise<void> => {
-    await publicClient.post(`/devis-fournisseur/public/${token}/soumettre`, data)
+    await publicClient.post(`/public/${token}/soumettre`, data)
   },
 }
 

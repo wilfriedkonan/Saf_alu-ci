@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -205,9 +205,10 @@ export function EnvoyerDemandesModal({
           fournisseurNom: d.fournisseurNom, fournisseurTelephone: d.fournisseurTelephone,
           token: d.token, otp: d.otp, dateExpiration: d.dateExpiration,
           lienDevis: lienFrontend,
-          messageWhatsApp: d.lienDevis
-            ? (d.messageWhatsApp ?? "").replace(d.lienDevis, lienFrontend)
-            : (d.messageWhatsApp ?? ""),
+          messageWhatsApp: (d.messageWhatsApp ?? "").replace(
+            /https?:\/\/[^\s]*\/(?:devis-fournisseur\/)?public\/[^\s]*/g,
+            lienFrontend
+          ),
         }
       })
 
@@ -227,9 +228,10 @@ export function EnvoyerDemandesModal({
               otp: d.otp,
               dateExpiration: d.dateExpiration,
               lienDevis: lienFrontend,
-              messageWhatsApp: d.lienDevis
-                ? (d.messageWhatsApp ?? "").replace(d.lienDevis, lienFrontend)
-                : (d.messageWhatsApp ?? ""),
+              messageWhatsApp: (d.messageWhatsApp ?? "").replace(
+                /https?:\/\/[^\s]*\/(?:devis-fournisseur\/)?public\/[^\s]*/g,
+                lienFrontend
+              ),
             }
           })
         toast({ title: "Une demande a déjà été envoyée à ce fournisseur", description: "Les informations existantes ont été chargées." })

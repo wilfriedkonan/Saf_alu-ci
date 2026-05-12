@@ -107,6 +107,7 @@ export interface DevisFournisseur {
   sections: DevisSection[]
   lignes: DevisLigne[]
   demandes: DevisDemande[]
+  nbDemandes:number
 }
 
 // =============================================

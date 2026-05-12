@@ -470,7 +470,7 @@ function EtapeEnvoi({
   const handleTerminer = async () => {
     // Filtre sur sentViaApi (envois réels), pas sentIds (état visuel)
     const nonEnvoyees = demandes.filter(d => !sentViaApi.has(d.id) && !!d.fournisseurTelephone)
-
+console.log('debug demand a lenvoi:',demandes)
     if (nonEnvoyees.length > 0) {
       if (!instanceNom) {
         toast({
