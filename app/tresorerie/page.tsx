@@ -280,6 +280,15 @@ function HistoriqueMouvementsModal({
               <span className="text-sm font-medium text-red-500">
                 − {formatCurrency(liste.filter(m => m.typeMouvement === "Sortie").reduce((s, m) => s + m.montant, 0))}
               </span>
+              {(() => {
+                const diff = liste.filter(m => m.typeMouvement === "Entree").reduce((s, m) => s + m.montant, 0)
+                           - liste.filter(m => m.typeMouvement === "Sortie").reduce((s, m) => s + m.montant, 0)
+                return (
+                  <span className={cn("text-sm font-bold border-l pl-4", diff >= 0 ? "text-green-600" : "text-red-500")}>
+                    = {diff >= 0 ? "+" : "−"}{formatCurrency(Math.abs(diff))}
+                  </span>
+                )
+              })()}
             </div>
           )}
           <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Fermer</Button>
