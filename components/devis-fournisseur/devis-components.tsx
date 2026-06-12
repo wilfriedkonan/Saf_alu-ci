@@ -56,7 +56,7 @@ function CreerFournisseurForm({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Sous-en-tête */}
       <div className="px-6 pt-4 pb-3 border-b shrink-0 flex items-center gap-3">
         <button
@@ -257,7 +257,7 @@ export function EnvoyerDemandesModal({
             onCancel={() => setShowCreer(false)}
           />
         ) : (
-          <>
+          <div className="flex flex-col flex-1 min-h-0">
             {/* ── Vue : liste des fournisseurs ── */}
             <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
               <div className="flex items-center justify-between gap-3">
@@ -352,7 +352,7 @@ export function EnvoyerDemandesModal({
                 </Button>
               </div>
             </div>
-          </>
+          </div>
         )}
       </DialogContent>
     </Dialog>

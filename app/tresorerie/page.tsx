@@ -7,6 +7,8 @@ import {
   CreditCard,
   DollarSign,
   Download,
+  History,
+  Loader2,
   Pencil,
   Plus,
   RefreshCw,
@@ -25,6 +27,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { useAuth, usePermissions } from "@/contexts/AuthContext"
 import {
   useMouvementsList,
@@ -50,9 +53,242 @@ import { useToast } from "@/components/ui/use-toast"
 import { ExpenseBreakdown } from "@/components/treasury/expense-breakdown"
 import { CashFlowChart } from "@/components/treasury/cash-flow-chart"
 import { RecentTransactions } from "@/components/treasury/recent-transactions"
-import type { MouvementFinancier } from "@/types/tresorerie"
+import type { Compte, MouvementFinancier } from "@/types/tresorerie"
+import { cn } from "@/lib/utils"
 
 type PeriodFilter = "week" | "month" | "quarter" | "year"
+
+// ── Modale historique complet ─────────────────────────────────
+
+function HistoriqueMouvementsModal({
+  open, onOpenChange, comptes,
+}: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  comptes: Compte[]
+}) {
+  const [filtreCompte, setFiltreCompte] = useState("all")
+  const [dateDebut, setDateDebut] = useState(() => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - 3)
+    return d.toISOString().slice(0, 10)
+  })
+  const [dateFin, setDateFin] = useState(() => new Date().toISOString().slice(0, 10))
+  const [filtreType, setFiltreType] = useState<"all" | TypeMouvement>("all")
+  const [recherche, setRecherche] = useState("")
+
+  const mouvementParams = useMemo(() => ({
+    compteId: filtreCompte !== "all" ? Number(filtreCompte) : undefined,
+    typeMouvement: filtreType !== "all" ? filtreType : undefined,
+    dateDebut: dateDebut ? new Date(dateDebut).toISOString() : undefined,
+    dateFin: dateFin ? (() => { const d = new Date(dateFin); d.setHours(23, 59, 59, 999); return d.toISOString() })() : undefined,
+  }), [filtreCompte, filtreType, dateDebut, dateFin])
+
+  const { mouvements, loading } = useMouvementsList(mouvementParams)
+
+  const compteSelectionne = filtreCompte !== "all"
+    ? comptes.find(c => c.id === Number(filtreCompte)) ?? null
+    : null
+
+  const liste = useMemo(() => {
+    const raw = Array.isArray(mouvements) ? mouvements : []
+    const q = recherche.trim().toLowerCase()
+    return raw
+      .filter(m => !q || `${m.libelle} ${m.description ?? ""} ${m.categorie ?? ""}`.toLowerCase().includes(q))
+      .sort((a, b) => new Date(b.dateMouvement).getTime() - new Date(a.dateMouvement).getTime())
+  }, [mouvements, recherche])
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="!w-[96vw] !max-w-[96vw] h-[96vh] max-h-[96vh] flex flex-col p-0 gap-0">
+
+        {/* En-tête */}
+        <DialogHeader className="px-6 pt-5 pb-4 border-b shrink-0">
+          <div className="flex items-center justify-between gap-4">
+            <DialogTitle className="flex items-center gap-2.5 text-lg">
+              <div className="rounded-full bg-primary/10 p-2 shrink-0">
+                <History className="h-4 w-4 text-primary" />
+              </div>
+              Historique complet des mouvements
+            </DialogTitle>
+            {/* Barre de recherche dans le header */}
+            <div className="relative w-72 shrink-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher…"
+                value={recherche}
+                onChange={e => setRecherche(e.target.value)}
+                className="pl-9 h-9"
+              />
+            </div>
+          </div>
+        </DialogHeader>
+
+        {/* Filtres */}
+        <div className="px-6 py-3 border-b shrink-0 bg-muted/20">
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground font-medium">Compte</p>
+              <Select value={filtreCompte} onValueChange={setFiltreCompte}>
+                <SelectTrigger className="w-[220px] h-9">
+                  <SelectValue placeholder="Tous les comptes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les comptes</SelectItem>
+                  {comptes.map(c => (
+                    <SelectItem key={c.id} value={c.id.toString()}>{c.nom}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground font-medium">Type</p>
+              <Select value={filtreType} onValueChange={(v) => setFiltreType(v as "all" | TypeMouvement)}>
+                <SelectTrigger className="w-[140px] h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous</SelectItem>
+                  {typesMouvementList.map(t => (
+                    <SelectItem key={t} value={t}>{typeMouvementLabels[t]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground font-medium">Du</p>
+              <Input type="date" value={dateDebut} onChange={e => setDateDebut(e.target.value)} className="w-[145px] h-9" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground font-medium">Au</p>
+              <Input type="date" value={dateFin} onChange={e => setDateFin(e.target.value)} className="w-[145px] h-9" />
+            </div>
+
+            {/* Solde du compte sélectionné — inline dans la barre de filtres */}
+            {compteSelectionne && (
+              <div className="ml-auto flex items-center gap-4 rounded-lg border bg-background px-4 py-2">
+                <div>
+                  <p className="font-semibold text-sm leading-tight">{compteSelectionne.nom}</p>
+                  <p className="text-xs text-muted-foreground">{compteSelectionne.banque || "Banque non renseignée"} · {compteSelectionne.typeCompte}</p>
+                </div>
+                <div className="text-right border-l pl-4">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Solde actuel</p>
+                  <p className={cn("text-lg font-bold leading-tight", compteSelectionne.soldeActuel >= 0 ? "text-green-600" : "text-red-600")}>
+                    {formatCurrency(compteSelectionne.soldeActuel)}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Tableau */}
+        <ScrollArea className="flex-1 min-h-0">
+          {loading ? (
+            <div className="flex justify-center items-center py-20">
+              <Loader2 className="h-7 w-7 animate-spin text-muted-foreground" />
+            </div>
+          ) : liste.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-2">
+              <History className="h-10 w-10 opacity-20" />
+              <p className="text-sm font-medium">Aucun mouvement trouvé</p>
+              <p className="text-xs">Modifiez les filtres ou la période</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="w-[105px] pl-6">Date</TableHead>
+                  <TableHead>Libellé</TableHead>
+                  <TableHead className="w-[160px]">Catégorie</TableHead>
+                  <TableHead className="w-[110px]">Mode</TableHead>
+                  <TableHead className="w-[100px]">Type</TableHead>
+                  {filtreCompte === "all" && <TableHead className="w-[200px]">Compte</TableHead>}
+                  <TableHead className="text-right w-[140px] pr-6">Montant</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {liste.map(m => {
+                  const raw = m as any
+                  const couleur: string = raw.couleur ?? (m.typeMouvement === "Entree" ? "#10b981" : m.typeMouvement === "Sortie" ? "#ef4444" : "#3b82f6")
+                  const signe = m.typeMouvement === "Entree" ? "+" : m.typeMouvement === "Sortie" ? "−" : ""
+                  const compteNom: string = raw.compte?.nom ?? "—"
+                  const modePaiement: string | null = raw.modePaiement ?? null
+                  const reference: string | null = raw.reference ?? null
+                  return (
+                    <TableRow key={m.id} className="hover:bg-muted/20 transition-colors">
+                      <TableCell className="pl-6">
+                        <p className="text-sm font-medium">{formatDate(m.dateMouvement)}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {new Date(raw.dateSaisie ?? m.dateMouvement).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      </TableCell>
+                      <TableCell>
+                        <p className="font-semibold text-sm leading-tight">{m.libelle}</p>
+                        {m.description && (
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[320px]">{m.description}</p>
+                        )}
+                        {reference && (
+                          <p className="text-[11px] text-muted-foreground font-mono mt-0.5">Réf. {reference}</p>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {m.categorie ? (
+                          <Badge variant="outline" className="text-xs font-normal">{m.categorie}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {modePaiement ? (
+                          <Badge variant="secondary" className="text-xs font-normal">{modePaiement}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={cn("text-xs", typeMouvementColors[m.typeMouvement as TypeMouvement])}>
+                          {typeMouvementLabels[m.typeMouvement as TypeMouvement] ?? m.typeMouvement}
+                        </Badge>
+                      </TableCell>
+                      {filtreCompte === "all" && (
+                        <TableCell className="text-sm text-muted-foreground">{compteNom}</TableCell>
+                      )}
+                      <TableCell className="text-right pr-6">
+                        <span className="font-bold text-sm" style={{ color: couleur }}>
+                          {signe}{formatCurrency(m.montant)}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </ScrollArea>
+
+        {/* Pied */}
+        <div className="px-6 py-3 border-t shrink-0 bg-muted/20 flex flex-wrap items-center justify-between gap-3">
+          {loading ? (
+            <span className="text-sm text-muted-foreground">Chargement…</span>
+          ) : (
+            <div className="flex flex-wrap items-center gap-4">
+              <span className="text-sm text-muted-foreground">{liste.length} mouvement{liste.length !== 1 ? "s" : ""}</span>
+              <span className="text-sm font-medium text-green-600">
+                + {formatCurrency(liste.filter(m => m.typeMouvement === "Entree").reduce((s, m) => s + m.montant, 0))}
+              </span>
+              <span className="text-sm font-medium text-red-500">
+                − {formatCurrency(liste.filter(m => m.typeMouvement === "Sortie").reduce((s, m) => s + m.montant, 0))}
+              </span>
+            </div>
+          )}
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Fermer</Button>
+        </div>
+
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 const initialCompteForm = {
   nom: "",
@@ -75,6 +311,7 @@ export default function TreasuryPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [showAddTransaction, setShowAddTransaction] = useState(false)
   const [showAddAccount, setShowAddAccount] = useState(false)
+  const [showHistorique, setShowHistorique] = useState(false)
   const [editingMouvement, setEditingMouvement] = useState<MouvementFinancier | null>(null)
   const [deletingMouvement, setDeletingMouvement] = useState<MouvementFinancier | null>(null)
   const [compteForm, setCompteForm] = useState(initialCompteForm)
@@ -660,6 +897,17 @@ export default function TreasuryPage() {
                   <AlertDescription>{errorRapport}</AlertDescription>
                 </Alert>
               )}
+
+              <div className="border-t pt-3">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setShowHistorique(true)}
+                >
+                  <History className="mr-2 h-4 w-4" />
+                  Historique complet
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -806,6 +1054,14 @@ export default function TreasuryPage() {
           </div>
         </DialogContent>
       </Dialog>
+      {/* Modal historique complet */}
+      {showHistorique && (
+        <HistoriqueMouvementsModal
+          open={showHistorique}
+          onOpenChange={setShowHistorique}
+          comptes={comptes}
+        />
+      )}
     </DashboardLayout>
   )
 }
