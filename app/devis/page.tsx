@@ -269,8 +269,9 @@ export default function DevisPage() {
         )}
 
         {/* Stats Cards */}
+        {(user?.Role?.Nom !== "chef_projet" && user?.Role?.Nom !== "commercial") && (
        <div className="grid gap-4 md:grid-cols-4">
-          {(user?.Role?.Nom !== "chef_projet" && user?.Role?.Nom !== "commercial") && <Card>
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total devis</CardTitle>
               <FileText className="h-4 w-4 text-muted-foreground" />
@@ -282,7 +283,7 @@ export default function DevisPage() {
                 <div className="text-2xl font-bold">{stats.total}</div>
               )}
             </CardContent>
-          </Card>}
+          </Card>
           
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -326,6 +327,7 @@ export default function DevisPage() {
             </CardContent>
           </Card>
         </div>
+        )}
 
         {/* Filtres */}
         <Card>
