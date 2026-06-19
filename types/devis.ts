@@ -316,6 +316,7 @@ export const UnitesDisponibles = [
   { value: "ml", label: "Mètre linéaire (ml)" },
   { value: "m³", label: "Mètre cube (m³)" },
   { value: "kg", label: "Kilogramme (kg)" },
+  { value: "T", label: "Tonne (t)" },
   { value: "L", label: "Litre (L)" },
   { value: "lot", label: "Lot" },
   { value: "ensemble", label: "Ensemble" },
