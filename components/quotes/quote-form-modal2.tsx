@@ -530,6 +530,8 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
                                     <SelectItem value="ml">ml</SelectItem>
                                     <SelectItem value="Ens">Ensemble</SelectItem>
                                     <SelectItem value="FF">Forfait</SelectItem>
+                                    <SelectItem value="kg">Kilogramme</SelectItem>
+                                    <SelectItem value="m³">Mètre cube</SelectItem>
                                     <SelectItem value="T">Tonne</SelectItem>
                                   </SelectContent>
                                 </Select>
