@@ -3,7 +3,9 @@ const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://167.86.107.54:80
 
 // ── API principale ────────────────────────────────────────────
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://167.86.107.54/api';
+/* export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://167.86.107.54/api'; */
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.safalu-ci.com/api';
+ 
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
