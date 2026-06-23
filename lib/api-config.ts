@@ -42,15 +42,37 @@ apiClient.interceptors.response.use(
 
 // ── API WhatsApp ──────────────────────────────────────────────
 
-export const WHATSAPP_API_URL = process.env.NEXT_PUBLIC_WHATSAPP_API_URL ?? 'http://167.86.107.54:9090';
+//export const WHATSAPP_API_URL = process.env.NEXT_PUBLIC_WHATSAPP_API_URL ?? 'http://167.86.107.54:9090';
 
 export const whatsappClient = axios.create({
-  baseURL: WHATSAPP_API_URL,
+  baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://messagerie-whatsappdotnetapi-agds3c:8080',
   headers: {
     'Content-Type': 'application/json',
-    'X-Api-Key': process.env.NEXT_PUBLIC_WHATSAPP_API_KEY ?? 'MON-SERVICE-API-KEY-2026-Lunette3485',
+    // ⚠️ NE PAS mettre la clé ici côté frontend!
   },
 });
+whatsappClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('safalu_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+// Interceptor pour les erreurs
+whatsappClient.interceptors.response.use(
+  
+  (response) => response,
+  (error) => {
+    console.error('WhatsApp API Error:', error.response?.data || error.message);
+    return Promise.reject(error);
+  }
+);
+export default whatsappClient;
 // ── API publique (sans auth) — pour les pages fournisseurs ───
 
 export const publicApiClient = axios.create({
