@@ -138,31 +138,47 @@ export function QuotePreviewModal({ quote, open, onOpenChange }: QuotePreviewMod
                           {section.nom}
                         </td>
                       </tr>
-                      
-                      {/* Lignes de la section */}
+
+                      {/* Lignes directes de la section */}
                       {section.lignes?.map((ligne) => (
                         <tr key={`ligne-${ligne.id}`} className="border-t hover:bg-muted/20">
                           <td className="p-3">
-                            <div className="font-medium text-xs">
-                              {ligne.typeElement || ligne.designation}
-                            </div>
+                            <div className="font-medium text-xs">{ligne.typeElement || ligne.designation}</div>
+                            {ligne.code && <div className="text-xs text-muted-foreground mt-0.5">Code : {ligne.code}</div>}
                           </td>
-                          <td className="text-center p-3 text-xs">
-                            {ligne.longueur ? formatCurrency(ligne.longueur) : "-"}
-                          </td>
-                          <td className="text-center p-3 text-xs">
-                            {ligne.hauteur ? formatCurrency(ligne.hauteur) : "-"}
-                          </td>
-                          <td className="text-center p-3 text-xs">
-                            {formatCurrency(ligne.quantite)}
-                          </td>
-                          <td className="text-right p-3 text-xs">
-                            {formatCurrency(ligne.prixUnitaireHT)}
-                          </td>
-                          <td className="text-right p-3 font-bold text-xs">
-                            {formatCurrency(ligne.totalHT)}
-                          </td>
+                          <td className="text-center p-3 text-xs">{ligne.longueur ? formatCurrency(ligne.longueur) : "-"}</td>
+                          <td className="text-center p-3 text-xs">{ligne.hauteur ? formatCurrency(ligne.hauteur) : "-"}</td>
+                          <td className="text-center p-3 text-xs">{formatCurrency(ligne.quantite)}</td>
+                          <td className="text-right p-3 text-xs">{formatCurrency(ligne.prixUnitaireHT)}</td>
+                          <td className="text-right p-3 font-bold text-xs">{formatCurrency(ligne.totalHT)}</td>
                         </tr>
+                      ))}
+
+                      {/* Sous-sections */}
+                      {section.sousSections?.map((ss) => (
+                        <Fragment key={`ss-${ss.id}`}>
+                          {/* En-tête sous-section */}
+                          <tr className="bg-muted/20 border-t">
+                            <td colSpan={6} className="py-2 pl-8 pr-3 font-semibold text-sm text-foreground/80">
+                              ▸ {ss.nom}
+                              {ss.code && <span className="ml-2 text-xs font-normal text-muted-foreground">[{ss.code}]</span>}
+                            </td>
+                          </tr>
+                          {/* Lignes de la sous-section */}
+                          {ss.lignes?.map((ligne) => (
+                            <tr key={`ssLigne-${ligne.id}`} className="border-t hover:bg-muted/20">
+                              <td className="pl-10 pr-3 py-2">
+                                <div className="font-medium text-xs">{ligne.typeElement || ligne.designation}</div>
+                                {ligne.code && <div className="text-xs text-muted-foreground mt-0.5">Code : {ligne.code}</div>}
+                              </td>
+                              <td className="text-center p-3 text-xs">{ligne.longueur ? formatCurrency(ligne.longueur) : "-"}</td>
+                              <td className="text-center p-3 text-xs">{ligne.hauteur ? formatCurrency(ligne.hauteur) : "-"}</td>
+                              <td className="text-center p-3 text-xs">{formatCurrency(ligne.quantite)}</td>
+                              <td className="text-right p-3 text-xs">{formatCurrency(ligne.prixUnitaireHT)}</td>
+                              <td className="text-right p-3 font-bold text-xs">{formatCurrency(ligne.totalHT)}</td>
+                            </tr>
+                          ))}
+                        </Fragment>
                       ))}
                     </Fragment>
                   ))}

@@ -1,6 +1,4 @@
 // components/quotes/quote-form-modal2.tsx
-// ✅ DEVIS CLASSIQUE - Compatible avec la base de données + Remises intégrées
-// ✅ CORRECTION: Gestion correcte du type Devis (pas de propriété lignes directe)
 "use client"
 
 import { useState, useEffect } from "react"
@@ -13,11 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Trash2, Calculator, Loader2, Percent, Tag } from "lucide-react"
-import { CreateDevisRequest, Devis } from "@/types/devis"
+import { Plus, Trash2, Calculator, Loader2, Percent, Tag, Folder, FileText, ChevronRight, ChevronDown, Layers } from "lucide-react"
+import { CreateDevisRequest, CreateSousSectionRequest, CreateLigneDevisRequest, Devis, UnitesDisponibles } from "@/types/devis"
 import { useAuth } from "@/contexts/AuthContext"
 import { toast } from "@/hooks/use-toast"
 import { useClientsList } from "@/hooks/useClients"
+import { Badge } from "@/components/ui/badge"
+import { v4 as uuidv4 } from 'uuid'
 
 interface QuoteFormModalProps {
   open: boolean
@@ -27,286 +27,298 @@ interface QuoteFormModalProps {
   loading?: boolean
 }
 
-interface LigneFormData {
-  designation: string
-  description?: string
-  quantite: number
-  unite: string
-  prixUnitaireHT: number
+interface LigneFormData extends CreateLigneDevisRequest {
+  tempId: string
 }
+
+interface SousSectionFormData {
+  tempId: string
+  code?: string
+  nom: string
+  description?: string
+  ordre: number
+  lignes: LigneFormData[]
+}
+
+interface SectionFormData {
+  tempId: string
+  nom: string
+  ordre: number
+  description?: string
+  lignes: LigneFormData[]
+  sousSections: SousSectionFormData[]
+}
+
+const makeLigne = (ordre = 1): LigneFormData => ({
+  tempId: uuidv4(), ordre, code: "", typeElement: "", designation: "",
+  description: "", longueur: undefined, hauteur: undefined,
+  quantite: 1, unite: "U", prixUnitaireHT: 0,
+})
+
+const makeSection = (index: number): SectionFormData => ({
+  tempId: uuidv4(), nom: `Section ${index}`, ordre: index,
+  description: "", lignes: [makeLigne(1)], sousSections: [],
+})
+
+// ---- standalone LignesTable ----
+interface LignesTableProps {
+  lignes: LigneFormData[]
+  isEdit: boolean
+  onAdd: () => void
+  onRemove: (id: string) => void
+  onUpdate: (id: string, field: keyof Omit<LigneFormData, 'tempId'>, value: any) => void
+  onOrdre: (id: string, val: number) => void
+}
+
+function LignesTable2({ lignes, isEdit, onAdd, onRemove, onUpdate, onOrdre }: LignesTableProps) {
+  const fmt = (n: number) => new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n).replace(/ /g, ' ')
+  return (
+    <>
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="text-sm font-semibold flex items-center gap-1"><FileText className="h-3.5 w-3.5" />Lignes</h4>
+        <Button type="button" variant="outline" size="sm" className="text-xs" onClick={onAdd}><Plus className="h-3 w-3 mr-1" />Ajouter</Button>
+      </div>
+      <div className="overflow-x-auto border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-12 text-center">N°</TableHead>
+              <TableHead className="w-24">Code</TableHead>
+              <TableHead>Désignation *</TableHead>
+              <TableHead className="w-20">Qté *</TableHead>
+              <TableHead className="w-20">Unité</TableHead>
+              <TableHead className="w-28">Prix U. HT</TableHead>
+              <TableHead className="w-28">Total HT</TableHead>
+              <TableHead className="w-10"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {lignes.map((ligne, idx) => (
+              <TableRow key={ligne.tempId}>
+                <TableCell className="text-center">
+                  {isEdit ? (
+                    <Input type="number" min="1" max={lignes.length}
+                      value={ligne.ordre ?? idx + 1}
+                      onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) onOrdre(ligne.tempId, v) }}
+                      className="h-8 w-14 text-center" />
+                  ) : (
+                    <span className="text-sm text-muted-foreground">{idx + 1}</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Input value={ligne.code || ""} onChange={(e) => onUpdate(ligne.tempId, 'code', e.target.value)} placeholder="Code" className="text-sm h-8" />
+                </TableCell>
+                <TableCell>
+                  <Input value={ligne.designation} onChange={(e) => onUpdate(ligne.tempId, 'designation', e.target.value)} placeholder="Désignation" className="text-sm h-8" />
+                </TableCell>
+                <TableCell>
+                  <Input type="number" value={ligne.quantite} onChange={(e) => onUpdate(ligne.tempId, 'quantite', parseFloat(e.target.value) || 0)} min="0" step="0.01" className="text-sm h-8" />
+                </TableCell>
+                <TableCell>
+                  <Select value={ligne.unite} onValueChange={(v) => onUpdate(ligne.tempId, 'unite', v)}>
+                    <SelectTrigger className="text-sm h-8"><SelectValue /></SelectTrigger>
+                    <SelectContent>{UnitesDisponibles.map(u => <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                </TableCell>
+                <TableCell>
+                  <Input type="number" value={ligne.prixUnitaireHT} onChange={(e) => onUpdate(ligne.tempId, 'prixUnitaireHT', parseFloat(e.target.value) || 0)} min="0" step="100" className="text-sm h-8" />
+                </TableCell>
+                <TableCell className="text-sm font-medium">{fmt((ligne.quantite || 0) * (ligne.prixUnitaireHT || 0))}</TableCell>
+                <TableCell>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => onRemove(ligne.tempId)}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </>
+  )
+}
+// --------------------------------
 
 export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = false }: QuoteFormModalProps) {
   const { user } = useAuth()
   const isEdit = !!devis
-
-  const [formData, setFormData] = useState({
-    clientId: 0,
-    titre: "",
-    description: "",
-    dateValidite: "",
-    conditions: "",
-    notes: "",
-    chantier: "",
-    contact: "",
-  })
-  
-  const [lignes, setLignes] = useState<LigneFormData[]>([
-    { designation: "", description: "", quantite: 1, unite: "U", prixUnitaireHT: 0 },
-  ])
-
-  // ✅ États pour les remises
+  const [formData, setFormData] = useState({ clientId: 0, titre: "", description: "", dateValidite: "", conditions: "", notes: "", chantier: "", contact: "" })
   const [remiseValeur, setRemiseValeur] = useState(0)
   const [remisePourcentage, setRemisePourcentage] = useState(0)
- 
+  const [sections, setSections] = useState<SectionFormData[]>([makeSection(1)])
+  const [activeSectionId, setActiveSectionId] = useState<string>(sections[0]?.tempId)
+  const [activeSousSectionId, setActiveSousSectionId] = useState<string | null>(null)
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set([sections[0]?.tempId]))
   const { clients, loading: clientLoading, error: clientError, refreshCliens } = useClientsList()
 
-  const getSelectedClient = () => {
-    if (formData.clientId > 0 && clients) {
-      return clients.find(client => client.id === formData.clientId)
-    }
-    return null
-  }
+  const fmt = (n: number) => new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n).replace(/ /g, ' ')
 
-  // Réinitialiser le formulaire
+  const normalizeLines = (raw: any[]): LigneFormData[] =>
+    raw.map((l, idx) => ({
+      tempId: uuidv4(), ordre: l.ordre ?? (idx + 1), code: l.code || "",
+      typeElement: l.typeElement || "", designation: l.designation || "",
+      description: l.description || "", longueur: l.longueur, hauteur: l.hauteur,
+      quantite: l.quantite || 1, unite: l.unite || "U", prixUnitaireHT: l.prixUnitaireHT || 0,
+    }))
+
+  const normalizeSections = (raw: any[]): SectionFormData[] =>
+    raw.map(s => ({
+      tempId: uuidv4(), nom: s.nom, ordre: s.ordre, description: s.description || "",
+      lignes: normalizeLines(s.lignes || []),
+      sousSections: (s.sousSections || []).map((ss: any, i: number) => ({
+        tempId: uuidv4(), code: ss.code || "", nom: ss.nom || `Sous-section ${i + 1}`,
+        description: ss.description || "", ordre: ss.ordre ?? (i + 1),
+        lignes: normalizeLines(ss.lignes || []),
+      })),
+    }))
+
   useEffect(() => {
-    if (open) {
-      if (isEdit && devis) {
-        // Mode édition
-        setFormData({
-          clientId: devis.clientId,
-          titre: devis.titre,
-          description: devis.description || "",
-          dateValidite: devis.dateValidite ? devis.dateValidite.split('T')[0] : "",
-          conditions: devis.conditions || "",
-          notes: devis.notes || "",
-          chantier: devis.chantier || "",
-          contact: devis.contact || "",
-        })
-
-        // ✅ Charger les remises
-        setRemiseValeur(devis.remiseValeur || 0)
-        setRemisePourcentage(devis.remisePourcentage || 0)
-
-        // ✅ CORRECTION: Charger les lignes UNIQUEMENT depuis sections
-        if (devis.sections && devis.sections.length > 0) {
-          // Extraire toutes les lignes de toutes les sections
-          const allLignes: LigneFormData[] = []
-          devis.sections.forEach(section => {
-            if (section.lignes && section.lignes.length > 0) {
-              section.lignes.forEach(ligne => {
-                allLignes.push({
-                  designation: ligne.designation || ligne.typeElement || "",
-                  description: ligne.description || "",
-                  quantite: ligne.quantite,
-                  unite: ligne.unite,
-                  prixUnitaireHT: ligne.prixUnitaireHT,
-                })
-              })
-            }
-          })
-          setLignes(allLignes.length > 0 ? allLignes : [{ designation: "", description: "", quantite: 1, unite: "U", prixUnitaireHT: 0 }])
-        } else {
-          // Pas de sections, ligne par défaut
-          setLignes([{ designation: "", description: "", quantite: 1, unite: "U", prixUnitaireHT: 0 }])
-        }
-      } else {
-        // Mode création
-        setFormData({
-          clientId: 0,
-          titre: "",
-          description: "",
-          dateValidite: "",
-          conditions: "",
-          notes: "",
-          chantier: "",
-          contact: "",
-        })
-        setLignes([{ designation: "", description: "", quantite: 1, unite: "U", prixUnitaireHT: 0 }])
-        setRemiseValeur(0)
-        setRemisePourcentage(0)
-      }
+    if (!open) return
+    if (isEdit && devis) {
+      setFormData({
+        clientId: devis.clientId, titre: devis.titre,
+        description: devis.description || "", dateValidite: devis.dateValidite ? devis.dateValidite.split('T')[0] : "",
+        conditions: devis.conditions || "", notes: devis.notes || "",
+        chantier: devis.chantier || "", contact: devis.contact || "",
+      })
+      setRemiseValeur(devis.remiseValeur || 0)
+      setRemisePourcentage(devis.remisePourcentage || 0)
+      const loaded = devis.sections && devis.sections.length > 0 ? normalizeSections(devis.sections) : [makeSection(1)]
+      setSections(loaded)
+      setActiveSectionId(loaded[0].tempId)
+      setActiveSousSectionId(null)
+      setExpandedSections(new Set([loaded[0].tempId]))
+    } else {
+      const s = makeSection(1)
+      setSections([s])
+      setActiveSectionId(s.tempId)
+      setActiveSousSectionId(null)
+      setExpandedSections(new Set([s.tempId]))
+      setFormData({ clientId: 0, titre: "", description: "", dateValidite: "", conditions: "", notes: "", chantier: "", contact: "" })
+      setRemiseValeur(0); setRemisePourcentage(0)
     }
   }, [open, isEdit, devis])
 
-  const handleInputChange = (field: keyof typeof formData, value: string | number) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
-
-  const handleLigneChange = (index: number, field: keyof LigneFormData, value: string | number) => {
-    setLignes(prev => prev.map((ligne, i) => 
-      i === index ? { ...ligne, [field]: value } : ligne
-    ))
-  }
-
-  const addLigne = () => {
-    setLignes(prev => [...prev, { 
-      designation: "", 
-      description: "", 
-      quantite: 1, 
-      unite: "U", 
-      prixUnitaireHT: 0 
-    }])
-  }
-
-  const removeLigne = (index: number) => {
-    if (lignes.length > 1) {
-      setLignes(prev => prev.filter((_, i) => i !== index))
-    }
-  }
-
-  // ✅ Fonction de calcul avec remises
   const calculateTotals = () => {
-    // 1. Calculer le montant HT brut
-    const montantHTBrut = lignes.reduce((sum, ligne) => {
-      return sum + (ligne.quantite * ligne.prixUnitaireHT)
-    }, 0)
-
-    // 2. Appliquer la remise en pourcentage
-    const montantRemisePourcentage = montantHTBrut * (remisePourcentage / 100)
-    const montantApresRemisePourcentage = montantHTBrut - montantRemisePourcentage
-
-    // 3. Appliquer la remise en valeur
-    const montantHTNet = Math.max(0, montantApresRemisePourcentage - remiseValeur)
-
-    // 4. Calculer le total de la remise
-    const montantRemiseTotal = montantHTBrut - montantHTNet
-
-    // 5. Calculer TVA et TTC
-    const tauxTVA = 18
-    const montantTVA = montantHTNet * (tauxTVA / 100)
-    const montantTTC = montantHTNet + montantTVA
-
-    return { 
-      montantHTBrut,
-      montantRemiseTotal,
-      montantHT: montantHTNet,
-      tauxTVA, 
-      montantTVA, 
-      montantTTC 
-    }
+    let brut = 0
+    sections.forEach(s => {
+      s.lignes.forEach(l => { brut += (l.quantite || 0) * (l.prixUnitaireHT || 0) })
+      s.sousSections.forEach(ss => ss.lignes.forEach(l => { brut += (l.quantite || 0) * (l.prixUnitaireHT || 0) }))
+    })
+    const net = Math.max(0, brut * (1 - remisePourcentage / 100) - remiseValeur)
+    const tva = net * 0.18
+    return { brut, remiseTotal: brut - net, net, tva, ttc: net + tva }
   }
 
-  const validateForm = () => {
-    const errors: string[] = []
+  // ---- sections ----
+  const addSection = () => {
+    const s = makeSection(sections.length + 1)
+    setSections(p => [...p, s])
+    setActiveSectionId(s.tempId); setActiveSousSectionId(null)
+    setExpandedSections(p => new Set([...p, s.tempId]))
+  }
+  const removeSection = (id: string) => {
+    if (sections.length <= 1) return
+    const f = sections.filter(s => s.tempId !== id); setSections(f)
+    if (activeSectionId === id) { setActiveSectionId(f[0].tempId); setActiveSousSectionId(null) }
+  }
+  const updateSection = (id: string, field: 'nom' | 'ordre' | 'description', value: any) =>
+    setSections(p => p.map(s => s.tempId === id ? { ...s, [field]: value } : s))
+  const toggleExpand = (id: string) =>
+    setExpandedSections(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
 
-    if (!formData.titre.trim()) {
-      errors.push('Le titre est requis')
-    }
+  // ---- sous-sections ----
+  const addSousSection = (sectionId: string) => {
+    const parent = sections.find(s => s.tempId === sectionId)
+    const ss: SousSectionFormData = { tempId: uuidv4(), code: "", nom: "", description: "", ordre: (parent?.sousSections.length ?? 0) + 1, lignes: [makeLigne(1)] }
+    setSections(p => p.map(s => s.tempId === sectionId ? { ...s, sousSections: [...s.sousSections, ss] } : s))
+    setActiveSectionId(sectionId); setActiveSousSectionId(ss.tempId)
+    setExpandedSections(p => new Set([...p, sectionId]))
+  }
+  const removeSousSection = (sectionId: string, ssId: string) => {
+    setSections(p => p.map(s => s.tempId !== sectionId ? s : { ...s, sousSections: s.sousSections.filter(ss => ss.tempId !== ssId) }))
+    if (activeSousSectionId === ssId) setActiveSousSectionId(null)
+  }
+  const updateSousSection = (sectionId: string, ssId: string, field: 'code' | 'nom' | 'description' | 'ordre', value: any) =>
+    setSections(p => p.map(s => s.tempId !== sectionId ? s : { ...s, sousSections: s.sousSections.map(ss => ss.tempId === ssId ? { ...ss, [field]: value } : ss) }))
 
-    if (formData.clientId === 0) {
-      if (clientLoading) {
-        errors.push('Veuillez attendre le chargement des clients')
-      } else if (!clients || clients.length === 0) {
-        errors.push('Aucun client disponible. Veuillez créer un client d\'abord.')
-      } else {
-        errors.push('Veuillez sélectionner un client')
-      }
-    }
+  // ---- lines (section) ----
+  const addLigne = (sId: string) =>
+    setSections(p => p.map(s => s.tempId !== sId ? s : { ...s, lignes: [...s.lignes, makeLigne(s.lignes.length + 1)] }))
+  const removeLigne = (sId: string, lId: string) =>
+    setSections(p => p.map(s => s.tempId !== sId ? s : { ...s, lignes: s.lignes.filter(l => l.tempId !== lId) }))
+  const updateLigne = (sId: string, lId: string, field: keyof Omit<LigneFormData, 'tempId'>, value: any) =>
+    setSections(p => p.map(s => s.tempId !== sId ? s : { ...s, lignes: s.lignes.map(l => l.tempId === lId ? { ...l, [field]: value } : l) }))
+  const handleOrdre = (sId: string, lId: string, newOrdre: number) =>
+    setSections(p => p.map(s => {
+      if (s.tempId !== sId) return s
+      const arr = [...s.lignes]; const from = arr.findIndex(l => l.tempId === lId); if (from === -1) return s
+      const to = Math.max(0, Math.min(newOrdre - 1, arr.length - 1))
+      const [m] = arr.splice(from, 1); arr.splice(to, 0, m)
+      return { ...s, lignes: arr.map((l, i) => ({ ...l, ordre: i + 1 })) }
+    }))
 
-    if (lignes.length === 0) {
-      errors.push('Au moins une ligne est requise')
-    }
-
-    lignes.forEach((ligne, index) => {
-      if (!ligne.designation.trim()) {
-        errors.push(`Ligne ${index + 1}: La désignation est requise`)
-      }
-      if (ligne.quantite <= 0) {
-        errors.push(`Ligne ${index + 1}: La quantité doit être supérieure à 0`)
-      }
-      if (ligne.prixUnitaireHT < 0) {
-        errors.push(`Ligne ${index + 1}: Le prix unitaire ne peut pas être négatif`)
-      }
+  // ---- lines (sous-section) ----
+  const updSS = (sId: string, ssId: string, fn: (ss: SousSectionFormData) => SousSectionFormData) =>
+    setSections(p => p.map(s => s.tempId !== sId ? s : { ...s, sousSections: s.sousSections.map(ss => ss.tempId === ssId ? fn(ss) : ss) }))
+  const addLigneInSS = (sId: string, ssId: string) =>
+    updSS(sId, ssId, ss => ({ ...ss, lignes: [...ss.lignes, makeLigne(ss.lignes.length + 1)] }))
+  const removeLigneInSS = (sId: string, ssId: string, lId: string) =>
+    updSS(sId, ssId, ss => ({ ...ss, lignes: ss.lignes.filter(l => l.tempId !== lId) }))
+  const updateLigneInSS = (sId: string, ssId: string, lId: string, field: keyof Omit<LigneFormData, 'tempId'>, value: any) =>
+    updSS(sId, ssId, ss => ({ ...ss, lignes: ss.lignes.map(l => l.tempId === lId ? { ...l, [field]: value } : l) }))
+  const handleOrdreInSS = (sId: string, ssId: string, lId: string, newOrdre: number) =>
+    updSS(sId, ssId, ss => {
+      const arr = [...ss.lignes]; const from = arr.findIndex(l => l.tempId === lId); if (from === -1) return ss
+      const to = Math.max(0, Math.min(newOrdre - 1, arr.length - 1))
+      const [m] = arr.splice(from, 1); arr.splice(to, 0, m)
+      return { ...ss, lignes: arr.map((l, i) => ({ ...l, ordre: i + 1 })) }
     })
 
-    // ✅ Validation des remises
-    if (remisePourcentage < 0 || remisePourcentage > 100) {
-      errors.push('La remise en pourcentage doit être entre 0 et 100')
-    }
-
-    if (remiseValeur < 0) {
-      errors.push('La remise en valeur ne peut pas être négative')
-    }
-
-    const { montantHTBrut } = calculateTotals()
-    if (remiseValeur + (montantHTBrut * remisePourcentage / 100) > montantHTBrut) {
-      errors.push('Le montant total des remises ne peut pas dépasser le montant HT brut')
-    }
-
-    return errors
-  }
+  const serializeLigne = (l: LigneFormData, idx: number) => ({
+    ordre: l.ordre ?? (idx + 1), code: l.code?.trim() || undefined,
+    typeElement: undefined, designation: l.designation.trim(),
+    description: l.description?.trim() || undefined,
+    longueur: undefined, hauteur: undefined,
+    quantite: l.quantite || 1, unite: l.unite, prixUnitaireHT: l.prixUnitaireHT || 0,
+  })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!user) { toast({ title: "Erreur", description: "Vous devez être connecté", variant: "destructive" }); return }
+    const errors: string[] = []
+    if (!formData.titre.trim()) errors.push('Titre requis')
+    if (!formData.clientId) errors.push('Client requis')
+    if (errors.length > 0) { toast({ title: "Erreurs", description: errors.join(', '), variant: "destructive" }); return }
 
-    if (!user) {
-      toast({
-        title: "Erreur",
-        description: "Vous devez être connecté pour effectuer cette action",
-        variant: "destructive",
-      })
-      return
-    }
-
-    const errors = validateForm()
-    if (errors.length > 0) {
-      toast({
-        title: "Erreurs de validation",
-        description: errors.slice(0, 3).join(', ') + (errors.length > 3 ? '...' : ''),
-        variant: "destructive",
-      })
-      return
-    }
-
-    // ✅ Structure compatible: Créer une section unique avec toutes les lignes
-    const devisData: CreateDevisRequest = {
-      clientId: formData.clientId,
-      titre: formData.titre.trim(),
+    const data: CreateDevisRequest = {
+      clientId: formData.clientId, titre: formData.titre.trim(),
       description: formData.description.trim() || undefined,
       dateValidite: formData.dateValidite || undefined,
       conditions: formData.conditions.trim() || undefined,
       notes: formData.notes.trim() || undefined,
       chantier: formData.chantier.trim() || undefined,
       contact: formData.contact.trim() || undefined,
-      
-      // ✅ Remises
       remiseValeur: remiseValeur > 0 ? remiseValeur : undefined,
       remisePourcentage: remisePourcentage > 0 ? remisePourcentage : undefined,
-
-      // ✅ Structure compatible: 1 section avec toutes les lignes
-      sections: [{
-        nom: "Devis Classique",
-        ordre: 1,
-        description: undefined,
-        lignes: lignes.map((ligne) => ({
-          typeElement: undefined,
-          designation: ligne.designation.trim(),
-          description: ligne.description?.trim() || undefined,
-          longueur: undefined,
-          hauteur: undefined,
-          quantite: ligne.quantite,
-          unite: ligne.unite,
-          prixUnitaireHT: ligne.prixUnitaireHT,
-        })),
-      }],
+      TypeDevis: 'classique',
+      sections: sections.map(s => ({
+        nom: s.nom.trim(), ordre: s.ordre, description: s.description?.trim() || undefined,
+        sousSections: s.sousSections.map((ss, si) => ({
+          code: ss.code?.trim() || undefined, nom: ss.nom.trim(),
+          description: ss.description?.trim() || undefined, ordre: ss.ordre ?? (si + 1),
+          lignes: ss.lignes.map(serializeLigne),
+        } satisfies CreateSousSectionRequest)),
+        lignes: s.lignes.map(serializeLigne),
+      })),
     }
-
-    try { 
-      await onSubmit(devisData)
-    } catch (error) {
-      // L'erreur est gérée par le parent
-    }
+    try { await onSubmit(data) } catch (_) { /* handled by parent */ }
   }
 
-  const { montantHTBrut, montantRemiseTotal, montantHT, tauxTVA, montantTVA, montantTTC } = calculateTotals()
+  const { brut, remiseTotal, net, tva, ttc } = calculateTotals()
   const hasRemise = remiseValeur > 0 || remisePourcentage > 0
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("fr-FR", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount).replace(/\s/g, ' ')
-  }
+  const activeSection = sections.find(s => s.tempId === activeSectionId)
+  const activeSousSection = activeSousSectionId ? activeSection?.sousSections.find(ss => ss.tempId === activeSousSectionId) : null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -316,9 +328,7 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
             {isEdit ? `Modifier le devis ${devis?.numero}` : "Nouveau devis classique"}
             <span className="text-xs font-normal text-muted-foreground">(Format simplifié)</span>
           </DialogTitle>
-          <DialogDescription className="text-sm sm:text-base">
-            {isEdit ? "Modifiez les informations du devis" : "Créez un devis rapide avec liste simple de lignes"}
-          </DialogDescription>
+          <DialogDescription>{isEdit ? "Modifiez les informations du devis" : "Créez un devis avec sections et sous-sections"}</DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto px-4 sm:px-6">
@@ -326,7 +336,7 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
             <Tabs defaultValue="general" className="w-full">
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="general">Général</TabsTrigger>
-                <TabsTrigger value="lignes">Lignes</TabsTrigger>
+                <TabsTrigger value="lignes">Sections & lignes</TabsTrigger>
                 <TabsTrigger value="remise">💰 Remises</TabsTrigger>
                 <TabsTrigger value="recap">Récapitulatif</TabsTrigger>
               </TabsList>
@@ -334,348 +344,194 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
               {/* TAB GÉNÉRAL */}
               <TabsContent value="general" className="space-y-4 mt-4">
                 <Card className="border-0 shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base sm:text-lg">Informations générales</CardTitle>
-                  </CardHeader>
+                  <CardHeader className="pb-3"><CardTitle className="text-base sm:text-lg">Informations générales</CardTitle></CardHeader>
                   <CardContent className="pt-0 grid gap-3 grid-cols-1 sm:grid-cols-2">
-                    {/* Client */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="clientId" className="text-sm font-medium">
-                          Client *
-                        </Label>
-                        {clientError && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={refreshCliens}
-                            className="text-xs h-6 px-2"
-                          >
-                            🔄 Rafraîchir
-                          </Button>
-                        )}
+                        <Label className="text-sm font-medium">Client *</Label>
+                        {clientError && <Button type="button" variant="ghost" size="sm" onClick={refreshCliens} className="text-xs h-6 px-2">🔄 Rafraîchir</Button>}
                       </div>
-                      <Select
-                        value={formData.clientId > 0 ? formData.clientId.toString() : ""}
-                        onValueChange={(value) => handleInputChange("clientId", parseInt(value) || 0)}
-                        disabled={clientLoading}
-                      >
+                      <Select value={formData.clientId > 0 ? formData.clientId.toString() : ""} onValueChange={(v) => setFormData(p => ({ ...p, clientId: parseInt(v) || 0 }))} disabled={clientLoading}>
                         <SelectTrigger className="text-sm h-9">
-                          <SelectValue 
-                            placeholder={
-                              clientLoading 
-                                ? "Chargement..." 
-                                : clients && clients.length === 0 
-                                  ? "Aucun client" 
-                                  : "Sélectionner"
-                            } 
-                          />
+                          <SelectValue placeholder={clientLoading ? "Chargement..." : clients && clients.length === 0 ? "Aucun client" : "Sélectionner"} />
                         </SelectTrigger>
                         <SelectContent>
-                          {clientLoading ? (
-                            <SelectItem value="" disabled>
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            </SelectItem>
-                          ) : clients && clients.length > 0 ? (
-                            clients.map((client) => (
-                              <SelectItem key={client.id} value={client.id.toString()}>
-                                {client.nom}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem value="" disabled>Aucun client</SelectItem>
-                          )}
+                          {clientLoading ? <SelectItem value="" disabled><Loader2 className="h-4 w-4 animate-spin" /></SelectItem>
+                            : clients && clients.length > 0 ? clients.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.nom}</SelectItem>)
+                              : <SelectItem value="" disabled>Aucun client</SelectItem>}
                         </SelectContent>
                       </Select>
                     </div>
-
-                    {/* Titre */}
                     <div className="space-y-1.5">
-                      <Label htmlFor="titre" className="text-sm font-medium">
-                        Titre du projet *
-                      </Label>
-                      <Input
-                        id="titre"
-                        value={formData.titre}
-                        onChange={(e) => handleInputChange("titre", e.target.value)}
-                        className="text-sm h-9"
-                        placeholder="Titre du devis"
-                      />
+                      <Label className="text-sm font-medium">Titre *</Label>
+                      <Input value={formData.titre} onChange={(e) => setFormData(p => ({ ...p, titre: e.target.value }))} className="text-sm h-9" placeholder="Titre du devis" />
                     </div>
-
-                    {/* Date validité */}
                     <div className="space-y-1.5">
-                      <Label htmlFor="dateValidite" className="text-sm font-medium">
-                        Valide jusqu'au
-                      </Label>
-                      <Input
-                        id="dateValidite"
-                        type="date"
-                        value={formData.dateValidite}
-                        onChange={(e) => handleInputChange("dateValidite", e.target.value)}
-                        className="text-sm h-9"
-                      />
+                      <Label className="text-sm font-medium">Valide jusqu'au</Label>
+                      <Input type="date" value={formData.dateValidite} onChange={(e) => setFormData(p => ({ ...p, dateValidite: e.target.value }))} className="text-sm h-9" />
                     </div>
-
-                    {/* Chantier */}
                     <div className="space-y-1.5">
-                      <Label htmlFor="chantier" className="text-sm font-medium">
-                        Chantier
-                      </Label>
-                      <Input
-                        id="chantier"
-                        value={formData.chantier}
-                        onChange={(e) => handleInputChange("chantier", e.target.value)}
-                        className="text-sm h-9"
-                        placeholder="Lieu du chantier"
-                      />
+                      <Label className="text-sm font-medium">Chantier</Label>
+                      <Input value={formData.chantier} onChange={(e) => setFormData(p => ({ ...p, chantier: e.target.value }))} className="text-sm h-9" placeholder="Lieu du chantier" />
                     </div>
-
-                    {/* Contact */}
                     <div className="space-y-1.5 sm:col-span-2">
-                      <Label htmlFor="contact" className="text-sm font-medium">
-                        Contact projet
-                      </Label>
-                      <Input
-                        id="contact"
-                        value={formData.contact}
-                        onChange={(e) => handleInputChange("contact", e.target.value)}
-                        className="text-sm h-9"
-                        placeholder="Nom et coordonnées du contact"
-                      />
+                      <Label className="text-sm font-medium">Contact projet</Label>
+                      <Input value={formData.contact} onChange={(e) => setFormData(p => ({ ...p, contact: e.target.value }))} className="text-sm h-9" />
                     </div>
-
-                    {/* Description */}
                     <div className="space-y-1.5 sm:col-span-2">
-                      <Label htmlFor="description" className="text-sm font-medium">
-                        Description
-                      </Label>
-                      <Textarea
-                        id="description"
-                        value={formData.description}
-                        onChange={(e) => handleInputChange("description", e.target.value)}
-                        placeholder="Description générale du projet..."
-                        rows={3}
-                        className="text-sm resize-none"
-                      />
+                      <Label className="text-sm font-medium">Description</Label>
+                      <Textarea value={formData.description} onChange={(e) => setFormData(p => ({ ...p, description: e.target.value }))} placeholder="Description générale..." rows={3} className="text-sm resize-none" />
                     </div>
                   </CardContent>
                 </Card>
               </TabsContent>
 
-              {/* TAB LIGNES */}
-              <TabsContent value="lignes" className="space-y-4 mt-4">
-                <Card className="border-0 shadow-sm">
-                  <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                    <CardTitle className="text-base sm:text-lg">
-                      Lignes du devis ({lignes.length})
-                    </CardTitle>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={addLigne}
-                      className="text-xs"
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      Ajouter
-                    </Button>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[40%]">Désignation *</TableHead>
-                            <TableHead className="w-[20%]">Quantité *</TableHead>
-                            <TableHead className="w-[15%]">Unité</TableHead>
-                            <TableHead className="w-[20%]">Prix Unit. HT *</TableHead>
-                            <TableHead className="w-[5%]"></TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {lignes.map((ligne, index) => (
-                            <TableRow key={index}>
-                              <TableCell>
-                                <Input
-                                  value={ligne.designation}
-                                  onChange={(e) => handleLigneChange(index, "designation", e.target.value)}
-                                  placeholder="Désignation"
-                                  className="text-sm h-8"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Input
-                                  type="number"
-                                  value={ligne.quantite}
-                                  onChange={(e) => handleLigneChange(index, "quantite", parseFloat(e.target.value) || 0)}
-                                  min="0"
-                                  step="0.01"
-                                  className="text-sm h-8"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Select
-                                  value={ligne.unite}
-                                  onValueChange={(value) => handleLigneChange(index, "unite", value)}
-                                >
-                                  <SelectTrigger className="text-sm h-8">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="U">Unité</SelectItem>
-                                    <SelectItem value="m">Mètre</SelectItem>
-                                    <SelectItem value="m²">m²</SelectItem>
-                                    <SelectItem value="ml">ml</SelectItem>
-                                    <SelectItem value="Ens">Ensemble</SelectItem>
-                                    <SelectItem value="FF">Forfait</SelectItem>
-                                    <SelectItem value="kg">Kilogramme</SelectItem>
-                                    <SelectItem value="m³">Mètre cube</SelectItem>
-                                    <SelectItem value="T">Tonne</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </TableCell>
-                              <TableCell>
-                                <Input
-                                  type="number"
-                                  value={ligne.prixUnitaireHT}
-                                  onChange={(e) => handleLigneChange(index, "prixUnitaireHT", parseFloat(e.target.value) || 0)}
-                                  min="0"
-                                  step="100"
-                                  className="text-sm h-8"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                {lignes.length > 1 && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => removeLigne(index)}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+              {/* TAB SECTIONS & LIGNES */}
+              <TabsContent value="lignes" className="mt-4">
+                <div className="flex gap-4 h-[60vh]">
+                  {/* Sidebar */}
+                  <div className="w-56 border-r pr-3 flex flex-col shrink-0">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold text-sm flex items-center gap-1"><Folder className="h-3.5 w-3.5" />Sections</h3>
+                      <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={addSection}><Plus className="h-3.5 w-3.5" /></Button>
                     </div>
-                  </CardContent>
-                </Card>
+                    <div className="space-y-1 flex-1 overflow-y-auto">
+                      {sections.map(section => {
+                        const expanded = expandedSections.has(section.tempId)
+                        const sActive = activeSectionId === section.tempId && !activeSousSectionId
+                        return (
+                          <div key={section.tempId}>
+                            <div className={`p-2 rounded-lg border cursor-pointer transition-colors ${sActive ? 'bg-primary/10 border-primary' : 'hover:bg-muted border-transparent'}`}>
+                              <div className="flex items-center justify-between gap-1">
+                                <div className="flex items-center gap-1 flex-1 min-w-0" onClick={() => { setActiveSectionId(section.tempId); setActiveSousSectionId(null) }}>
+                                  <button type="button" className="p-0.5 shrink-0" onClick={(e) => { e.stopPropagation(); toggleExpand(section.tempId) }}>
+                                    {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                  </button>
+                                  <span className="font-medium text-xs truncate">{section.nom}</span>
+                                </div>
+                                <div className="flex shrink-0">
+                                  <Button type="button" variant="ghost" size="sm" className="h-5 w-5 p-0" title="Ss." onClick={(e) => { e.stopPropagation(); addSousSection(section.tempId) }}><Layers className="h-3 w-3" /></Button>
+                                  {sections.length > 1 && <Button type="button" variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={(e) => { e.stopPropagation(); removeSection(section.tempId) }}><Trash2 className="h-3 w-3" /></Button>}
+                                </div>
+                              </div>
+                              <div className="flex gap-1 mt-1 ml-4">
+                                <Badge variant="secondary" className="text-xs">{section.lignes.length}L</Badge>
+                                {section.sousSections.length > 0 && <Badge variant="outline" className="text-xs">{section.sousSections.length}ss</Badge>}
+                              </div>
+                            </div>
+                            {expanded && section.sousSections.map(ss => {
+                              const ssActive = activeSectionId === section.tempId && activeSousSectionId === ss.tempId
+                              return (
+                                <div key={ss.tempId}
+                                  className={`ml-4 mt-0.5 p-1.5 rounded-lg border cursor-pointer transition-colors ${ssActive ? 'bg-blue-50 border-blue-300 dark:bg-blue-950/30 dark:border-blue-700' : 'hover:bg-muted border-transparent'}`}
+                                  onClick={() => { setActiveSectionId(section.tempId); setActiveSousSectionId(ss.tempId) }}>
+                                  <div className="flex items-center justify-between gap-1">
+                                    <div className="flex items-center gap-1 flex-1 min-w-0">
+                                      <Layers className="h-3 w-3 shrink-0 text-blue-500" />
+                                      <span className="text-xs truncate">{ss.nom || <span className="italic text-muted-foreground">Sans nom</span>}</span>
+                                    </div>
+                                    <Button type="button" variant="ghost" size="sm" className="h-5 w-5 p-0 shrink-0" onClick={(e) => { e.stopPropagation(); removeSousSection(section.tempId, ss.tempId) }}><Trash2 className="h-3 w-3" /></Button>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+                    {activeSousSection && activeSection ? (
+                      <div className="flex flex-col h-full">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+                          <button type="button" className="hover:text-foreground underline" onClick={() => setActiveSousSectionId(null)}>{activeSection.nom}</button>
+                          <ChevronRight className="h-3 w-3" />
+                          <span className="font-medium text-foreground">{activeSousSection.nom || "Sous-section"}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 mb-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Code</Label>
+                            <Input value={activeSousSection.code || ""} onChange={(e) => updateSousSection(activeSection.tempId, activeSousSection.tempId, 'code', e.target.value)} placeholder="Code" className="h-8 text-sm" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Nom *</Label>
+                            <Input value={activeSousSection.nom} onChange={(e) => updateSousSection(activeSection.tempId, activeSousSection.tempId, 'nom', e.target.value)} placeholder="Nom" className="h-8 text-sm" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Ordre</Label>
+                            <Input type="number" min="1" value={activeSousSection.ordre} onChange={(e) => updateSousSection(activeSection.tempId, activeSousSection.tempId, 'ordre', parseInt(e.target.value) || 1)} className="h-8 text-sm" />
+                          </div>
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                          <LignesTable2 lignes={activeSousSection.lignes} isEdit={isEdit}
+                            onAdd={() => addLigneInSS(activeSection.tempId, activeSousSection.tempId)}
+                            onRemove={(lId) => removeLigneInSS(activeSection.tempId, activeSousSection.tempId, lId)}
+                            onUpdate={(lId, f, v) => updateLigneInSS(activeSection.tempId, activeSousSection.tempId, lId, f, v)}
+                            onOrdre={(lId, o) => handleOrdreInSS(activeSection.tempId, activeSousSection.tempId, lId, o)} />
+                        </div>
+                      </div>
+                    ) : activeSection ? (
+                      <div className="flex flex-col h-full">
+                        <div className="grid grid-cols-2 gap-2 mb-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Nom *</Label>
+                            <Input value={activeSection.nom} onChange={(e) => updateSection(activeSection.tempId, 'nom', e.target.value)} className="h-8 text-sm" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Ordre</Label>
+                            <Input type="number" min="1" value={activeSection.ordre} onChange={(e) => updateSection(activeSection.tempId, 'ordre', parseInt(e.target.value) || 1)} className="h-8 text-sm" />
+                          </div>
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                          <LignesTable2 lignes={activeSection.lignes} isEdit={isEdit}
+                            onAdd={() => addLigne(activeSection.tempId)}
+                            onRemove={(lId) => removeLigne(activeSection.tempId, lId)}
+                            onUpdate={(lId, f, v) => updateLigne(activeSection.tempId, lId, f, v)}
+                            onOrdre={(lId, o) => handleOrdre(activeSection.tempId, lId, o)} />
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
               </TabsContent>
 
-              {/* ✅ TAB REMISES */}
+              {/* TAB REMISES */}
               <TabsContent value="remise" className="space-y-4 mt-4">
                 <Card className="border-0 shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base sm:text-lg">Remises commerciales</CardTitle>
-                  </CardHeader>
+                  <CardHeader className="pb-3"><CardTitle className="text-base sm:text-lg">Remises commerciales</CardTitle></CardHeader>
                   <CardContent className="pt-0 space-y-4">
-                    {/* Montant HT brut */}
                     <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                       <span className="text-sm font-medium">Montant HT brut</span>
-                      <span className="text-lg font-bold">{formatCurrency(montantHTBrut)} FCFA</span>
+                      <span className="text-lg font-bold">{fmt(brut)} FCFA</span>
                     </div>
-
-                    {/* Remise pourcentage */}
                     <div className="space-y-2">
-                      <Label htmlFor="remisePourcentage">Remise en pourcentage (%)</Label>
-                      <Input
-                        id="remisePourcentage"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        value={remisePourcentage}
-                        onChange={(e) => setRemisePourcentage(parseFloat(e.target.value) || 0)}
-                        placeholder="0"
-                      />
+                      <Label>Remise en pourcentage (%)</Label>
+                      <Input type="number" min="0" max="100" step="0.01" value={remisePourcentage} onChange={(e) => setRemisePourcentage(parseFloat(e.target.value) || 0)} />
                     </div>
-
-                    {/* Remise valeur */}
                     <div className="space-y-2">
-                      <Label htmlFor="remiseValeur">Remise forfaitaire (FCFA)</Label>
-                      <Input
-                        id="remiseValeur"
-                        type="number"
-                        min="0"
-                        step="1000"
-                        value={remiseValeur}
-                        onChange={(e) => setRemiseValeur(parseFloat(e.target.value) || 0)}
-                        placeholder="0"
-                      />
+                      <Label>Remise forfaitaire (FCFA)</Label>
+                      <Input type="number" min="0" step="1000" value={remiseValeur} onChange={(e) => setRemiseValeur(parseFloat(e.target.value) || 0)} />
                     </div>
-
-                    {/* Boutons remise rapide */}
                     {!hasRemise && (
                       <div className="space-y-2">
                         <Label className="text-xs text-muted-foreground">Remises rapides:</Label>
                         <div className="flex gap-2">
-                          {[5, 10, 15, 20].map(percent => (
-                            <Button
-                              key={percent}
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setRemisePourcentage(percent)}
-                              className="flex-1"
-                            >
-                              {percent}%
-                            </Button>
+                          {[5, 10, 15, 20].map(p => (
+                            <Button key={p} type="button" variant="outline" size="sm" onClick={() => setRemisePourcentage(p)} className="flex-1">{p}%</Button>
                           ))}
                         </div>
                       </div>
                     )}
-
-                    {/* Aperçu */}
                     {hasRemise && (
                       <div className="p-4 bg-green-50 border border-green-200 rounded-lg space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>Montant HT brut:</span>
-                          <span className="font-medium">{formatCurrency(montantHTBrut)} FCFA</span>
-                        </div>
-                        {remisePourcentage > 0 && (
-                          <div className="flex justify-between text-sm text-green-700">
-                            <span className="flex items-center gap-1">
-                              <Percent className="h-3 w-3" />
-                              Remise {remisePourcentage}%:
-                            </span>
-                            <span>-{formatCurrency(montantHTBrut * (remisePourcentage / 100))} FCFA</span>
-                          </div>
-                        )}
-                        {remiseValeur > 0 && (
-                          <div className="flex justify-between text-sm text-green-700">
-                            <span className="flex items-center gap-1">
-                              <Tag className="h-3 w-3" />
-                              Remise forfaitaire:
-                            </span>
-                            <span>-{formatCurrency(remiseValeur)} FCFA</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between text-sm font-semibold text-green-700 border-t pt-2">
-                          <span>Remise totale:</span>
-                          <span>-{formatCurrency(montantRemiseTotal)} FCFA</span>
-                        </div>
-                        <div className="flex justify-between font-bold border-t pt-2">
-                          <span>Montant HT net:</span>
-                          <span className="text-lg">{formatCurrency(montantHT)} FCFA</span>
-                        </div>
-
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setRemiseValeur(0)
-                            setRemisePourcentage(0)
-                          }}
-                          className="w-full mt-2"
-                        >
-                          Supprimer les remises
-                        </Button>
+                        <div className="flex justify-between text-sm"><span>Montant HT brut:</span><span>{fmt(brut)} FCFA</span></div>
+                        {remisePourcentage > 0 && <div className="flex justify-between text-sm text-green-700"><span className="flex items-center gap-1"><Percent className="h-3 w-3" />Remise {remisePourcentage}%:</span><span>-{fmt(brut * remisePourcentage / 100)} FCFA</span></div>}
+                        {remiseValeur > 0 && <div className="flex justify-between text-sm text-green-700"><span className="flex items-center gap-1"><Tag className="h-3 w-3" />Remise forfaitaire:</span><span>-{fmt(remiseValeur)} FCFA</span></div>}
+                        <div className="flex justify-between text-sm font-semibold text-green-700 border-t pt-2"><span>Remise totale:</span><span>-{fmt(remiseTotal)} FCFA</span></div>
+                        <div className="flex justify-between font-bold border-t pt-2"><span>Montant HT net:</span><span className="text-lg">{fmt(net)} FCFA</span></div>
+                        <Button type="button" variant="outline" size="sm" onClick={() => { setRemiseValeur(0); setRemisePourcentage(0) }} className="w-full mt-2">Supprimer les remises</Button>
                       </div>
                     )}
                   </CardContent>
@@ -684,115 +540,53 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
 
               {/* TAB RÉCAPITULATIF */}
               <TabsContent value="recap" className="space-y-4 mt-4">
-                {/* Résumé */}
                 <Card className="border-0 shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base sm:text-lg">Résumé du devis</CardTitle>
-                  </CardHeader>
+                  <CardHeader className="pb-3"><CardTitle className="text-base">Résumé</CardTitle></CardHeader>
                   <CardContent className="pt-0 space-y-3">
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div className="text-muted-foreground">Client:</div>
-                      <div className="font-medium">{getSelectedClient()?.nom || "Non sélectionné"}</div>
-                      
+                      <div className="font-medium">{clients?.find(c => c.id === formData.clientId)?.nom || "Non sélectionné"}</div>
                       <div className="text-muted-foreground">Titre:</div>
                       <div className="font-medium">{formData.titre || "Non renseigné"}</div>
-                      
-                      <div className="text-muted-foreground">Nombre de lignes:</div>
-                      <div className="font-medium">{lignes.length}</div>
                     </div>
+                    {sections.map(s => {
+                      const sTotal = s.lignes.reduce((t, l) => t + (l.quantite || 0) * (l.prixUnitaireHT || 0), 0)
+                          + s.sousSections.reduce((t, ss) => t + ss.lignes.reduce((t2, l) => t2 + (l.quantite || 0) * (l.prixUnitaireHT || 0), 0), 0)
+                      return (
+                        <div key={s.tempId} className="border rounded p-3 text-sm">
+                          <div className="flex justify-between font-semibold mb-2"><span>{s.nom}</span><span>{fmt(sTotal)} FCFA</span></div>
+                          {s.sousSections.map(ss => (
+                            <div key={ss.tempId} className="ml-4 border-l-2 border-blue-200 pl-2 mb-1">
+                              <p className="text-xs text-blue-700 font-medium">{ss.nom}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })}
                   </CardContent>
                 </Card>
-
-                {/* Totaux */}
                 <Card className="border-0 shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base sm:text-lg">Montants</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0 space-y-3">
+                  <CardContent className="pt-4 space-y-2">
                     <div className="bg-gray-50 p-3 rounded-lg space-y-2">
-                      {hasRemise && (
-                        <div className="flex justify-between text-sm text-muted-foreground">
-                          <span>Montant HT brut:</span>
-                          <span className="line-through">{formatCurrency(montantHTBrut)} FCFA</span>
-                        </div>
-                      )}
-                      
-                      {remisePourcentage > 0 && (
-                        <div className="flex justify-between text-sm text-green-600">
-                          <span>Remise {remisePourcentage}%:</span>
-                          <span>-{formatCurrency(montantHTBrut * (remisePourcentage / 100))} FCFA</span>
-                        </div>
-                      )}
-                      
-                      {remiseValeur > 0 && (
-                        <div className="flex justify-between text-sm text-green-600">
-                          <span>Remise forfaitaire:</span>
-                          <span>-{formatCurrency(remiseValeur)} FCFA</span>
-                        </div>
-                      )}
-                      
-                      {hasRemise && (
-                        <div className="flex justify-between text-sm font-semibold text-green-600 border-t pt-2">
-                          <span>Remise totale:</span>
-                          <span>-{formatCurrency(montantRemiseTotal)} FCFA</span>
-                        </div>
-                      )}
-
-                      <div className="flex justify-between text-sm">
-                        <span>{hasRemise ? "Montant HT net:" : "Sous-total HT:"}</span>
-                        <span className="font-medium">{formatCurrency(montantHT)} FCFA</span>
-                      </div>
-                      
-                      <div className="flex justify-between text-sm">
-                        <span>TVA ({tauxTVA}%):</span>
-                        <span className="font-medium">{formatCurrency(montantTVA)} FCFA</span>
-                      </div>
-                      
-                      <div className="border-t pt-2">
-                        <div className="flex justify-between text-lg font-bold text-primary">
-                          <span>Total TTC:</span>
-                          <span>{formatCurrency(montantTTC)} FCFA</span>
-                        </div>
-                      </div>
-
-                      {hasRemise && (
-                        <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded">
-                          <div className="text-sm font-medium text-green-700">
-                            💰 Économie: {formatCurrency(montantRemiseTotal)} FCFA
-                          </div>
-                        </div>
-                      )}
+                      {hasRemise && <div className="flex justify-between text-sm text-muted-foreground"><span>HT brut:</span><span className="line-through">{fmt(brut)} FCFA</span></div>}
+                      {remisePourcentage > 0 && <div className="flex justify-between text-sm text-green-600"><span>Remise {remisePourcentage}%:</span><span>-{fmt(brut * remisePourcentage / 100)} FCFA</span></div>}
+                      {remiseValeur > 0 && <div className="flex justify-between text-sm text-green-600"><span>Remise forfaitaire:</span><span>-{fmt(remiseValeur)} FCFA</span></div>}
+                      {hasRemise && <div className="flex justify-between text-sm font-semibold text-green-600 border-t pt-2"><span>Remise totale:</span><span>-{fmt(remiseTotal)} FCFA</span></div>}
+                      <div className="flex justify-between text-sm"><span>{hasRemise ? "HT net:" : "Sous-total HT:"}</span><span className="font-medium">{fmt(net)} FCFA</span></div>
+                      <div className="flex justify-between text-sm"><span>TVA (18%):</span><span className="font-medium">{fmt(tva)} FCFA</span></div>
+                      <div className="border-t pt-2"><div className="flex justify-between text-lg font-bold text-primary"><span>Total TTC:</span><span>{fmt(ttc)} FCFA</span></div></div>
                     </div>
                   </CardContent>
                 </Card>
-
-                {/* Conditions et notes */}
                 <Card className="border-0 shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base sm:text-lg">Conditions et Notes</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0 space-y-3">
+                  <CardContent className="pt-4 space-y-3">
                     <div className="space-y-1.5">
-                      <Label htmlFor="conditions">Conditions générales</Label>
-                      <Textarea
-                        id="conditions"
-                        value={formData.conditions}
-                        onChange={(e) => handleInputChange("conditions", e.target.value)}
-                        placeholder="Ex: Acompte 30%, solde à la livraison..."
-                        rows={3}
-                        className="text-sm resize-none"
-                      />
+                      <Label>Conditions générales</Label>
+                      <Textarea value={formData.conditions} onChange={(e) => setFormData(p => ({ ...p, conditions: e.target.value }))} placeholder="Ex: Acompte 30%..." rows={3} className="text-sm resize-none" />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="notes">Notes internes</Label>
-                      <Textarea
-                        id="notes"
-                        value={formData.notes}
-                        onChange={(e) => handleInputChange("notes", e.target.value)}
-                        placeholder="Notes privées..."
-                        rows={2}
-                        className="text-sm resize-none"
-                      />
+                      <Label>Notes internes</Label>
+                      <Textarea value={formData.notes} onChange={(e) => setFormData(p => ({ ...p, notes: e.target.value }))} placeholder="Notes privées..." rows={2} className="text-sm resize-none" />
                     </div>
                   </CardContent>
                 </Card>
@@ -806,41 +600,13 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
           <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
             <div className="text-xs text-muted-foreground flex items-center gap-2">
               <Calculator className="h-4 w-4" />
-              Total: {formatCurrency(montantTTC)} FCFA
-              {hasRemise && (
-                <span className="text-green-600">(Économie: {formatCurrency(montantRemiseTotal)} FCFA)</span>
-              )}
+              Total: {fmt(ttc)} FCFA
+              {hasRemise && <span className="text-green-600">(Économie: {fmt(remiseTotal)} FCFA)</span>}
             </div>
-            
             <div className="flex gap-3">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => onOpenChange(false)}
-                disabled={loading}
-              >
-                Annuler
-              </Button>
-              <Button 
-                type="submit" 
-                onClick={handleSubmit}
-                disabled={loading || clientLoading || !formData.titre.trim() || formData.clientId === 0}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {isEdit ? "Modification..." : "Création..."}
-                  </>
-                ) : (
-                  <>
-                    {isEdit ? "Modifier" : "Créer le devis"}
-                    {montantTTC > 0 && (
-                      <span className="ml-2 text-xs">
-                        ({formatCurrency(montantTTC)} FCFA)
-                      </span>
-                    )}
-                  </>
-                )}
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>Annuler</Button>
+              <Button type="submit" onClick={handleSubmit} disabled={loading || clientLoading || !formData.titre.trim() || formData.clientId === 0}>
+                {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{isEdit ? "Modification..." : "Création..."}</> : <>{isEdit ? "Modifier" : "Créer le devis"}{ttc > 0 && <span className="ml-2 text-xs">({fmt(ttc)} FCFA)</span>}</>}
               </Button>
             </div>
           </div>

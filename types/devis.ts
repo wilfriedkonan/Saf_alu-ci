@@ -14,6 +14,9 @@ export interface Client {
 export interface ClientInfo {
   id: number;
   nom: string;
+  email?: string;
+  telephone?: string;
+  adresse?: string;
 }
 
 // =====================================================
@@ -26,6 +29,7 @@ export interface DevisSection {
   nom: string;
   ordre: number;
   description?: string;
+  sousSections?: SousSection[];
   lignes?: LigneDevis[];
   totalSectionHT: number;
 }
@@ -35,6 +39,7 @@ export interface DevisSectionResponse {
   nom: string;
   ordre: number;
   description?: string;
+  sousSections?: SousSectionResponse[];
   lignes?: LigneDevisResponse[];
   totalSectionHT: number;
 }
@@ -43,6 +48,40 @@ export interface CreateDevisSectionRequest {
   nom: string;
   ordre: number;
   description?: string;
+  sousSections?: CreateSousSectionRequest[];
+  lignes?: CreateLigneDevisRequest[];
+}
+
+// =====================================================
+// SOUS-SECTION DE DEVIS
+// =====================================================
+
+export interface SousSection {
+  id: number;
+  sectionId: number;
+  code?: string;
+  nom: string;
+  description?: string;
+  ordre: number;
+  lignes?: LigneDevis[];
+  totalSousSectionHT: number;
+}
+
+export interface SousSectionResponse {
+  id: number;
+  code?: string;
+  nom: string;
+  description?: string;
+  ordre: number;
+  lignes?: LigneDevisResponse[];
+  totalSousSectionHT: number;
+}
+
+export interface CreateSousSectionRequest {
+  code?: string;
+  nom: string;
+  description?: string;
+  ordre: number;
   lignes?: CreateLigneDevisRequest[];
 }
 
@@ -54,7 +93,9 @@ export interface LigneDevis {
   id: number;
   devisId: number;
   sectionId?: number;
+  sousSectionId?: number;
   ordre: number;
+  code?: string;
   typeElement?: string;
   designation: string;
   description?: string;
@@ -68,7 +109,9 @@ export interface LigneDevis {
 
 export interface LigneDevisResponse {
   id: number;
+  sousSectionId?: number;
   ordre: number;
+  code?: string;
   typeElement?: string;
   designation: string;
   description?: string;
@@ -81,6 +124,8 @@ export interface LigneDevisResponse {
 }
 
 export interface CreateLigneDevisRequest {
+  ordre?: number;
+  code?: string;
   typeElement?: string;
   designation: string;
   description?: string;
@@ -89,6 +134,7 @@ export interface CreateLigneDevisRequest {
   quantite: number;
   unite: string;
   prixUnitaireHT: number;
+  sousSectionId?: number;
 }
 
 // =====================================================
@@ -125,9 +171,11 @@ export interface Devis {
   contact?: string;
   qualiteMateriel?: string;
   typeVitrage?: string;
-  
+  actif: boolean;
+
   client?: Client;
   sections?: DevisSection[];
+  TypeDevis?: string;
 }
 
 export interface DevisCompletResponse {
@@ -156,9 +204,11 @@ export interface DevisCompletResponse {
   contact?: string;
   qualiteMateriel?: string;
   typeVitrage?: string;
-  
+  actif: boolean;
+
   client?: ClientInfo;
   sections?: DevisSectionResponse[];
+  TypeDevis?: string;
 }
 
 export type DevisStatut = 
@@ -191,6 +241,7 @@ export interface CreateDevisRequest {
   remisePourcentage?: number;
   
   sections?: CreateDevisSectionRequest[];
+  TypeDevis?: string;
 }
 
 export interface UpdateDevisRequest extends CreateDevisRequest {}
@@ -232,6 +283,7 @@ export interface DevisListItem {
   dateCreation: string;
   dateValidite?: string;
   chantier?: string;
+  actif: boolean;
   client?: ClientInfo;
   utilisateurCreation: number;
 }
@@ -465,12 +517,23 @@ export function devisCompletToEditFormat(devis: DevisCompletResponse): Devis {
     contact: devis.contact,
     qualiteMateriel: devis.qualiteMateriel,
     typeVitrage: devis.typeVitrage,
+    actif: devis.actif,
     client: devis.client as Client | undefined,
     sections: devis.sections?.map(section => ({
       ...section,
       devisId: devis.id,
       dateCreation: devis.dateCreation,
       totalSectionHT: section.totalSectionHT || calculateSectionTotal(section),
+      sousSections: section.sousSections?.map(ss => ({
+        ...ss,
+        sectionId: section.id,
+        lignes: ss.lignes?.map(ligne => ({
+          ...ligne,
+          devisId: devis.id,
+          sectionId: section.id,
+          sousSectionId: ss.id
+        }))
+      })),
       lignes: section.lignes?.map(ligne => ({
         ...ligne,
         devisId: devis.id,
