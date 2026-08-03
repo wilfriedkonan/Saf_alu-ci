@@ -274,6 +274,7 @@ export const usePermissions = () => {
     canManageTresorerie: () => hasPermission('tresorerie'),
     canManageParametres: () => hasPermission('parametres'),
     canManageNotifications: () => hasPermission('notifications'),
+    canManageStock: () => hasPermission('notifications'),
     isAdmin: () => hasRole('admin') || hasRole('super_admin'),
     isSuperAdmin: () => hasRole('super_admin'),
     currentUserRole: user?.Role?.Nom || null,
