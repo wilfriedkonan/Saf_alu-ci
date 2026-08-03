@@ -33,6 +33,8 @@ export interface Project {
   villeChantier?: string
   pourcentageAvancement: number
   chefProjetId?: number
+  compteId?:number
+  depotId?: number
   soustaitantId?: number
   dateCreation: string
   dateModification: string
@@ -62,6 +64,7 @@ export interface Project {
     nom: string
     prenom: string
   }
+  chefProjetIds :[]
   dqeConvertedBy?: {
     id: number
     nom: string
@@ -188,6 +191,9 @@ export interface CreateProjetRequest {
   codePostalChantier?: string
   villeChantier?: string
   chefProjetId?: number
+  chefProjetIds :number[]
+  compteId?:number
+  depotId?: number
   etapes?: CreateEtapeProjetRequest[]
   statut?: string
   

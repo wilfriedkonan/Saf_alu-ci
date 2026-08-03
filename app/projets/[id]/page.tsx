@@ -23,7 +23,8 @@ import {
   User,
   Briefcase,
   Edit,
-  Wallet
+  Wallet,
+  Plus
 } from "lucide-react"
 import {
   type Project,
@@ -35,6 +36,7 @@ import { SubcontractorOffersTable } from "@/components/projects/subcontractor-of
 import { useAuth, usePermissions } from "@/contexts/AuthContext"
 import { ProjectDQELinkBanner } from "@/components/projects/project-dqe-link-banner"
 import { ProjectFormModal } from "@/components/projects/project-form-modal"
+import { ProjectExpenseFormModal } from "@/components/projects/project-expense-form-modal"
 import { useProjet } from "@/hooks/useProjet"
 import { usePaiementsSousTraitants } from "@/hooks/useTresorerie"
 import { toast } from "sonner"
@@ -50,6 +52,7 @@ export default function ProjectDetailPage() {
   const { paiements: paiementsST, loading: loadingPaiements, error: errorPaiements } = usePaiementsSousTraitants(projectId)
 
   const [showEditModal, setShowEditModal] = useState(false)
+  const [showExpenseModal, setShowExpenseModal] = useState(false)
   // ✅ État pour préserver l'onglet actif lors du refresh
   const [activeTab, setActiveTab] = useState("overview")
   const [openST, setOpenST] = useState<string[]>([])
@@ -532,9 +535,19 @@ export default function ProjectDetailPage() {
               <CardContent className="pt-6">
                 <div className="space-y-6">
                   {/* Titre */}
-                  <Label className="text-base font-medium flex items-center gap-2">
-                    Historique des dépenses du projet
-                  </Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base font-medium flex items-center gap-2">
+                      Historique des dépenses du projet
+                    </Label>
+                    <Button
+                      size="sm"
+                      onClick={() => setShowExpenseModal(true)}
+                      className="bg-[#1e3a5f] hover:bg-[#15293f] text-white"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Nouvelle dépense
+                    </Button>
+                  </div>
 
                   {/* 🔥 LISTE DES MOUVEMENTS FINANCIERS 🔥 */}
                   <div className="space-y-4">
@@ -723,6 +736,20 @@ export default function ProjectDetailPage() {
         onSuccess={() => {
           refreshProjet()
           toast.success("Le projet a été mis à jour")
+        }}
+      />
+
+      {/* Modal de nouvelle dépense */}
+      <ProjectExpenseFormModal
+        isOpen={showExpenseModal}
+        onClose={() => setShowExpenseModal(false)}
+        projetId={projet.id}
+        projetNom={projet.nom}
+        compteId={projet.compteId}
+        etapes={projet.etapes}
+        onSuccess={() => {
+          refreshProjet()
+          toast.success("Dépense ajoutée au projet")
         }}
       />
     </DashboardLayout>

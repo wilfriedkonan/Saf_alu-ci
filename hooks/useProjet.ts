@@ -433,7 +433,44 @@ export const useProjetsByStatut = (statut: ProjectStatus | null) => {
     refreshProjets
   };
 };
+// Hook pour les projets d'un chef de projet (via /Projets/{id}/by-chefProjet)
+export const useProjetsByChefProjet = (chefProjetId: number | null) => {
+  const [projets, setProjets] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  const fetchProjetsByChefProjet = useCallback(async (id: number) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await ProjetService.getProjetsByChefProjetV2(id);
+      setProjets(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors du chargement des projets');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (chefProjetId) {
+      fetchProjetsByChefProjet(chefProjetId);
+    }
+  }, [chefProjetId, fetchProjetsByChefProjet]);
+
+  const refreshProjets = useCallback(() => {
+    if (chefProjetId) {
+      fetchProjetsByChefProjet(chefProjetId);
+    }
+  }, [chefProjetId, fetchProjetsByChefProjet]);
+
+  return {
+    projets,
+    loading,
+    error,
+    refreshProjets
+  };
+};
 // Hook pour les projets d'un client
 export const useProjetsByClient = (clientId: number | null) => {
   const [projets, setProjets] = useState<Project[]>([]);

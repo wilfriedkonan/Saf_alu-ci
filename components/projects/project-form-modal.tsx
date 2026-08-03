@@ -36,6 +36,8 @@ import {
   projectStatusLabels,
 } from "@/types/projet"
 import { useProjetActions, useTypesProjets } from "@/hooks/useProjet"
+import { useComptesList } from "@/hooks/useTresorerie"
+import { useDepotsList } from "@/hooks/useDepot"
 import { toast } from "../ui/use-toast"
 import { Badge } from "../ui/badge"
 import { useClientActions, useClientsList } from "@/hooks/useClients"
@@ -111,6 +113,8 @@ const getSousTraitantItemNom = (item: any) =>
 export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: ProjectFormModalProps) {
   const { createProjet, updateProjet, loading } = useProjetActions()
   const { types, loading: loadingTypes } = useTypesProjets()
+  const { comptes, loading: loadingComptes } = useComptesList()
+  const { items: depots, loading: loadingDepots } = useDepotsList({ page: 1, pageSize: 100 })
 
   const isEditMode = !!projet
 
@@ -136,6 +140,8 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
     codePostalChantier: "",
     villeChantier: "",
     chefProjetId: 0,
+    compteId: 0,
+    depotId: 0,
   })
 
   // ---- État étapes ----
@@ -176,6 +182,8 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
         codePostalChantier: projet.codePostalChantier || "",
         villeChantier: projet.villeChantier || "",
         chefProjetId: projet.chefProjetId || 0,
+        compteId: projet.compteId || 0,
+        depotId: projet.depotId || 0,
       })
 
       if (projet.etapes && projet.etapes.length > 0) {
@@ -276,6 +284,8 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
       codePostalChantier: "",
       villeChantier: "",
       chefProjetId: 0,
+      compteId: 0,
+      depotId: 0,
     })
     setStages([emptyStage()])
     setStAddSTOpen({})
@@ -428,6 +438,8 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
       codePostalChantier: formData.codePostalChantier || undefined,
       villeChantier: formData.villeChantier || undefined,
       chefProjetId: formData.chefProjetId,
+      compteId: formData.compteId || undefined,
+      depotId: formData.depotId || undefined,
       statut: formData.statut || undefined,
       etapes: isEditMode
         ? stages.map((stage) => ({
@@ -728,6 +740,46 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
                         {Utilisateur.map((chef) => (
                           <SelectItem key={chef.id} value={String(chef.id)}>
                             {chef.prenom} {chef.nom}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="compteId">Compte trésorerie</Label>
+                    <Select
+                      value={formData.compteId.toString()}
+                      onValueChange={(value) => setFormData({ ...formData, compteId: Number(value) })}
+                      disabled={loadingComptes}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={loadingComptes ? "Chargement..." : "Sélectionner un compte"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {comptes.map((compte) => (
+                          <SelectItem key={compte.id} value={String(compte.id)}>
+                            {compte.nom}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="depotId">Dépôt</Label>
+                    <Select
+                      value={formData.depotId.toString()}
+                      onValueChange={(value) => setFormData({ ...formData, depotId: Number(value) })}
+                      disabled={loadingDepots}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={loadingDepots ? "Chargement..." : "Sélectionner un dépôt"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {depots.map((depot) => (
+                          <SelectItem key={depot.id} value={String(depot.id)}>
+                            {depot.nom}
                           </SelectItem>
                         ))}
                       </SelectContent>

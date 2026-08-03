@@ -239,7 +239,18 @@ export class ProjetService {
       throw this.handleError(error);
     }
   }
-
+/**
+   * Récupère les projets assignés à un chef de projet via /Projets/{id}/by-chefProjet
+   */
+  static async getProjetsByChefProjetV2(chefProjetId: number): Promise<Project[]> {
+    try {
+      const response: AxiosResponse<Project[]> = await apiClient.get(`/Projets/${chefProjetId}/by-chefProjet`);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur lors de la récupération des projets du chef de projet ${chefProjetId}:`, error);
+      throw this.handleError(error);
+    }
+  }
   /**
    * Recherche des projets avec filtres
    */

@@ -56,9 +56,9 @@ export default function ProjectsPage() {
     let filtered = projets
 
     // Filtrage par rôle : chef_projet et commercial ne voient que leurs projets
-    if (user?.Role?.Nom === "chef_projet" || user?.Role?.Nom === "commercial") {
+    /* if (user?.Role?.Nom === "chef_projet" || user?.Role?.Nom === "commercial") {
       filtered = filtered.filter((project) => project.utilisateurCreation === user.Id)
-    }
+    } */
 
     if (searchTerm) {
       filtered = filtered.filter(
@@ -161,20 +161,23 @@ export default function ProjectsPage() {
             <h1 className="text-3xl font-bold tracking-tight">Gestion des Projets</h1>
             <p className="text-muted-foreground">Suivez et gérez vos projets de construction</p>
           </div>
-          <div className="flex items-center gap-2">
+         
+           <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loadingProjets }>
               <RefreshCw className={`mr-2 h-4 w-4 ${(loadingProjets ) ? 'animate-spin' : ''}`} />
               Actualiser
             </Button>
-          <Button onClick={() => setShowProjectForm(true)} disabled={actionLoading}>
+          {user && ["super_admin", "admin", "comptable"].includes(user.Role?.Nom ?? "") && (
+            <Button onClick={() => setShowProjectForm(true)} disabled={actionLoading}>
             <Plus className="mr-2 h-4 w-4" />
             Nouveau projet
-          </Button>
+          </Button>)}
           </div>
         </div>
 
         {/* Overdue Projects Alert */}
-        {overdueProjects.length > 0 && (
+        {overdueProjects.length > 0 && 
+        user && ["super_admin", "admin", "comptable"].includes(user.Role?.Nom ?? "") && (
           <Card className="border-red-200 bg-red-50">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2 text-red-800">
@@ -204,7 +207,8 @@ export default function ProjectsPage() {
         )}
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
+        {user && ["super_admin", "admin", "comptable"].includes(user.Role?.Nom ?? "") && (
+          <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total projets</CardTitle>
@@ -259,7 +263,7 @@ export default function ProjectsPage() {
               </div>
             </CardContent>
           </Card>
-        </div>
+        </div>)}
 
         {/* Filters */}
         <Card>
