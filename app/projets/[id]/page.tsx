@@ -370,7 +370,7 @@ export default function ProjectDetailPage() {
             </div>
 
             {/* Budget Details */}
-            <Card>
+           {user && ["super_admin", "admin", "comptable"].includes(user.Role?.Nom ?? "") && (<Card>
               <CardHeader>
                 <CardTitle>Détails du budget</CardTitle>
               </CardHeader>
@@ -399,7 +399,7 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
               </CardContent>
-            </Card>
+            </Card>)}
           </TabsContent>
 
           <TabsContent value="timeline">

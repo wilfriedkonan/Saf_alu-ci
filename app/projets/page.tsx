@@ -321,7 +321,7 @@ export default function ProjectsPage() {
                   <TableRow>
                     <TableHead>Projet</TableHead>
                     <TableHead>Client</TableHead>
-                    <TableHead>Budget</TableHead>
+               {user && ["super_admin", "admin", "comptable"].includes(user.Role?.Nom ?? "") && (<TableHead>Budget</TableHead>)}
                     <TableHead>Progression</TableHead>
                     <TableHead>Statut</TableHead>
                     <TableHead>Dates</TableHead>

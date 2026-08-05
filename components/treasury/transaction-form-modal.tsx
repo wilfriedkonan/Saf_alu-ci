@@ -378,6 +378,7 @@ export function TransactionFormModal({
   const {
     createMouvement,
     updateMouvement,
+    effectuerVirement,
     loadingMouvementActions,
     errorMouvementActions,
     refreshComptes,
@@ -452,7 +453,7 @@ export function TransactionFormModal({
     }
   }, [comptes, formState.compteId])
 
-  /* const isVirement = formState.typeMouvement === "Virement" */
+  const isVirement = formState.typeMouvement === "Virement"
   const isEntree = formState.typeMouvement === "Entree"
   const isSortie = formState.typeMouvement === "Sortie"
 
@@ -463,6 +464,11 @@ export function TransactionFormModal({
       // Si on change de projet, réinitialiser l'étape
       if (field === "projetId") {
         newState.etapeProjetId = ""
+      }
+
+      // Si on quitte le type Virement, réinitialiser le compte destination
+      if (field === "typeMouvement" && value !== "Virement") {
+        newState.compteDestinationId = ""
       }
 
       return newState
@@ -477,10 +483,10 @@ export function TransactionFormModal({
       return
     }
 
-  /*   if (isVirement && (!formState.compteDestinationId || formState.compteDestinationId === formState.compteId)) {
+    if (isVirement && (!formState.compteDestinationId || formState.compteDestinationId === formState.compteId)) {
       toast.info('Sélectionnez un compte de destination différent du compte source.')
       return
-    } */
+    }
 
     const montant = Number(formState.montant)
     if (!montant || montant <= 0) {
@@ -495,6 +501,29 @@ export function TransactionFormModal({
       toast.info('Veillez entrer un libelle avant.')
        return
      }
+
+    if (isVirement) {
+      const virementPayload = {
+        compteSourceId: Number(formState.compteId),
+        compteDestinationId: Number(formState.compteDestinationId),
+        montant,
+        libelle: formState.libelle.trim(),
+        description: formState.description.trim() || undefined,
+        dateMouvement: formatDateForAPI(transactionDate) ?? transactionDate.toISOString(),
+        reference: formState.reference || undefined,
+      }
+      try {
+        await effectuerVirement(virementPayload)
+        toast.info(`Virement de ${montant.toLocaleString('fr-FR')} XOF effectué avec succès.`)
+        onClose()
+        resetForm()
+        if (onSuccess) onSuccess()
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Impossible d'effectuer le virement")
+      }
+      return
+    }
+
     const payload: CreateMouvementRequest = {
       compteId: Number(formState.compteId),
       typeMouvement: formState.typeMouvement,
@@ -697,7 +726,7 @@ export function TransactionFormModal({
                         </p>
                       )}
                     </div>
-                  {/*   {isVirement && (
+                    {isVirement && (
                       <div>
                         <Label>Compte destination</Label>
                         <Select
@@ -712,7 +741,7 @@ export function TransactionFormModal({
                                   ? "Chargement..."
                                   : comptes.length === 0
                                     ? "Aucun compte disponible"
-                                    : "Sélectionner un compte"
+                                    : "Sélectionner le compte de destination"
                               }
                             />
                           </SelectTrigger>
@@ -721,14 +750,28 @@ export function TransactionFormModal({
                               .filter((compte) => compte.id.toString() !== formState.compteId)
                               .map((compte) => (
                                 <SelectItem key={compte.id} value={compte.id.toString()}>
-                                  {compte.nom} ({compte.typeCompte})
+                                  {compte.nom} ({compte.typeCompte}) — {compte.soldeActuel?.toLocaleString('fr-FR')} XOF
                                 </SelectItem>
                               ))}
                           </SelectContent>
                         </Select>
                       </div>
-                    )} */}
+                    )}
                   </div>
+
+                  {isVirement && formState.compteId && formState.compteDestinationId && (
+                    <div className="rounded-md border bg-blue-50 p-3 text-sm text-blue-800">
+                      <p className="font-medium">Résumé du virement</p>
+                      <p>
+                        De : <strong>{comptes.find((c) => c.id.toString() === formState.compteId)?.nom}</strong>
+                        {' → '}
+                        Vers : <strong>{comptes.find((c) => c.id.toString() === formState.compteDestinationId)?.nom}</strong>
+                      </p>
+                      {formState.montant && (
+                        <p>Montant : <strong>{Number(formState.montant).toLocaleString('fr-FR')} XOF</strong></p>
+                      )}
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
@@ -797,6 +840,7 @@ export function TransactionFormModal({
               </Card>
 
               {/* LIENS AVEC PROJETS, FACTURES, SOUS-TRAITANTS */}
+              {!isVirement && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Liens avec le projet</CardTitle>
@@ -868,6 +912,7 @@ export function TransactionFormModal({
                   </div>
                 </CardContent>
               </Card>
+              )}
 
               {/* DESCRIPTION */}
               <Card>

@@ -36,7 +36,6 @@ import {
 } from "@/hooks/useTresorerie"
 import {
   categoriesMouvementList,
-  calculateSoldeTotal,
   formatCurrency,
   formatDate,
   isSoldeFaible,
@@ -430,13 +429,6 @@ export default function TreasuryPage() {
     return new Map(comptes.map((compte) => [compte.id, compte]))
   }, [comptes])
 
-  const totalSolde = useMemo(() => {
-    if (stats?.soldeTotal !== undefined) {
-      return stats.soldeTotal
-    }
-    return calculateSoldeTotal(comptes)
-  }, [stats, comptes])
-
   const mouvementsList = Array.isArray(mouvements) ? mouvements : []
 
   const displayedMouvements = useMemo(() => {
@@ -629,7 +621,7 @@ export default function TreasuryPage() {
         )}
 
         {/* KPIs */}
-       {user && ["super_admin", "admin"].includes(user.Role?.Nom ?? "") && <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+       {user && ["super_admin", "admin", "comptable"].includes(user.Role?.Nom ?? "") && <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {/* Solde Total Card with gradient */}
           <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
             <CardHeader className="pb-2">
@@ -641,7 +633,7 @@ export default function TreasuryPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold mb-1">{formatCurrency(totalSolde)}</div>
+              <div className="text-3xl font-bold mb-1">{formatCurrency(comptes.reduce((sum, compte) => sum + compte.soldeActuel, 0))}</div>
               <p className="text-sm text-blue-100">{comptes.length} compte(s) actif(s)</p>
             </CardContent>
           </Card>
