@@ -214,7 +214,8 @@ export default function ProjectDetailPage() {
 
         {/* Overview Cards */}
         <div className="grid gap-4 md:grid-cols-4">
-          <Card>
+          {user && ["super_admin", "admin", "comptable"].includes(user.Role?.Nom ?? "") && (
+            <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Budget</CardTitle>
               <Euro className="h-4 w-4 text-muted-foreground" />
@@ -239,7 +240,7 @@ export default function ProjectDetailPage() {
                 </p>
               )}
             </CardContent>
-          </Card>
+          </Card>)}
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

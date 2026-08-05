@@ -10,6 +10,7 @@ import type { Project, ProjectStage } from "@/types/projet"
 import { StageProgressModal } from "./stage-progress-modal"
 import { useProjetEtapes } from "@/hooks/useProjet"
 import { toast } from "sonner"
+import { useAuth } from "@/contexts/AuthContext"
 
 interface ProjectTimelineProps {
   projet: Project
@@ -19,7 +20,7 @@ interface ProjectTimelineProps {
 export function ProjectTimeline({ projet, onUpdate }: ProjectTimelineProps) {
   const [selectedStage, setSelectedStage] = useState<ProjectStage | null>(null)
   const { etapes, loading, addEtape, refreshEtapes } = useProjetEtapes(projet.id)
-
+  const { user } = useAuth()
   const getStageIcon = (stage: ProjectStage) => {
     switch (stage.statut) {
       case "Termine":
@@ -198,7 +199,8 @@ export function ProjectTimeline({ projet, onUpdate }: ProjectTimelineProps) {
                         </div>
 
                         {/* Budget de l'étape */}
-                        {linkedOrder !== null &&   <div className="flex items-center justify-between text-xs">
+                        {linkedOrder !== null && user && ["super_admin", "admin", "comptable"].includes(user.Role?.Nom ?? "") && ( 
+                        <div className="flex items-center justify-between text-xs">
                           <span className="text-muted-foreground">
                             Budget: {new Intl.NumberFormat("fr-FR", {
                               style: "currency",
@@ -229,7 +231,7 @@ export function ProjectTimeline({ projet, onUpdate }: ProjectTimelineProps) {
                               minimumFractionDigits: 0,
                             }).format(stage.depense)}
                           </span>
-                        </div>}
+                        </div>)}
 
                         {/* Lien DQE si présent */}
                         {stage.linkedDqeLotCode && (

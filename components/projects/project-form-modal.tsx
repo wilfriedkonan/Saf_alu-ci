@@ -35,6 +35,7 @@ import {
   type StageStatus,
   projectStatusLabels,
 } from "@/types/projet"
+import { useAuth } from "@/contexts/AuthContext"
 import { useProjetActions, useTypesProjets } from "@/hooks/useProjet"
 import { useComptesList } from "@/hooks/useTresorerie"
 import { useDepotsList } from "@/hooks/useDepot"
@@ -111,6 +112,8 @@ const getSousTraitantItemNom = (item: any) =>
 // ============================================================
 
 export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: ProjectFormModalProps) {
+  const { user } = useAuth()
+  const canEditInfosGenerales = !!(user && ["super_admin", "admin", "comptable"].includes(user.Role?.Nom ?? ""))
   const { createProjet, updateProjet, loading } = useProjetActions()
   const { types, loading: loadingTypes } = useTypesProjets()
   const { comptes, loading: loadingComptes } = useComptesList()
@@ -139,7 +142,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
     adresseChantier: "",
     codePostalChantier: "",
     villeChantier: "",
-    chefProjetId: 0,
+    chefProjetIds: [] as number[],
     compteId: 0,
     depotId: 0,
   })
@@ -156,6 +159,9 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
   const [stSearchQuery, setStSearchQuery] = useState<Record<number, string>>({})
   const [isExecutantModalOpen, setExecutantModalOpen] = useState(false)
   const [currentStageIndexForExecutant, setCurrentStageIndexForExecutant] = useState<number | null>(null)
+  /** Popover multi-sélection des chefs de projet */
+  const [chefSearchOpen, setChefSearchOpen] = useState(false)
+  const [chefSearchQuery, setChefSearchQuery] = useState("")
 
   // ---- Données ----
   const { clients, loading: clientLoading, refreshCliens } = useClientsList()
@@ -181,7 +187,12 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
         adresseChantier: projet.adresseChantier || "",
         codePostalChantier: projet.codePostalChantier || "",
         villeChantier: projet.villeChantier || "",
-        chefProjetId: projet.chefProjetId || 0,
+        chefProjetIds:
+          projet.chefsProjet && projet.chefsProjet.length > 0
+            ? projet.chefsProjet.map((c) => c.id)
+            : projet.chefProjetId
+            ? [projet.chefProjetId]
+            : [],
         compteId: projet.compteId || 0,
         depotId: projet.depotId || 0,
       })
@@ -283,7 +294,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
       adresseChantier: "",
       codePostalChantier: "",
       villeChantier: "",
-      chefProjetId: 0,
+      chefProjetIds: [] as number[],
       compteId: 0,
       depotId: 0,
     })
@@ -358,6 +369,33 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
   }
 
   // ============================================================
+  // Chefs de projet (multi-sélection)
+  // ============================================================
+
+  const addChefProjet = (chefId: number) => {
+    setFormData((prev) =>
+      prev.chefProjetIds.includes(chefId)
+        ? prev
+        : { ...prev, chefProjetIds: [...prev.chefProjetIds, chefId] }
+    )
+    setChefSearchOpen(false)
+    setChefSearchQuery("")
+  }
+
+  const removeChefProjet = (chefId: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      chefProjetIds: prev.chefProjetIds.filter((id) => id !== chefId),
+    }))
+  }
+
+  const availableChefs = Utilisateur.filter((chef) => {
+    if (formData.chefProjetIds.includes(chef.id)) return false
+    const q = chefSearchQuery.toLowerCase()
+    return !q || `${chef.prenom} ${chef.nom}`.toLowerCase().includes(q)
+  })
+
+  // ============================================================
   // Callbacks modaux
   // ============================================================
 
@@ -419,9 +457,11 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
         toast({ title: "Erreur de validation", description: "Au moins une étape active est requise", variant: "destructive" })
         return
       }
-      const invalidStages = activeStages.filter((s) => !s.nom.trim() || !s.budgetPrevu || parseFloat(s.budgetPrevu) <= 0)
+      const invalidStages = activeStages.filter(
+        (s) => !s.nom.trim() || (s.budgetPrevu !== "" && parseFloat(s.budgetPrevu) < 0)
+      )
       if (invalidStages.length > 0) {
-        toast({ title: "Erreur de validation", description: "Toutes les étapes actives doivent avoir un nom et un budget valide", variant: "destructive" })
+        toast({ title: "Erreur de validation", description: "Toutes les étapes actives doivent avoir un nom, et un budget prévu non négatif", variant: "destructive" })
         return
       }
     }
@@ -437,7 +477,8 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
       adresseChantier: formData.adresseChantier || undefined,
       codePostalChantier: formData.codePostalChantier || undefined,
       villeChantier: formData.villeChantier || undefined,
-      chefProjetId: formData.chefProjetId,
+      chefProjetId: formData.chefProjetIds[0] ?? undefined,
+      chefProjetIds: formData.chefProjetIds,
       compteId: formData.compteId || undefined,
       depotId: formData.depotId || undefined,
       statut: formData.statut || undefined,
@@ -448,7 +489,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
             description: stage.description || undefined,
             dateDebut: stage.dateDebut?.toISOString(),
             dateFinPrevue: stage.dateFinPrevue?.toISOString(),
-            budgetPrevu: parseFloat(stage.budgetPrevu),
+            budgetPrevu: parseFloat(stage.budgetPrevu) || 0,
             coutReel: parseFloat(stage.coutReel || "0"),
             statut: stage.statut,
             estActif: stage.estActif,
@@ -515,7 +556,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
                       value={formData.nom}
                       onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
                       placeholder="Ex: Construction immeuble R+3"
-                      disabled={loading}
+                      disabled={loading || !canEditInfosGenerales}
                     />
                   </div>
 
@@ -528,6 +569,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
                             variant="outline"
                             role="combobox"
                             aria-expanded={clientSearchOpen}
+                            disabled={!canEditInfosGenerales}
                             className="flex-1 justify-between bg-transparent"
                           >
                             {formData.clientName || "Rechercher un client..."}
@@ -578,7 +620,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
                         variant="outline"
                         size="icon"
                         onClick={() => setIsClientModalOpen(true)}
-                        disabled={loading}
+                        disabled={loading || !canEditInfosGenerales}
                         title="Ajouter un nouveau client"
                       >
                         <UserPlus className="h-4 w-4" />
@@ -586,26 +628,28 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="budgetInitial">Budget initial (FCFA) *</Label>
-                    <Input
-                      id="budgetInitial"
-                      type="number"
-                      value={formData.budgetInitial}
-                      onChange={(e) => setFormData({ ...formData, budgetInitial: e.target.value })}
-                      placeholder="0"
-                      min="0"
-                      step="1000"
-                      disabled={loading}
-                    />
-                  </div>
+                  {canEditInfosGenerales && (
+                    <div className="space-y-2">
+                      <Label htmlFor="budgetInitial">Budget initial (FCFA) *</Label>
+                      <Input
+                        id="budgetInitial"
+                        type="number"
+                        value={formData.budgetInitial}
+                        onChange={(e) => setFormData({ ...formData, budgetInitial: e.target.value })}
+                        placeholder="0"
+                        min="0"
+                        step="1000"
+                        disabled={loading}
+                      />
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label htmlFor="statut">Statut</Label>
                     <Select
                       value={formData.statut}
                       onValueChange={(value: ProjectStatus) => setFormData({ ...formData, statut: value })}
-                      disabled={loading}
+                      disabled={loading || !canEditInfosGenerales}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -627,7 +671,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
                         <Button
                           type="button"
                           variant="outline"
-                          disabled={loading}
+                          disabled={loading || !canEditInfosGenerales}
                           className={cn(
                             "w-full justify-start text-left font-normal",
                             !formData.dateDebut && "text-muted-foreground"
@@ -655,7 +699,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
                         <Button
                           type="button"
                           variant="outline"
-                          disabled={loading}
+                          disabled={loading || !canEditInfosGenerales}
                           className={cn(
                             "w-full justify-start text-left font-normal",
                             !formData.dateFinPrevue && "text-muted-foreground"
@@ -688,7 +732,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     placeholder="Description détaillée du projet..."
                     rows={3}
-                    disabled={loading}
+                    disabled={loading || !canEditInfosGenerales}
                   />
                 </div>
 
@@ -700,7 +744,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
                       value={formData.adresseChantier}
                       onChange={(e) => setFormData({ ...formData, adresseChantier: e.target.value })}
                       placeholder="Ex: 123 Rue de la Paix"
-                      disabled={loading}
+                      disabled={loading || !canEditInfosGenerales}
                     />
                   </div>
                   <div className="space-y-2">
@@ -710,7 +754,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
                       value={formData.codePostalChantier}
                       onChange={(e) => setFormData({ ...formData, codePostalChantier: e.target.value })}
                       placeholder="Ex: 00225"
-                      disabled={loading}
+                      disabled={loading || !canEditInfosGenerales}
                     />
                   </div>
                   <div className="space-y-2">
@@ -720,30 +764,94 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
                       value={formData.villeChantier}
                       onChange={(e) => setFormData({ ...formData, villeChantier: e.target.value })}
                       placeholder="Ex: Abidjan"
-                      disabled={loading}
+                      disabled={loading || !canEditInfosGenerales}
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="chefProjetId">Chef de projet</Label>
-                    <Select
-                      value={formData.chefProjetId.toString()}
-                      onValueChange={(value) => setFormData({ ...formData, chefProjetId: Number(value) })}
-                      disabled={utlisateurLoading}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner un chef de projet" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Utilisateur.map((chef) => (
-                          <SelectItem key={chef.id} value={String(chef.id)}>
-                            {chef.prenom} {chef.nom}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label className="flex items-center gap-1.5">
+                      Chefs de projet
+                      {formData.chefProjetIds.length > 0 && (
+                        <Badge variant="secondary" className="text-xs ml-1">
+                          {formData.chefProjetIds.length}
+                        </Badge>
+                      )}
+                    </Label>
+
+                    {formData.chefProjetIds.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 p-2 bg-muted/40 rounded-md border">
+                        {formData.chefProjetIds.map((id) => {
+                          const chef = Utilisateur.find((u) => u.id === id)
+                          return (
+                            <Badge
+                              key={id}
+                              variant="secondary"
+                              className="flex items-center gap-1 pr-1 text-xs"
+                            >
+                              <span className="truncate max-w-[120px]">
+                                {chef ? `${chef.prenom} ${chef.nom}` : `#${id}`}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => removeChefProjet(id)}
+                                disabled={loading || !canEditInfosGenerales}
+                                className="ml-0.5 rounded-full hover:bg-destructive/20 hover:text-destructive p-0.5 transition-colors"
+                                title="Retirer"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    <Popover open={chefSearchOpen} onOpenChange={setChefSearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={loading || utlisateurLoading || !canEditInfosGenerales}
+                          className="w-full justify-start text-muted-foreground"
+                        >
+                          <Plus className="mr-2 h-3.5 w-3.5" />
+                          {utlisateurLoading ? "Chargement..." : "Ajouter un chef de projet"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[320px] p-0" align="start">
+                        <div className="p-2 border-b">
+                          <Input
+                            placeholder="Rechercher..."
+                            className="h-8 border-0 shadow-none focus-visible:ring-0 text-sm"
+                            value={chefSearchQuery}
+                            onChange={(e) => setChefSearchQuery(e.target.value)}
+                          />
+                        </div>
+                        <ScrollArea className="max-h-52">
+                          {availableChefs.length === 0 ? (
+                            <p className="p-3 text-sm text-muted-foreground text-center">
+                              {Utilisateur.length === 0
+                                ? "Aucun utilisateur disponible."
+                                : "Tous les utilisateurs sont déjà ajoutés."}
+                            </p>
+                          ) : (
+                            availableChefs.map((chef) => (
+                              <button
+                                key={chef.id}
+                                type="button"
+                                onClick={() => addChefProjet(chef.id)}
+                                className="w-full flex items-start gap-2 px-3 py-2 text-left text-sm hover:bg-accent transition-colors"
+                              >
+                                <p className="font-medium truncate">{chef.prenom} {chef.nom}</p>
+                              </button>
+                            ))
+                          )}
+                        </ScrollArea>
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
                   <div className="space-y-2">
@@ -751,7 +859,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
                     <Select
                       value={formData.compteId.toString()}
                       onValueChange={(value) => setFormData({ ...formData, compteId: Number(value) })}
-                      disabled={loadingComptes}
+                      disabled={loadingComptes || !canEditInfosGenerales}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder={loadingComptes ? "Chargement..." : "Sélectionner un compte"} />
@@ -771,7 +879,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
                     <Select
                       value={formData.depotId.toString()}
                       onValueChange={(value) => setFormData({ ...formData, depotId: Number(value) })}
-                      disabled={loadingDepots}
+                      disabled={loadingDepots || !canEditInfosGenerales}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder={loadingDepots ? "Chargement..." : "Sélectionner un dépôt"} />
@@ -906,42 +1014,45 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
                               />
                             </div>
 
-                            {/* Budget prévu */}
-                            <div className="space-y-2">
-                              <Label>Budget prévu (FCFA)</Label>
-                              <Input
-                                type="number"
-                                value={stage.budgetPrevu}
-                                onChange={(e) => updateStage(index, "budgetPrevu", e.target.value)}
-                                placeholder="0"
-                                min="0"
-                                step="1000"
-                                disabled={loading || isInactive}
-                              />
-                            </div>
+                            {/* Budget prévu / Coût réel — visibles uniquement pour super_admin, admin, comptable */}
+                            {canEditInfosGenerales && (
+                              <>
+                                <div className="space-y-2">
+                                  <Label>Budget prévu (FCFA)</Label>
+                                  <Input
+                                    type="number"
+                                    value={stage.budgetPrevu}
+                                    onChange={(e) => updateStage(index, "budgetPrevu", e.target.value)}
+                                    placeholder="0"
+                                    min="0"
+                                    step="1000"
+                                    disabled={loading || isInactive}
+                                  />
+                                </div>
 
-                            {/* Coût réel */}
-                            <div className="space-y-2">
-                              <Label>Coût réel (FCFA)</Label>
-                              <Input
-                                type="number"
-                                value={stage.coutReel}
-                                onChange={(e) => updateStage(index, "coutReel", e.target.value)}
-                                placeholder="0"
-                                min="0"
-                                step="1000"
-                                disabled={loading || isInactive}
-                              />
-                              {!isInactive && stage.budgetPrevu && stage.coutReel && parseFloat(stage.budgetPrevu) > 0 && (
-                                <p className="text-xs text-muted-foreground">
-                                  Marge:{" "}
-                                  {formatCurrency(parseFloat(stage.budgetPrevu) - parseFloat(stage.coutReel || "0"))}
-                                  {parseFloat(stage.coutReel || "0") > parseFloat(stage.budgetPrevu) && (
-                                    <span className="text-red-600 ml-1">(Dépassement)</span>
+                                <div className="space-y-2">
+                                  <Label>Coût réel (FCFA)</Label>
+                                  <Input
+                                    type="number"
+                                    value={stage.coutReel}
+                                    onChange={(e) => updateStage(index, "coutReel", e.target.value)}
+                                    placeholder="0"
+                                    min="0"
+                                    step="1000"
+                                    disabled={loading || isInactive}
+                                  />
+                                  {!isInactive && stage.budgetPrevu && stage.coutReel && parseFloat(stage.budgetPrevu) > 0 && (
+                                    <p className="text-xs text-muted-foreground">
+                                      Marge:{" "}
+                                      {formatCurrency(parseFloat(stage.budgetPrevu) - parseFloat(stage.coutReel || "0"))}
+                                      {parseFloat(stage.coutReel || "0") > parseFloat(stage.budgetPrevu) && (
+                                        <span className="text-red-600 ml-1">(Dépassement)</span>
+                                      )}
+                                    </p>
                                   )}
-                                </p>
-                              )}
-                            </div>
+                                </div>
+                              </>
+                            )}
 
                             {/* Date de début */}
                             <div className="space-y-2">

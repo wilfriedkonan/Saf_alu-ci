@@ -399,7 +399,7 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Client *</Label>
-                  <Select value={formData.clientId.toString()} onValueChange={(v) => setFormData(p => ({ ...p, clientId: parseInt(v) }))} disabled={clientLoading ||isEdit  }>
+                  <Select value={formData.clientId.toString()} onValueChange={(v) => setFormData(p => ({ ...p, clientId: parseInt(v) }))} disabled={clientLoading ||(isEdit && !(user && ["super_admin", "admin", "comptable"].includes(user.Role?.Nom ?? "")))  }>
                     <SelectTrigger><SelectValue placeholder={clientLoading ? "Chargement..." : "Sélectionner un client"} /></SelectTrigger>
                     <SelectContent>{clients?.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.nom || c.raisonSociale}</SelectItem>)}</SelectContent>
                   </Select>

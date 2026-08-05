@@ -64,7 +64,11 @@ export interface Project {
     nom: string
     prenom: string
   }
-  chefProjetIds :[]
+  chefsProjet?: {
+    id: number
+    prenom: string
+    nom: string
+  }[]
   dqeConvertedBy?: {
     id: number
     nom: string
@@ -191,7 +195,7 @@ export interface CreateProjetRequest {
   codePostalChantier?: string
   villeChantier?: string
   chefProjetId?: number
-  chefProjetIds :number[]
+  chefProjetIds?: number[]
   compteId?:number
   depotId?: number
   etapes?: CreateEtapeProjetRequest[]

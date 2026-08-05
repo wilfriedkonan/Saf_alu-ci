@@ -351,7 +351,7 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
                         <Label className="text-sm font-medium">Client *</Label>
                         {clientError && <Button type="button" variant="ghost" size="sm" onClick={refreshCliens} className="text-xs h-6 px-2">🔄 Rafraîchir</Button>}
                       </div>
-                      <Select value={formData.clientId > 0 ? formData.clientId.toString() : ""} onValueChange={(v) => setFormData(p => ({ ...p, clientId: parseInt(v) || 0 }))} disabled={clientLoading ||isEdit }>
+                      <Select value={formData.clientId > 0 ? formData.clientId.toString() : ""} onValueChange={(v) => setFormData(p => ({ ...p, clientId: parseInt(v) || 0 }))} disabled={clientLoading || (isEdit && !(user && ["super_admin", "admin", "comptable"].includes(user.Role?.Nom ?? "")))}>
                         <SelectTrigger className="text-sm h-9">
                           <SelectValue placeholder={clientLoading ? "Chargement..." : clients && clients.length === 0 ? "Aucun client" : "Sélectionner"} />
                         </SelectTrigger>

@@ -446,7 +446,7 @@ const getSousTraitantItemNom = (item: any) =>
         <Tabs defaultValue="progress" className="w-full">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="progress">Progression</TabsTrigger>
-            <TabsTrigger value="details">Détails</TabsTrigger>
+            {user && ["super_admin", "admin", "comptable"].includes(user.Role?.Nom ?? "") && (<TabsTrigger value="details">Détails</TabsTrigger>)}
             <TabsTrigger value="evaluation">Évaluation</TabsTrigger>
             <TabsTrigger value="history">Historique</TabsTrigger>
             <TabsTrigger value="depenses"> Dépenses</TabsTrigger>
