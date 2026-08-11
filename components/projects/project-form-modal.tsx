@@ -152,6 +152,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
 
   // ---- UI state ----
   const [clientSearchOpen, setClientSearchOpen] = useState(false)
+  const [clientSearchQuery, setClientSearchQuery] = useState("")
   const [isClientModalOpen, setIsClientModalOpen] = useState(false)
   /** Popover d'ajout de sous-traitant ouvert par étape (index → open) */
   const [stAddSTOpen, setStAddSTOpen] = useState<Record<number, boolean>>({})
@@ -366,7 +367,23 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
   const handleClientSelect = (client: Client) => {
     setFormData({ ...formData, clientId: client.id, clientName: client.nom })
     setClientSearchOpen(false)
+    setClientSearchQuery("")
   }
+
+  const handleClientClear = () => {
+    setFormData({ ...formData, clientId: 0, clientName: "" })
+    setClientSearchQuery("")
+  }
+
+  const filteredClients = clients.filter((client) => {
+    const q = clientSearchQuery.toLowerCase().trim()
+    if (!q) return true
+    return (
+      client.nom.toLowerCase().includes(q) ||
+      (client.email ?? "").toLowerCase().includes(q) ||
+      (client.telephone ?? "").toLowerCase().includes(q)
+    )
+  })
 
   // ============================================================
   // Chefs de projet (multi-sélection)
@@ -563,39 +580,70 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
                   <div className="space-y-2">
                     <Label htmlFor="client">Client *</Label>
                     <div className="flex gap-2">
-                      <Popover open={clientSearchOpen} onOpenChange={setClientSearchOpen}>
+                      <Popover
+                        open={clientSearchOpen}
+                        onOpenChange={(open) => {
+                          setClientSearchOpen(open)
+                          if (!open) setClientSearchQuery("")
+                        }}
+                      >
                         <PopoverTrigger asChild>
                           <Button
+                            type="button"
                             variant="outline"
                             role="combobox"
                             aria-expanded={clientSearchOpen}
-                            disabled={!canEditInfosGenerales}
-                            className="flex-1 justify-between bg-transparent"
+                            disabled={!canEditInfosGenerales || clientLoading}
+                            className={cn(
+                              "flex-1 justify-between bg-transparent font-normal",
+                              !getSelectedClient() && "text-muted-foreground"
+                            )}
                           >
-                            {formData.clientName || "Rechercher un client..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            <span className="truncate">
+                              {clientLoading
+                                ? "Chargement..."
+                                : formData.clientName || "Rechercher un client..."}
+                            </span>
+                            {getSelectedClient() && canEditInfosGenerales ? (
+                              <X
+                                className="ml-2 h-4 w-4 shrink-0 opacity-50 hover:opacity-100"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleClientClear()
+                                }}
+                              />
+                            ) : (
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            )}
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-[400px] p-0">
+                        <PopoverContent className="w-[400px] p-0" align="start">
                           <div className="p-2 border-b">
                             <Input
-                              placeholder="Rechercher un client..."
+                              placeholder="Rechercher par nom, email, téléphone..."
                               className="h-8 border-0 shadow-none focus-visible:ring-0"
-                              onChange={(e) => {
-                                /* filtre géré inline */
-                              }}
+                              value={clientSearchQuery}
+                              onChange={(e) => setClientSearchQuery(e.target.value)}
+                              autoFocus
                             />
                           </div>
-                          <ScrollArea className="max-h-60">
-                            {clients.length === 0 ? (
-                              <p className="p-3 text-sm text-muted-foreground text-center">Aucun client trouvé.</p>
+                          <ScrollArea className="h-60">
+                            {clientLoading ? (
+                              <p className="p-3 text-sm text-muted-foreground text-center">Chargement des clients...</p>
+                            ) : filteredClients.length === 0 ? (
+                              <p className="p-3 text-sm text-muted-foreground text-center">
+                                {clientSearchQuery ? "Aucun résultat trouvé." : "Aucun client trouvé."}
+                              </p>
                             ) : (
-                              clients.map((client) => (
+                              filteredClients.map((client) => (
                                 <button
                                   key={client.id}
                                   type="button"
                                   onClick={() => handleClientSelect(client)}
-                                  className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
+                                  className={cn(
+                                    "w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent",
+                                    getSelectedClient()?.id === client.id && "bg-accent"
+                                  )}
                                 >
                                   <Check
                                     className={cn(
@@ -603,16 +651,21 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
                                       getSelectedClient()?.id === client.id ? "opacity-100" : "opacity-0"
                                     )}
                                   />
-                                  <div>
-                                    <p className="font-medium">{client.nom}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {client.email} • {client.telephone}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium truncate">{client.nom}</p>
+                                    <p className="text-xs text-muted-foreground truncate">
+                                      {[client.email, client.telephone].filter(Boolean).join(" • ") || "—"}
                                     </p>
                                   </div>
                                 </button>
                               ))
                             )}
                           </ScrollArea>
+                          {!clientLoading && filteredClients.length > 0 && (
+                            <div className="p-2 border-t text-xs text-muted-foreground text-center">
+                              {filteredClients.length} résultat(s)
+                            </div>
+                          )}
                         </PopoverContent>
                       </Popover>
                       <Button
