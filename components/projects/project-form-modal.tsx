@@ -39,7 +39,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import { useProjetActions, useTypesProjets } from "@/hooks/useProjet"
 import { useComptesList } from "@/hooks/useTresorerie"
 import { useDepotsList } from "@/hooks/useDepot"
-import { toast } from "../ui/use-toast"
+import { toast } from "sonner"
 import { Badge } from "../ui/badge"
 import { useClientActions, useClientsList } from "@/hooks/useClients"
 import { Client } from "@/types/clients"
@@ -261,16 +261,16 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
     const stage = stages[index]
     if (stage.id) {
       setStages(stages.map((s, i) => (i === index ? { ...s, estActif: false } : s)))
-      toast({ title: "Étape marquée pour suppression", description: "Elle sera retirée à l'enregistrement." })
+      toast.info("Étape marquée pour suppression — elle sera retirée à l'enregistrement.")
     } else {
       setStages(stages.filter((_, i) => i !== index))
-      toast({ title: "Étape retirée" })
+      toast.info("Étape retirée")
     }
   }
 
   const restoreStage = (index: number) => {
     setStages(stages.map((s, i) => (i === index ? { ...s, estActif: true } : s)))
-    toast({ title: "Étape restaurée" })
+    toast.info("Étape restaurée")
   }
 
   const addStage = () => {
@@ -418,7 +418,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
 
   const handleNewClient = async (newClient: any) => {
     const response = await createClient(newClient)
-    toast({ title: "Client créé", description: response.message || "Client créé avec succès" })
+    toast.success(response.message || "Client créé avec succès")
     refreshCliens()
     handleClientSelect(response.data as Client)
     setIsClientModalOpen(false)
@@ -428,7 +428,7 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
     try {
       const response = await SousTraitantService.createSoustraitants(newSoustraitant)
       if (response.success && response.data) {
-        toast({ title: "Sous-traitant créé", description: response.message || "Créé avec succès" })
+        toast.success(response.message || "Sous-traitant créé avec succès")
         refreshSoutraitant()
         // 🆕 Ajouter directement à l'étape courante
         if (currentStageIndexForExecutant !== null && response.data) {
@@ -437,14 +437,10 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
         setExecutantModalOpen(false)
         setCurrentStageIndexForExecutant(null)
       } else {
-        toast({
-          title: "Erreur",
-          description: response.error || response.message || "Erreur lors de la création",
-          variant: "destructive",
-        })
+        toast.error(response.error || response.message || "Erreur lors de la création")
       }
     } catch (error: any) {
-      toast({ title: "Erreur", description: error.message || "Erreur lors de la création", variant: "destructive" })
+      toast.error(error.message || "Erreur lors de la création")
     }
   }
 
@@ -456,31 +452,31 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
     e.preventDefault()
 
     if (!formData.nom.trim()) {
-      toast({ title: "Erreur de validation", description: "Le nom du projet est requis", variant: "destructive" })
+      toast.error("Erreur de validation : le nom du projet est requis")
       return
     }
     if (formData.clientId === 0) {
-      toast({ title: "Erreur de validation", description: "Veuillez sélectionner un client", variant: "destructive" })
+      toast.error("Erreur de validation : veuillez sélectionner un client")
       return
     }
     if (!formData.budgetInitial || parseFloat(formData.budgetInitial) <= 0) {
-      toast({ title: "Erreur de validation", description: "Le budget initial doit être > 0", variant: "destructive" })
+      toast.error("Erreur de validation : le budget initial doit être > 0")
       return
     }
 
     if (isEditMode) {
       const activeStages = stages.filter((s) => s.estActif)
       if (activeStages.length === 0) {
-        toast({ title: "Erreur de validation", description: "Au moins une étape active est requise", variant: "destructive" })
+        toast.error("Erreur de validation : au moins une étape active est requise")
         return
       }
       const invalidStages = activeStages.filter(
         (s) => !s.nom.trim() || (s.budgetPrevu !== "" && parseFloat(s.budgetPrevu) < 0)
       )
-      if (invalidStages.length > 0) {
-        toast({ title: "Erreur de validation", description: "Toutes les étapes actives doivent avoir un nom, et un budget prévu non négatif", variant: "destructive" })
+  /*     if (invalidStages.length > 0) {
+        toast.error("Erreur de validation : toutes les étapes actives doivent avoir un nom, et un budget prévu non négatif")
         return
-      }
+      } */
     }
 
     const projetData: CreateProjetRequest = {
@@ -529,16 +525,16 @@ export function ProjectFormModal({ open, onOpenChange, projet, onSuccess }: Proj
     try {
       if (isEditMode && projet) {
         await updateProjet(projet.id, projetData)
-        toast({ title: "Projet modifié", description: "Le projet a été modifié avec succès" })
+        toast.success("Le projet a été modifié avec succès")
       } else {
         await createProjet(projetData)
-        toast({ title: "Projet créé", description: "Le projet a été créé avec succès" })
+        toast.success("Le projet a été créé avec succès")
       }
       onSuccess?.()
       onOpenChange(false)
       resetForm()
     } catch (error: any) {
-      toast({ title: "Erreur", description: error.message || "Une erreur est survenue", variant: "destructive" })
+      toast.error(error.message || "Une erreur est survenue")
     }
   }
 
