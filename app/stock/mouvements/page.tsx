@@ -113,12 +113,12 @@ export default function MouvementsPage() {
 
   const handleDateDebutChange = (value: string) => {
     setDateDebut(value)
-    setParams({ ...params, page: 1 })
+    setParams({ ...params, dateDebut: value || undefined, page: 1 })
   }
 
   const handleDateFinChange = (value: string) => {
     setDateFin(value)
-    setParams({ ...params, page: 1 })
+    setParams({ ...params, dateFin: value || undefined, page: 1 })
   }
 
   const handleResetFilters = () => {
@@ -127,7 +127,15 @@ export default function MouvementsPage() {
     setArticleId(null)
     setDepotId("all")
     setTypeMouvement("all")
-    setParams({ page: 1, pageSize: DEFAULT_PAGE_SIZE })
+    setParams({
+      page: 1,
+      pageSize: DEFAULT_PAGE_SIZE,
+      type: undefined,
+      articleId: undefined,
+      depotId: undefined,
+      dateDebut: undefined,
+      dateFin: undefined,
+    })
   }
 
   const handlePageChange = (page: number) => {

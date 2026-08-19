@@ -577,7 +577,7 @@ export const useDemandesActions = () => {
 // MOUVEMENTS
 // =====================================================
 
-export const useMouvementsList = (initialParams: PagedParams & { type?: string; articleId?: number; depotId?: number } = { page: 1, pageSize: 20 }) => {
+export const useMouvementsList = (initialParams: PagedParams & { type?: string; articleId?: number; depotId?: number; dateDebut?: string; dateFin?: string } = { page: 1, pageSize: 20 }) => {
   const [items, setItems] = useState<import('@/types/stock').Mouvement[]>([]);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);

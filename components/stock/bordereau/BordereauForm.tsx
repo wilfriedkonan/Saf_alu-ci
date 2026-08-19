@@ -16,8 +16,11 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Calendar } from "@/components/ui/calendar"
 import { useToast } from "@/hooks/use-toast"
-import { Plus, Trash2, Search, Loader2, CheckCircle2, AlertTriangle, XCircle, Building2 } from "lucide-react"
+import { Plus, Trash2, Search, Loader2, CheckCircle2, AlertTriangle, XCircle, Building2, CalendarIcon } from "lucide-react"
+import { format } from "date-fns"
+import { fr } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { useArticlesAll, useArticlesActions } from "@/hooks/useArticle"
 import { ArticleService } from "@/services/articleService"
@@ -358,6 +361,7 @@ export function BordereauForm({ type }: BordereauFormProps) {
 
   const [depotId, setDepotId] = useState("")
   const [reference, setReference] = useState("")
+  const [dateMouvement, setDateMouvement] = useState<Date>(new Date())
   const [notes, setNotes] = useState("")
   const [fournisseurId, setFournisseurId] = useState("")
   const [motifSortie, setMotifSortie] = useState("")
@@ -425,11 +429,17 @@ export function BordereauForm({ type }: BordereauFormProps) {
     return comptes.find((c) => c.id === projetPourMouvement.compteId)
   }, [projetPourMouvement, comptes])
 
-  // Le switch "Agir dans la caisse par défaut" ne peut être activé que lorsqu'un compte lié
-  // au projet est trouvé ; il se (dés)active automatiquement selon cette détection.
+  // Côté entrée, le projet est déduit automatiquement du dépôt : le switch peut donc suivre
+  // la détection du compte sans action de l'utilisateur.
+  // Côté sortie, le projet est choisi manuellement : l'activation reste manuelle, on se contente
+  // de désactiver le switch si le compte détecté n'est plus valable.
   useEffect(() => {
-    setAgirDansLaCaisse(!!compteAuto)
-  }, [compteAuto?.id])
+    if (isEntree) {
+      setAgirDansLaCaisse(!!compteAuto)
+    } else if (!compteAuto) {
+      setAgirDansLaCaisse(false)
+    }
+  }, [isEntree, compteAuto?.id])
 
   const stockDisponible = (articleId: string) => {
     if (!articleId) return undefined
@@ -460,6 +470,7 @@ export function BordereauForm({ type }: BordereauFormProps) {
   const resetForm = () => {
     setDepotId("")
     setReference("")
+    setDateMouvement(new Date())
     setNotes("")
     setFournisseurId("")
     setMotifSortie("")
@@ -495,6 +506,7 @@ export function BordereauForm({ type }: BordereauFormProps) {
           reference: reference.trim() || undefined,
           fournisseurId: fournisseurId ? Number(fournisseurId) : undefined,
           notes: notes.trim() || undefined,
+          dateMouvement: dateMouvement.toISOString(),
           lignes: lignesValides.map((l) => ({
             articleId: Number(l.articleId),
             quantite: Number(l.quantite),
@@ -510,6 +522,7 @@ export function BordereauForm({ type }: BordereauFormProps) {
           projetId: projetId ? Number(projetId) : undefined,
           motifSortie: motifSortie.trim() || undefined,
           notes: notes.trim() || undefined,
+          dateMouvement: dateMouvement.toISOString(),
           lignes: lignesValides.map((l) => ({
             articleId: Number(l.articleId),
             quantite: Number(l.quantite),
@@ -592,7 +605,7 @@ export function BordereauForm({ type }: BordereauFormProps) {
             <CardTitle className="text-base">Informations générales</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <Label>Référence bordereau</Label>
                 <Input
@@ -615,6 +628,32 @@ export function BordereauForm({ type }: BordereauFormProps) {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div>
+                <Label>Date du mouvement</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !dateMouvement && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateMouvement ? format(dateMouvement, "dd/MM/yyyy", { locale: fr }) : "Sélectionner une date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={dateMouvement}
+                      onSelect={(date) => date && setDateMouvement(date)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 
@@ -888,8 +927,12 @@ export function BordereauForm({ type }: BordereauFormProps) {
                   <p className="text-sm font-medium">Agir dans la caisse du projet</p>
                   <p className="text-xs text-muted-foreground">
                     {compteAuto
-                      ? "Un mouvement financier sera créé automatiquement sur le compte du projet"
-                      : "Activé automatiquement dès qu'un compte lié au projet est trouvé"}
+                      ? isEntree
+                        ? "Un mouvement financier sera créé automatiquement sur le compte du projet"
+                        : "Activez pour créer un mouvement financier sur le compte du projet"
+                      : isEntree
+                        ? "Activé automatiquement dès qu'un compte lié au projet est trouvé"
+                        : "Sélectionnez un projet disposant d'un compte pour pouvoir l'activer"}
                   </p>
                 </div>
               </div>

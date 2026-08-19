@@ -727,7 +727,7 @@ export default function TreasuryPage() {
         </div>}
 
         {/* Graphiques */}
-        {user && ["super_admin", "admin"].includes(user.Role?.Nom ?? "") &&
+        {user && ["super_admin", "admin", "comptable"].includes(user.Role?.Nom ?? "") &&
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <CashFlowChart dateDebut={reportRange.dateDebut} dateFin={reportRange.dateFin} />
           <ExpenseBreakdown dateDebut={reportRange.dateDebut} dateFin={reportRange.dateFin} />

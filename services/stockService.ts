@@ -391,7 +391,7 @@ export class StockService {
   // MOUVEMENTS
   // =====================================================
 
-  static async getMouvementsPaged(params: PagedParams & { type?: string; articleId?: number; depotId?: number } = {}): Promise<PagedResponse<Mouvement>> {
+  static async getMouvementsPaged(params: PagedParams & { type?: string; articleId?: number; depotId?: number; dateDebut?: string; dateFin?: string } = {}): Promise<PagedResponse<Mouvement>> {
     try {
       const query = new URLSearchParams();
       if (params.page) query.append('page', String(params.page));
@@ -400,6 +400,8 @@ export class StockService {
       if (params.type) query.append('type', params.type);
       if (params.articleId) query.append('articleId', String(params.articleId));
       if (params.depotId) query.append('depotId', String(params.depotId));
+      if (params.dateDebut) query.append('dateDebut', params.dateDebut);
+      if (params.dateFin) query.append('dateFin', params.dateFin);
       const response: AxiosResponse<PagedResponse<Mouvement>> = await apiClient.get(`/Stock/mouvements/paged?${query}`);
       return response.data;
     } catch (error) {

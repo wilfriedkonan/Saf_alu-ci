@@ -567,6 +567,7 @@ export interface BordereauEntreeRequest {
   reference?: string;
   fournisseurId?: number;
   notes?: string;
+  dateMouvement?: string;
   lignes: BordereauLigneEntreeRequest[];
 }
 
@@ -583,6 +584,7 @@ export interface BordereauSortieRequest {
   etapeProjetId?: number;
   motifSortie?: string;
   notes?: string;
+  dateMouvement?: string;
   lignes: BordereauLigneSortieRequest[];
 }
 
