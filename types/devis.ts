@@ -151,11 +151,12 @@ export interface Devis {
   montantHT: number;
   tauxTVA: number;
   montantTTC: number;
-  
+  afficherTVA: boolean;
+
   // ✅ NOUVEAUX CHAMPS DE REMISE
   remiseValeur: number;
   remisePourcentage: number;
-  
+
   dateCreation: string;
   dateValidite?: string;
   dateEnvoi?: string;
@@ -188,11 +189,12 @@ export interface DevisCompletResponse {
   montantHT: number;
   tauxTVA: number;
   montantTTC: number;
-  
+  afficherTVA: boolean;
+
   // ✅ NOUVEAUX CHAMPS DE REMISE
   remiseValeur: number;
   remisePourcentage: number;
-  
+
   dateCreation: string;
   dateValidite?: string;
   dateEnvoi?: string;
@@ -235,11 +237,15 @@ export interface CreateDevisRequest {
   contact?: string;
   qualiteMateriel?: string;
   typeVitrage?: string;
-  
+
   // ✅ NOUVEAUX CHAMPS DE REMISE
   remiseValeur?: number;
   remisePourcentage?: number;
-  
+
+  // afficherTVA?: boolean — défaut true si absent. true = le PDF affiche HT + TVA + TTC,
+  // false = le PDF affiche HT uniquement.
+  afficherTVA?: boolean;
+
   sections?: CreateDevisSectionRequest[];
   TypeDevis?: string;
 }
@@ -501,6 +507,7 @@ export function devisCompletToEditFormat(devis: DevisCompletResponse): Devis {
     montantHT: devis.montantHT,
     tauxTVA: devis.tauxTVA,
     montantTTC: devis.montantTTC,
+    afficherTVA: devis.afficherTVA ?? true,
     remiseValeur: devis.remiseValeur || 0,  // ✅
     remisePourcentage: devis.remisePourcentage || 0,  // ✅
     dateCreation: devis.dateCreation,

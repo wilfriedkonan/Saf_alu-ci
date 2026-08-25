@@ -194,7 +194,9 @@ export default function StockDashboardPage() {
                     </TableRow>
                   ) : (
                     alertes.map((alerte, index) => {
-                      const manquant = Math.max(0, alerte.seuilAlerte - alerte.quantiteDisponible)
+                      const seuilAlerte = Number(alerte.seuilAlerte) || 0
+                      const quantiteDisponible = Number(alerte.quantiteDisponible) || 0
+                      const manquant = Math.max(0, seuilAlerte - quantiteDisponible)
                       return (
                         <TableRow
                           key={`${alerte.articleId}-${alerte.depotId}`}
@@ -202,8 +204,8 @@ export default function StockDashboardPage() {
                         >
                           <TableCell className="font-mono text-sm">{alerte.articleCode}</TableCell>
                           <TableCell className="font-medium">{alerte.articleDesignation}</TableCell>
-                          <TableCell className="text-right">{alerte.quantiteDisponible}</TableCell>
-                          <TableCell className="text-right">{alerte.seuilAlerte}</TableCell>
+                          <TableCell className="text-right">{quantiteDisponible}</TableCell>
+                          <TableCell className="text-right">{seuilAlerte}</TableCell>
                           <TableCell className="text-right font-medium text-red-600">{manquant}</TableCell>
                           <TableCell>{alerte.depotNom || "-"}</TableCell>
                           <TableCell className="text-center">

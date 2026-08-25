@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Building2, Percent, Tag } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { 
   Devis, 
   DevisStatutLabels, 
@@ -43,6 +44,15 @@ export function QuotePreviewModal({ quote, open, onOpenChange }: QuotePreviewMod
                 <Badge variant="secondary" className="bg-green-100 text-green-800">
                   <Tag className="h-3 w-3 mr-1" />
                   Remise appliquée
+                </Badge>
+              )}
+              {quote.afficherTVA ? (
+                <Badge variant="outline" className="text-green-700 border-green-200 bg-green-50">
+                  TVA incluse dans le PDF
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-gray-500 border-gray-200">
+                  Sans TVA dans le PDF
                 </Badge>
               )}
               <Badge className={DevisStatutColors[quote.statut]}>
@@ -229,7 +239,7 @@ export function QuotePreviewModal({ quote, open, onOpenChange }: QuotePreviewMod
               )}
 
               {/* Montant HT Net */}
-              <div className="border-t-2 border-black pt-2">
+              <div className={cn(quote.afficherTVA ? "" : "border-t-2 border-black pt-2")}>
                 <div className="flex items-center justify-between">
                   <span className="text-lg font-bold">MONTANT TOTAL HT</span>
                   <span className="text-lg font-bold">
@@ -237,6 +247,24 @@ export function QuotePreviewModal({ quote, open, onOpenChange }: QuotePreviewMod
                   </span>
                 </div>
               </div>
+
+              {/* TVA et TTC — conditionnels */}
+              {quote.afficherTVA ? (
+                <>
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>TVA ({quote.tauxTVA ?? 18}%) :</span>
+                    <span>{formatCurrency(quote.montantHT * (quote.tauxTVA ?? 18) / 100)}</span>
+                  </div>
+                  <div className="border-t-2 border-black pt-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg font-bold">MONTANT TOTAL TTC</span>
+                      <span className="text-lg font-bold">{formatCurrency(quote.montantTTC)}</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground italic">TVA non affichée sur ce devis</p>
+              )}
             </div>
           </div>
 

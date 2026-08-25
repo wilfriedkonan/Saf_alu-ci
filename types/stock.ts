@@ -480,6 +480,35 @@ export const StatutDemandeColors: Record<StatutDemande, string> = {
 
 export type TypeMouvement = 'Entree' | 'Sortie' | 'Transfert' | 'Ajustement';
 
+export interface UpdateMouvementRequest {
+  dateMouvement?: string;
+  reference?: string;
+  notes?: string;
+}
+
+export interface UpdateBordereauEntreeRequest {
+  reference: string;
+  depotId: number;
+  nouvelleReference?: string;
+  notes?: string;
+  dateMouvement?: string;
+}
+
+export interface UpdateBordereauSortieRequest {
+  reference: string;
+  depotId: number;
+  nouvelleReference?: string;
+  notes?: string;
+  dateMouvement?: string;
+  motifSortie?: string;
+}
+
+export interface UpdateBordereauResultDTO {
+  reference: string;
+  nbMouvementsModifies: number;
+  message: string;
+}
+
 export interface Mouvement {
   mouvementId: number;
   dateMouvement: string;

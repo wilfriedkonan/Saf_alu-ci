@@ -37,6 +37,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { PaginationBar } from "@/components/stock/pagination-bar"
+import { EditBordereauModal } from "@/components/stock/bordereau/EditBordereauModal"
 import {
   FileDown,
   Check,
@@ -50,13 +51,14 @@ import {
   History,
   PackagePlus,
   PackageMinus,
+  Pencil,
 } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import {
-  TypeMouvementLabels,
   TypeMouvementColors,
   type TypeMouvement,
+  type UpdateBordereauResultDTO,
 } from "@/types/stock"
 import { useMouvementsList, useArticlesList, useDepotsList, useStockExports } from "@/hooks/useStock"
 
@@ -77,7 +79,7 @@ export default function MouvementsPage() {
   const [typeMouvement, setTypeMouvement] = useState("all")
   const [articleOpen, setArticleOpen] = useState(false)
 
-  const { items: mouvements, loading, totalItems, totalPages, params, setParams } = useMouvementsList({
+  const { items: mouvements, setItems: setMouvements, loading, totalItems, totalPages, params, setParams, refresh } = useMouvementsList({
     page: 1,
     pageSize: DEFAULT_PAGE_SIZE,
   })
@@ -85,6 +87,16 @@ export default function MouvementsPage() {
   const { items: articles } = useArticlesList({ page: 1, pageSize: 200 })
   const { items: depots } = useDepotsList({ page: 1, pageSize: 100 })
   const { exportHistoriquePDF, exportHistoriqueExcel, loading: exportLoading } = useStockExports()
+
+  const [editOpen, setEditOpen] = useState(false)
+  const [editTarget, setEditTarget] = useState<{
+    reference: string
+    depotId: number
+    type: "entree" | "sortie"
+    notes?: string
+    dateMouvement?: string
+    motifSortie?: string
+  } | null>(null)
 
   const selectedArticle = articles.find((a) => a.id === articleId)
   const currentPage = params.page ?? 1
@@ -136,6 +148,30 @@ export default function MouvementsPage() {
       dateDebut: undefined,
       dateFin: undefined,
     })
+  }
+
+  const handleOpenEditBordereau = (mvt: (typeof mouvements)[number]) => {
+    setEditTarget({
+      reference: mvt.reference,
+      depotId: mvt.depotId,
+      type: mvt.typeMouvement === "Entree" ? "entree" : "sortie",
+      notes: mvt.notes,
+      dateMouvement: mvt.dateMouvement,
+    })
+    setEditOpen(true)
+  }
+
+  const handleBordereauEditSuccess = (result: UpdateBordereauResultDTO) => {
+    if (editTarget) {
+      setMouvements((prev) =>
+        prev.map((m) =>
+          m.reference === editTarget.reference && m.depotId === editTarget.depotId
+            ? { ...m, reference: result.reference }
+            : m
+        )
+      )
+    }
+    setEditTarget(null)
   }
 
   const handlePageChange = (page: number) => {
@@ -345,6 +381,7 @@ export default function MouvementsPage() {
                     <TableHead className="text-white font-medium text-right">Stock après</TableHead>
                     <TableHead className="text-white font-medium">Projet / Demande</TableHead>
                     <TableHead className="text-white font-medium">Opérateur</TableHead>
+                    <TableHead className="text-white font-medium text-center w-10">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -365,11 +402,12 @@ export default function MouvementsPage() {
                         <TableCell className="text-right"><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                        <TableCell><Skeleton className="h-8 w-8 rounded-md" /></TableCell>
                       </TableRow>
                     ))
                   ) : mouvements.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={11} className="py-16 text-center">
+                      <TableCell colSpan={12} className="py-16 text-center">
                         <div className="flex flex-col items-center gap-3 text-muted-foreground">
                           <History className="h-10 w-10 opacity-30" />
                           <p className="font-medium">
@@ -408,7 +446,14 @@ export default function MouvementsPage() {
                           </div>
                         </TableCell>
                         <TableCell className="font-mono text-sm tabular-nums">
-                          {mvt.articleReference}
+                          <div className="flex flex-col gap-0.5">
+                            <span>{mvt.articleReference}</span>
+                            {mvt.reference && (
+                              <span className="text-xs text-muted-foreground font-sans" title="Référence du bordereau">
+                                Bordereau : {mvt.reference}
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col">
@@ -473,6 +518,19 @@ export default function MouvementsPage() {
                           )}
                         </TableCell>
                         <TableCell className="text-sm">{mvt.operateurNom || "—"}</TableCell>
+                        <TableCell className="text-center">
+                          {mvt.reference && (mvt.typeMouvement === "Entree" || mvt.typeMouvement === "Sortie") && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleOpenEditBordereau(mvt)}
+                              title="Modifier les informations du bordereau"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -494,6 +552,23 @@ export default function MouvementsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Modification des informations générales d'un bordereau (référence, date, notes, motif de
+          sortie) — s'applique à tous les mouvements du groupe reference+depotId, pas seulement à
+          celui sur lequel on a cliqué. Les quantités et le FIFO ne sont pas modifiables ici. */}
+      {editTarget && (
+        <EditBordereauModal
+          open={editOpen}
+          type={editTarget.type}
+          reference={editTarget.reference}
+          depotId={editTarget.depotId}
+          notes={editTarget.notes}
+          dateMouvement={editTarget.dateMouvement}
+          motifSortie={editTarget.motifSortie}
+          onOpenChange={setEditOpen}
+          onSuccess={handleBordereauEditSuccess}
+        />
+      )}
     </DashboardLayout>
   )
 }

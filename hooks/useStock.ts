@@ -24,6 +24,9 @@ import {
   ValiderDemandeRequest,
   RejeterDemandeRequest,
   LivraisonDirecteRequest,
+  UpdateMouvementRequest,
+  UpdateBordereauEntreeRequest,
+  UpdateBordereauSortieRequest,
   EntreeStockRequest,
   SortieStockRequest,
   TransfertStockRequest,
@@ -602,7 +605,7 @@ export const useMouvementsList = (initialParams: PagedParams & { type?: string; 
 
   useEffect(() => { fetch(params); }, [params, fetch]);
 
-  return { items, totalItems, totalPages, loading, error, params, setParams, refresh: () => fetch(params) };
+  return { items, setItems, totalItems, totalPages, loading, error, params, setParams, refresh: () => fetch(params) };
 };
 
 export const useMouvementsActions = () => {
@@ -664,6 +667,39 @@ export const useMouvementsActions = () => {
     } finally { setLoading(false); }
   }, []);
 
+  const updateMouvement = useCallback(async (id: number, data: UpdateMouvementRequest) => {
+    try {
+      setLoading(true);
+      setError(null);
+      return await StockService.updateMouvement(id, data);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erreur lors de la modification du mouvement';
+      setError(msg); throw err;
+    } finally { setLoading(false); }
+  }, []);
+
+  const updateBordereauEntree = useCallback(async (data: UpdateBordereauEntreeRequest) => {
+    try {
+      setLoading(true);
+      setError(null);
+      return await StockService.updateBordereauEntree(data);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erreur lors de la modification du bordereau d\'entrée';
+      setError(msg); throw err;
+    } finally { setLoading(false); }
+  }, []);
+
+  const updateBordereauSortie = useCallback(async (data: UpdateBordereauSortieRequest) => {
+    try {
+      setLoading(true);
+      setError(null);
+      return await StockService.updateBordereauSortie(data);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erreur lors de la modification du bordereau de sortie';
+      setError(msg); throw err;
+    } finally { setLoading(false); }
+  }, []);
+
   return {
     loading,
     error,
@@ -672,6 +708,9 @@ export const useMouvementsActions = () => {
     transfertStock,
     bordereauEntree,
     bordereauSortie,
+    updateMouvement,
+    updateBordereauEntree,
+    updateBordereauSortie,
     clearError: () => setError(null),
   };
 };

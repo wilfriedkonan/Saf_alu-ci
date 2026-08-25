@@ -26,6 +26,10 @@ import {
   LivraisonDirecteRequest,
   LivraisonDirecteResponse,
   Mouvement,
+  UpdateMouvementRequest,
+  UpdateBordereauEntreeRequest,
+  UpdateBordereauSortieRequest,
+  UpdateBordereauResultDTO,
   EntreeStockRequest,
   SortieStockRequest,
   TransfertStockRequest,
@@ -406,6 +410,43 @@ export class StockService {
       return response.data;
     } catch (error) {
       throw StockService.handleError(error);
+    }
+  }
+
+  static async updateMouvement(id: number, data: UpdateMouvementRequest): Promise<ApiResponse<void>> {
+    try {
+      const response: AxiosResponse<ApiResponse<void>> = await apiClient.put(`/Stock/mouvements/${id}`, data);
+      return response.data;
+    } catch (error) {
+      throw StockService.handleError(error);
+    }
+  }
+
+  private static handleBordereauUpdateError(error: unknown): never {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      if (status === 404) throw new Error('Bordereau introuvable. Vérifiez la référence.');
+      if (status === 400) throw new Error(error.response?.data?.message || 'Aucun champ à modifier.');
+      throw new Error('Erreur serveur');
+    }
+    throw StockService.handleError(error);
+  }
+
+  static async updateBordereauEntree(data: UpdateBordereauEntreeRequest): Promise<UpdateBordereauResultDTO> {
+    try {
+      const response: AxiosResponse<UpdateBordereauResultDTO> = await apiClient.put('/Stock/mouvements/bordereau-entree', data);
+      return response.data;
+    } catch (error) {
+      StockService.handleBordereauUpdateError(error);
+    }
+  }
+
+  static async updateBordereauSortie(data: UpdateBordereauSortieRequest): Promise<UpdateBordereauResultDTO> {
+    try {
+      const response: AxiosResponse<UpdateBordereauResultDTO> = await apiClient.put('/Stock/mouvements/bordereau-sortie', data);
+      return response.data;
+    } catch (error) {
+      StockService.handleBordereauUpdateError(error);
     }
   }
 

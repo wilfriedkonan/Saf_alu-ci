@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
 import { Plus, Trash2, Calculator, Loader2, Percent, Tag, Folder, FileText, ChevronRight, ChevronDown, Layers } from "lucide-react"
 import { CreateDevisRequest, CreateSousSectionRequest, CreateLigneDevisRequest, Devis, UnitesDisponibles } from "@/types/devis"
 import { useAuth } from "@/contexts/AuthContext"
@@ -145,6 +146,7 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
   const [formData, setFormData] = useState({ clientId: 0, titre: "", description: "", dateValidite: "", conditions: "", notes: "", chantier: "", contact: "" })
   const [remiseValeur, setRemiseValeur] = useState(0)
   const [remisePourcentage, setRemisePourcentage] = useState(0)
+  const [afficherTVA, setAfficherTVA] = useState(true)
   const [sections, setSections] = useState<SectionFormData[]>([makeSection(1)])
   const [activeSectionId, setActiveSectionId] = useState<string>(sections[0]?.tempId)
   const [activeSousSectionId, setActiveSousSectionId] = useState<string | null>(null)
@@ -183,6 +185,7 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
       })
       setRemiseValeur(devis.remiseValeur || 0)
       setRemisePourcentage(devis.remisePourcentage || 0)
+      setAfficherTVA(devis.afficherTVA ?? true)
       const loaded = devis.sections && devis.sections.length > 0 ? normalizeSections(devis.sections) : [makeSection(1)]
       setSections(loaded)
       setActiveSectionId(loaded[0].tempId)
@@ -196,6 +199,7 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
       setExpandedSections(new Set([s.tempId]))
       setFormData({ clientId: 0, titre: "", description: "", dateValidite: "", conditions: "", notes: "", chantier: "", contact: "" })
       setRemiseValeur(0); setRemisePourcentage(0)
+      setAfficherTVA(true)
     }
   }, [open, isEdit, devis])
 
@@ -301,6 +305,7 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
       contact: formData.contact.trim() || undefined,
       remiseValeur: remiseValeur > 0 ? remiseValeur : undefined,
       remisePourcentage: remisePourcentage > 0 ? remisePourcentage : undefined,
+      afficherTVA,
       TypeDevis: 'classique',
       sections: sections.map(s => ({
         nom: s.nom.trim(), ordre: s.ordre, description: s.description?.trim() || undefined,
@@ -536,6 +541,16 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
                     )}
                   </CardContent>
                 </Card>
+
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <Label className="text-base font-medium">Afficher la TVA</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Si activé, la TVA (18%) et le montant TTC apparaîtront sur le PDF du devis.
+                    </p>
+                  </div>
+                  <Switch checked={afficherTVA} onCheckedChange={setAfficherTVA} />
+                </div>
               </TabsContent>
 
               {/* TAB RÉCAPITULATIF */}
@@ -572,9 +587,18 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
                       {remisePourcentage > 0 && <div className="flex justify-between text-sm text-green-600"><span>Remise {remisePourcentage}%:</span><span>-{fmt(brut * remisePourcentage / 100)} FCFA</span></div>}
                       {remiseValeur > 0 && <div className="flex justify-between text-sm text-green-600"><span>Remise forfaitaire:</span><span>-{fmt(remiseValeur)} FCFA</span></div>}
                       {hasRemise && <div className="flex justify-between text-sm font-semibold text-green-600 border-t pt-2"><span>Remise totale:</span><span>-{fmt(remiseTotal)} FCFA</span></div>}
-                      <div className="flex justify-between text-sm"><span>{hasRemise ? "HT net:" : "Sous-total HT:"}</span><span className="font-medium">{fmt(net)} FCFA</span></div>
-                      <div className="flex justify-between text-sm"><span>TVA (18%):</span><span className="font-medium">{fmt(tva)} FCFA</span></div>
-                      <div className="border-t pt-2"><div className="flex justify-between text-lg font-bold text-primary"><span>Total TTC:</span><span>{fmt(ttc)} FCFA</span></div></div>
+                      {afficherTVA ? (
+                        <>
+                          <div className="flex justify-between text-sm"><span>{hasRemise ? "HT net:" : "Sous-total HT:"}</span><span className="font-medium">{fmt(net)} FCFA</span></div>
+                          <div className="flex justify-between text-sm"><span>TVA (18%):</span><span className="font-medium">{fmt(tva)} FCFA</span></div>
+                          <div className="border-t pt-2"><div className="flex justify-between text-lg font-bold text-primary"><span>Total TTC:</span><span>{fmt(ttc)} FCFA</span></div></div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="border-t pt-2"><div className="flex justify-between text-lg font-bold text-primary"><span>{hasRemise ? "Total HT net:" : "Total HT:"}</span><span>{fmt(net)} FCFA</span></div></div>
+                          <p className="text-xs text-muted-foreground italic">TVA non affichée sur ce devis</p>
+                        </>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -600,13 +624,13 @@ export function QuoteFormModal({ open, onOpenChange, onSubmit, devis, loading = 
           <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
             <div className="text-xs text-muted-foreground flex items-center gap-2">
               <Calculator className="h-4 w-4" />
-              Total: {fmt(ttc)} FCFA
+              Total: {fmt(afficherTVA ? ttc : net)} FCFA
               {hasRemise && <span className="text-green-600">(Économie: {fmt(remiseTotal)} FCFA)</span>}
             </div>
             <div className="flex gap-3">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>Annuler</Button>
               <Button type="submit" onClick={handleSubmit} disabled={loading || clientLoading || !formData.titre.trim() || formData.clientId === 0}>
-                {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{isEdit ? "Modification..." : "Création..."}</> : <>{isEdit ? "Modifier" : "Créer le devis"}{ttc > 0 && <span className="ml-2 text-xs">({fmt(ttc)} FCFA)</span>}</>}
+                {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{isEdit ? "Modification..." : "Création..."}</> : <>{isEdit ? "Modifier" : "Créer le devis"}{ttc > 0 && <span className="ml-2 text-xs">({fmt(afficherTVA ? ttc : net)} FCFA)</span>}</>}
               </Button>
             </div>
           </div>

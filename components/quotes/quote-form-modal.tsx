@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
 import { Plus, Trash2, Calculator, Loader2, Folder, FileText, ChevronRight, ChevronDown, Layers } from "lucide-react"
 import {
   CreateDevisRequest,
@@ -179,6 +180,7 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set([sections[0]?.tempId]))
   const [remiseValeur, setRemiseValeur] = useState(0)
   const [remisePourcentage, setRemisePourcentage] = useState(0)
+  const [afficherTVA, setAfficherTVA] = useState(true)
 
   const { clients, loading: clientLoading } = useClientsList()
 
@@ -213,6 +215,7 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
       })
       setRemiseValeur(devis.remiseValeur || 0)
       setRemisePourcentage(devis.remisePourcentage || 0)
+      setAfficherTVA(devis.afficherTVA ?? true)
       const loaded = devis.sections && devis.sections.length > 0 ? normalizeSections(devis.sections) : [makeSection(1)]
       setSections(loaded)
       setActiveSectionId(loaded[0].tempId)
@@ -227,6 +230,7 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
       setFormData({ clientId: 0, titre: "", description: "", dateValidite: "", conditions: "", notes: "", chantier: "", contact: "", qualiteMateriel: "", typeVitrage: "" })
       setRemiseValeur(0)
       setRemisePourcentage(0)
+      setAfficherTVA(true)
     }
     setCurrentTab("general")
   }, [open, isEdit, devis])
@@ -359,6 +363,7 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
       typeVitrage: formData.typeVitrage || undefined,
       remiseValeur: remiseValeur > 0 ? remiseValeur : undefined,
       remisePourcentage: remisePourcentage > 0 ? remisePourcentage : undefined,
+      afficherTVA,
       TypeDevis: 'technique',
       sections: sections.map(s => ({
         nom: s.nom.trim(), ordre: s.ordre, description: s.description?.trim() || undefined,
@@ -603,6 +608,16 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
                 onRemiseChange={(v, p) => { setRemiseValeur(v); setRemisePourcentage(p) }}
                 disabled={loading}
               />
+
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label className="text-base font-medium">Afficher la TVA</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Si activé, la TVA ({totals.tauxTVA}%) et le montant TTC apparaîtront sur le PDF du devis.
+                  </p>
+                </div>
+                <Switch checked={afficherTVA} onCheckedChange={setAfficherTVA} disabled={loading} />
+              </div>
             </TabsContent>
 
             {/* TAB 4: Récapitulatif */}
@@ -655,8 +670,14 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
                       {remiseValeur > 0 && <div className="flex justify-between text-sm"><span>Remise forfaitaire:</span><span>-{formatCurrency(remiseValeur)}</span></div>}
                       {(remiseValeur > 0 || remisePourcentage > 0) && <div className="flex justify-between font-semibold border-t pt-2"><span>Remise totale:</span><span>-{formatCurrency(totals.montantRemiseTotal)}</span></div>}
                       <div className="flex justify-between text-xl font-bold border-t pt-2"><span>{(remiseValeur > 0 || remisePourcentage > 0) ? 'HT net:' : 'Sous-total HT:'}</span><span className="text-primary">{formatCurrency(totals.montantHT)}</span></div>
-                      <div className="flex justify-between text-xl font-bold border-t pt-2"><span>TVA ({totals.tauxTVA}%):</span><span className="text-primary">{formatCurrency(totals.montantTVA)}</span></div>
-                      <div className="flex justify-between text-xl font-bold border-t pt-2"><span>TOTAL TTC:</span><span className="text-primary">{formatCurrency(totals.montantTTC)}</span></div>
+                      {afficherTVA ? (
+                        <>
+                          <div className="flex justify-between text-xl font-bold border-t pt-2"><span>TVA ({totals.tauxTVA}%):</span><span className="text-primary">{formatCurrency(totals.montantTVA)}</span></div>
+                          <div className="flex justify-between text-xl font-bold border-t pt-2"><span>TOTAL TTC:</span><span className="text-primary">{formatCurrency(totals.montantTTC)}</span></div>
+                        </>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic pt-1">TVA non affichée sur ce devis</p>
+                      )}
                     </CardContent>
                   </Card>
                 </CardContent>
@@ -668,7 +689,7 @@ export function QuoteFormModalV2({ open, onOpenChange, onSubmit, devis, loading 
             <div className="flex items-center justify-between w-full">
               <div className="text-sm text-muted-foreground">
                 <Calculator className="inline h-4 w-4 mr-1" />
-                Total: <span className="font-semibold">{formatCurrency(totals.montantTTC)}</span>
+                Total: <span className="font-semibold">{formatCurrency(afficherTVA ? totals.montantTTC : totals.montantHT)}</span>
               </div>
               <div className="flex gap-2">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
