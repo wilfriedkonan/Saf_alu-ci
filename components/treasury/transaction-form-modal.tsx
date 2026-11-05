@@ -502,7 +502,7 @@ export function TransactionFormModal({
        return
      }
 
-    if (isVirement) {
+    if (isVirement && mode !== "edit") {
       const virementPayload = {
         compteSourceId: Number(formState.compteId),
         compteDestinationId: Number(formState.compteDestinationId),
@@ -536,9 +536,9 @@ export function TransactionFormModal({
       reference: formState.reference || undefined,
     }
 
-    /* if (isVirement) {
+    if (isVirement) {
       payload.compteDestinationId = Number(formState.compteDestinationId)
-    } */
+    }
 
     // En cas d'entrée avec facture
     if (isEntree && formState.factureId) {
@@ -551,12 +551,12 @@ export function TransactionFormModal({
     }
 
     // Toujours inclure le projetId si renseigné
-    if (formState.projetId) {
+    if (!isVirement && formState.projetId) {
       payload.projetId = Number(formState.projetId)
     }
 
     // Toujours inclure l'etapeProjetId si renseigné
-    if (formState.etapeProjetId) {
+    if (!isVirement && formState.etapeProjetId) {
       payload.etapeProjetId = Number(formState.etapeProjetId)
     }
 
